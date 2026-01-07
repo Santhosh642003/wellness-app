@@ -6,7 +6,7 @@ export default function Footer() {
         {/* LEFT: NJIT logo + divider + title */}
         <div className="flex items-center gap-8">
           <img
-            src="/public/njit_logo.png"
+            src="/njit_logo.png"
             alt="NJIT"
             className="h-20 w-auto filter grayscale invert brightness-105"
             draggable="false"

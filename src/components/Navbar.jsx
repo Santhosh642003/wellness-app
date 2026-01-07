@@ -61,7 +61,7 @@ export default function Navbar() {
         {/* Left */}
         <div className="flex items-center gap-5 mr-14">
           <img
-            src="/public/njit_logo.png"
+            src="/njit_logo.png"
             alt="NJIT"
             className="h-10 w-auto filter grayscale invert brightness-110"
             draggable="false"
