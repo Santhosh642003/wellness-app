@@ -9,6 +9,7 @@ import ModulePlayer from "./pages/ModulePlayer.jsx";
 import Profile from "./pages/Profile.jsx";
 import BiWeeklyQuiz from "./pages/BiWeeklyQuiz.jsx";
 import ModuleQuiz from "./pages/ModuleQuiz.jsx";
+import Admin from "./pages/Admin.jsx";
 
 function isLoggedIn() {
   return localStorage.getItem("wellness_logged_in") === "true";
@@ -86,6 +87,17 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ModuleQuiz />
+          </ProtectedRoute>
+        }
+      />
+
+
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <Admin />
           </ProtectedRoute>
         }
       />

@@ -1,16 +1,99 @@
-# React + Vite
+# Wellness App (Frontend + Backend + Admin)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This repository now includes:
+- React + Vite frontend
+- Express backend API
+- SQLite database (auto-created and seeded)
+- Admin panel for users, quizzes, rewards, and progress tracking
 
-Currently, two official plugins are available:
+## 1) Install
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+```
 
-## React Compiler
+## 2) Run backend API
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm run backend:dev
+```
 
-## Expanding the ESLint configuration
+Backend base URL: `http://localhost:4000/api`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The SQLite DB file is auto-created at:
+- `backend/data/wellness.sqlite`
+
+## 3) Run frontend
+
+```bash
+npm run dev
+```
+
+Frontend URL: `http://localhost:5173`
+
+## Login accounts
+
+- Student:
+  - email: `student@njit.edu`
+  - password: `demo1234`
+- Admin:
+  - email: `admin@njit.edu`
+  - password: `admin1234`
+
+---
+
+## API Routes
+
+### General
+- `GET /api/health`
+- `POST /api/auth/login`
+- `GET /api/dashboard/summary`
+- `GET /api/dashboard/progress/overview`
+- `GET /api/modules`
+- `GET /api/modules/:moduleId`
+- `GET /api/rewards`
+
+### Admin APIs
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `GET /api/admin/quizzes`
+- `POST /api/admin/quizzes`
+- `PATCH /api/admin/quizzes/:id`
+- `GET /api/admin/rewards`
+- `POST /api/admin/rewards`
+- `GET /api/admin/progress`
+- `POST /api/admin/progress/event`
+
+---
+
+## How to use the Admin Panel
+
+1. Start backend and frontend.
+2. Open `http://localhost:5173/admin`.
+3. Use forms at top to:
+   - add users
+   - add quizzes
+   - add rewards
+4. Review data tables to control:
+   - users
+   - quizzes
+   - rewards
+   - progress metrics per student
+
+## Example API calls
+
+Create a user:
+
+```bash
+curl -X POST http://localhost:4000/api/admin/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"New Student","email":"new@njit.edu","password":"pass1234"}'
+```
+
+Create progress event:
+
+```bash
+curl -X POST http://localhost:4000/api/admin/progress/event \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":1,"event_type":"quiz_completed","points_delta":50,"metadata":{"quiz":"HPV"}}'
+```
