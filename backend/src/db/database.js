@@ -1,24 +1,41 @@
 /* global process */
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-import {
-  seedChallenges,
-  seedModules,
-  seedQuizzes,
-  seedRewards,
-  seedUsers,
-} from './seedData.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../../data/wellness.sqlite');
+const connectionString = process.env.DATABASE_URL;
 
-let db;
+if (!connectionString) {
+  throw new Error('DATABASE_URL is required. Use a hosted Postgres DB (Neon/Supabase/Railway).');
+}
 
-async function runSchema(database) {
-  await database.exec(`
+let pool;
+
+async function getPool() {
+  if (pool) return pool;
+
+  let Pool;
+  try {
+    ({ Pool } = await import('pg'));
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error(
+        "Missing dependency 'pg'. Run `npm install` in the project root, then restart the backend.",
+      );
+    }
+
+    throw error;
+  }
+
+  const ssl = process.env.PG_SSL === 'false' ? false : { rejectUnauthorized: false };
+  pool = new Pool({ connectionString, ssl });
+  return pool;
+}
+
+export async function query(text, params = []) {
+  const client = await getPool();
+  return client.query(text, params);
+}
+
+export async function initDatabase() {
+  await query(`
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
       name TEXT NOT NULL,
