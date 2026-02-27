@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, BookOpen, Gift, User, Shield } from "lucide-react";
+import { Home, BookOpen, Gift, User } from "lucide-react";
 
 function NavItem({ to, children }) {
   return (
@@ -68,10 +68,6 @@ export default function DashboardNav({
             Rewards
           </NavItem>
 
-          <NavItem to="/admin">
-            <Shield size={16} />
-            Admin
-          </NavItem>
         </nav>
 
         {/* Right: Stats + Profile */}
@@ -117,10 +113,6 @@ export default function DashboardNav({
           Rewards
         </NavItem>
 
-        <NavItem to="/admin">
-          <Shield size={16} />
-          Admin
-        </NavItem>
 
         <NavItem to="/profile">
           <User size={16} />

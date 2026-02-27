@@ -1,12 +1,11 @@
 import { Router } from 'express';
-import { initDatabase } from '../db/database.js';
+import { query } from '../db/database.js';
 
 const rewardRouter = Router();
 
 rewardRouter.get('/', async (_req, res) => {
-  const database = await initDatabase();
-  const rewards = await database.all('SELECT * FROM rewards ORDER BY points_required ASC');
-  res.json({ rewards });
+  const rewards = await query('SELECT * FROM rewards ORDER BY points_required ASC');
+  res.json({ rewards: rewards.rows });
 });
 
 export default rewardRouter;

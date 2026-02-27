@@ -1,17 +1,15 @@
 import { Router } from 'express';
-import { initDatabase } from '../db/database.js';
+import { query } from '../db/database.js';
 
 const healthRouter = Router();
 
 healthRouter.get('/', async (_req, res) => {
-  const db = await initDatabase();
-  const users = await db.get('SELECT COUNT(*) AS count FROM users');
-
+  const users = await query('SELECT COUNT(*)::int AS count FROM users');
   res.json({
     status: 'ok',
     service: 'wellness-api',
-    database: 'sqlite',
-    users: users.count,
+    database: 'postgres',
+    users: users.rows[0].count,
     timestamp: new Date().toISOString(),
   });
 });

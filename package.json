@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "backend:dev": "node --watch backend/src/server.js",
-    "backend:start": "node backend/src/server.js"
+    "backend:start": "node backend/src/server.js",
+    "admin:dev": "npm --prefix admin-web run dev",
+    "admin:build": "npm --prefix admin-web run build"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -18,8 +20,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.11.0",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7"
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

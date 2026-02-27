@@ -1,23 +1,21 @@
 import { Router } from 'express';
-import { initDatabase } from '../db/database.js';
+import { query } from '../db/database.js';
 
 const moduleRouter = Router();
 
 moduleRouter.get('/', async (_req, res) => {
-  const database = await initDatabase();
-  const modules = await database.all('SELECT * FROM modules ORDER BY id ASC');
-  res.json({ modules });
+  const modules = await query('SELECT * FROM modules ORDER BY id ASC');
+  res.json({ modules: modules.rows });
 });
 
 moduleRouter.get('/:moduleId', async (req, res) => {
-  const database = await initDatabase();
-  const module = await database.get('SELECT * FROM modules WHERE id = ?', [req.params.moduleId]);
+  const module = await query('SELECT * FROM modules WHERE id = $1', [req.params.moduleId]);
 
-  if (!module) {
+  if (module.rowCount === 0) {
     return res.status(404).json({ message: 'Module not found.' });
   }
 
-  return res.json({ module });
+  return res.json({ module: module.rows[0] });
 });
 
 export default moduleRouter;
