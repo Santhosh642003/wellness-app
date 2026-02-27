@@ -67,6 +67,7 @@ export default function DashboardNav({
             <Gift size={16} />
             Rewards
           </NavItem>
+
         </nav>
 
         {/* Right: Stats + Profile */}
@@ -111,6 +112,7 @@ export default function DashboardNav({
           <Gift size={16} />
           Rewards
         </NavItem>
+
 
         <NavItem to="/profile">
           <User size={16} />
