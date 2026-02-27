@@ -112,3 +112,21 @@ Deploy `admin-web` as its own project:
 - `GET /api/admin/modules`
 - `POST /api/admin/modules`
 
+
+---
+
+
+## Troubleshooting
+
+If backend shows `Cannot find package 'pg'`:
+
+```bash
+npm install
+```
+
+Then restart:
+
+```bash
+npm run backend:dev
+```
+

@@ -1,5 +1,4 @@
 /* global process */
-import { Pool } from 'pg';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -7,13 +6,32 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is required. Use a hosted Postgres DB (Neon/Supabase/Railway).');
 }
 
-const ssl = process.env.PG_SSL === 'false' ? false : { rejectUnauthorized: false };
+let pool;
 
-export const pool = new Pool({ connectionString, ssl });
+async function getPool() {
+  if (pool) return pool;
+
+  let Pool;
+  try {
+    ({ Pool } = await import('pg'));
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error(
+        "Missing dependency 'pg'. Run `npm install` in the project root, then restart the backend.",
+      );
+    }
+
+    throw error;
+  }
+
+  const ssl = process.env.PG_SSL === 'false' ? false : { rejectUnauthorized: false };
+  pool = new Pool({ connectionString, ssl });
+  return pool;
+}
 
 export async function query(text, params = []) {
-  const result = await pool.query(text, params);
-  return result;
+  const client = await getPool();
+  return client.query(text, params);
 }
 
 export async function initDatabase() {
