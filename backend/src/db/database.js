@@ -1,4 +1,5 @@
 /* global process */
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sqlite3 from 'sqlite3';
@@ -129,6 +130,9 @@ async function seedData(database) {
 
 export async function initDatabase() {
   if (db) return db;
+
+  const dbDir = path.dirname(DB_PATH);
+  await fs.mkdir(dbDir, { recursive: true });
 
   db = await open({
     filename: DB_PATH,
