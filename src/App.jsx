@@ -9,13 +9,12 @@ import ModulePlayer from "./pages/ModulePlayer.jsx";
 import Profile from "./pages/Profile.jsx";
 import BiWeeklyQuiz from "./pages/BiWeeklyQuiz.jsx";
 import ModuleQuiz from "./pages/ModuleQuiz.jsx";
-
-function isLoggedIn() {
-  return localStorage.getItem("wellness_logged_in") === "true";
-}
+import { useAuth } from "./contexts/AuthContext.jsx";
 
 function ProtectedRoute({ children }) {
-  if (!isLoggedIn()) return <Navigate to="/" replace />;
+  const { isLoggedIn, loading } = useAuth();
+  if (loading) return null;
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
   return children;
 }
 

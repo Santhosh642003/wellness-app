@@ -1,92 +1,166 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const STORAGE_KEY = "wellness_dashboard_state_v1";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [touched, setTouched] = useState(false);
+  const { login, register } = useAuth();
   const navigate = useNavigate();
 
+  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const normalized = email.trim().toLowerCase();
+  const isNjitEmail = useMemo(
+    () => normalized.endsWith("@njit.edu") && normalized.length > "@njit.edu".length,
+    [normalized]
+  );
 
-  const isNjitEmail = useMemo(() => {
-    return normalized.endsWith("@njit.edu") && normalized.length > "@njit.edu".length;
-  }, [normalized]);
+  const canSubmit =
+    isNjitEmail &&
+    password.length >= 8 &&
+    (mode === "login" || name.trim().length >= 2);
 
-  const canContinue = isNjitEmail;
-
-  const handleContinue = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!canContinue) return;
+    setTouched(true);
+    if (!canSubmit) return;
 
-    // ✅ frontend auth flag so protected routes work
-    localStorage.setItem("wellness_logged_in", "true");
-
-    // optional: store email in dashboard state
+    setLoading(true);
+    setError("");
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      const next = {
-        ...parsed,
-        user: {
-          ...(parsed.user || {}),
-          email: normalized,
-          name: parsed?.user?.name || "Santhosh",
-          initials: parsed?.user?.initials || "SN",
-        },
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {}
-
-    navigate("/dashboard");
+      if (mode === "register") {
+        await register({ email: normalized, password, name: name.trim() });
+      } else {
+        await login(normalized, password);
+      }
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <section className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center p-6">
       <div className="w-full max-w-xl bg-[#121212] border border-gray-800 rounded-2xl p-10 shadow-lg">
-        <h1 className="text-4xl font-semibold mb-3">Sign in</h1>
+        <h1 className="text-4xl font-semibold mb-3">
+          {mode === "login" ? "Sign in" : "Create account"}
+        </h1>
         <p className="text-gray-400 mb-10">
-          Enter your NJIT email. You’ll be redirected to NJIT’s secure login.
+          {mode === "login"
+            ? "Sign in with your NJIT credentials to continue."
+            : "Register with your NJIT email to get started."}
         </p>
 
-        <form onSubmit={handleContinue}>
-          <label className="block text-sm font-semibold text-gray-200 mb-2">
-            NJIT Email
-          </label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {mode === "register" && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-200 mb-2">
+                Full Name
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your full name"
+                className="w-full rounded-xl bg-[#0f0f0f] border border-gray-800 px-4 py-3 text-gray-100
+                           focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              />
+            </div>
+          )}
 
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => setTouched(true)}
-            placeholder="yourname@njit.edu"
-            className="w-full rounded-xl bg-[#0f0f0f] border border-gray-800 px-4 py-3 text-gray-100
-                       focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-          />
+          <div>
+            <label className="block text-sm font-semibold text-gray-200 mb-2">
+              NJIT Email
+            </label>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => setTouched(true)}
+              placeholder="yourname@njit.edu"
+              type="email"
+              className="w-full rounded-xl bg-[#0f0f0f] border border-gray-800 px-4 py-3 text-gray-100
+                         focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            {touched && email.trim() && !isNjitEmail && (
+              <p className="text-sm text-red-300 mt-2">
+                Please enter a valid NJIT email (must end with{" "}
+                <span className="font-semibold">@njit.edu</span>).
+              </p>
+            )}
+          </div>
 
-          {touched && email.trim() && !isNjitEmail && (
-            <p className="text-sm text-red-300 mt-3">
-              Please enter a valid NJIT email (must end with{" "}
-              <span className="font-semibold">@njit.edu</span>).
+          <div>
+            <label className="block text-sm font-semibold text-gray-200 mb-2">
+              Password
+            </label>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="Min. 8 characters"
+              className="w-full rounded-xl bg-[#0f0f0f] border border-gray-800 px-4 py-3 text-gray-100
+                         focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3">
+              {error}
             </p>
           )}
 
           <button
             type="submit"
-            disabled={!canContinue}
-            className={`mt-8 w-full px-6 py-4 rounded-xl text-lg font-semibold
+            disabled={!canSubmit || loading}
+            className={`mt-2 w-full px-6 py-4 rounded-xl text-lg font-semibold
               ${
-                canContinue
+                canSubmit && !loading
                   ? "text-white bg-gradient-to-r from-blue-500 to-emerald-400 shadow-[0_10px_24px_rgba(16,185,129,0.18)] hover:scale-[1.01] transition-transform"
                   : "text-gray-400 bg-[#1a1a1a] cursor-not-allowed"
               }`}
           >
-            Continue
+            {loading
+              ? mode === "login"
+                ? "Signing in..."
+                : "Creating account..."
+              : mode === "login"
+              ? "Sign In"
+              : "Create Account"}
           </button>
         </form>
 
-        <p className="text-xs text-gray-500 mt-6">
-          This app won’t store your NJIT password. Authentication happens on NJIT’s login page.
+        <p className="text-sm text-gray-500 mt-8 text-center">
+          {mode === "login" ? (
+            <>
+              Don&apos;t have an account?{" "}
+              <button
+                onClick={() => { setMode("register"); setError(""); }}
+                className="text-emerald-400 hover:underline font-medium"
+              >
+                Register
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <button
+                onClick={() => { setMode("login"); setError(""); }}
+                className="text-emerald-400 hover:underline font-medium"
+              >
+                Sign in
+              </button>
+            </>
+          )}
+        </p>
+
+        <p className="text-xs text-gray-600 mt-4">
+          Your password is securely hashed and never stored in plain text.
         </p>
       </div>
     </section>

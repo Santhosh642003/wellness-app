@@ -1,0 +1,61 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: wellness_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wellness_db}
+      POSTGRES_USER: ${POSTGRES_USER:-wellness_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wellness_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wellness_user} -d ${POSTGRES_DB:-wellness_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wellness_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wellness_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-wellness_user}:${POSTGRES_PASSWORD:-wellness_secret}@db:5432/${POSTGRES_DB:-wellness_db}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      PORT: 3001
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    ports:
+      - "3001:3001"
+    networks:
+      - wellness_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: wellness_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - wellness_net
+
+volumes:
+  postgres_data:
+
+networks:
+  wellness_net:
+    driver: bridge
