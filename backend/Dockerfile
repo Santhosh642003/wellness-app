@@ -1,17 +1,11 @@
-FROM node:20 AS deps
+FROM node:20-alpine
 WORKDIR /app
+
 COPY package.json ./
 RUN npm install --frozen-lockfile
 
-FROM node:20 AS production
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-RUN npx prisma generate
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
+CMD ["node", "src/server.js"]
