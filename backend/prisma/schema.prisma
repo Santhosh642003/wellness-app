@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  initials  String
+  role      String   @default("Student")
+  campus    String   @default("NJIT Newark")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  progress         UserProgress?
+  moduleProgresses UserModuleProgress[]
+  quizAttempts     QuizAttempt[]
+  redemptions      RewardRedemption[]
+
+  @@map("users")
+}
+
+model UserProgress {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  points        Int       @default(0)
+  streakDays    Int       @default(0)
+  lastClaimDate DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_progress")
+}
+
+model Module {
+  id          String @id @default(cuid())
+  slug        String @unique
+  title       String
+  description String
+  duration    String
+  category    String
+  orderIndex  Int
+  pointsValue Int    @default(100)
+  videoUrl    String @default("")
+  locked      Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  userProgresses UserModuleProgress[]
+  quizAttempts   QuizAttempt[]
+
+  @@map("modules")
+}
+
+model UserModuleProgress {
+  id             String    @id @default(cuid())
+  userId         String
+  moduleId       String
+  completed      Boolean   @default(false)
+  watchedPercent Int       @default(0)
+  quizPassed     Boolean   @default(false)
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@map("user_module_progress")
+}
+
+model QuizAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  moduleId    String?
+  quizType    String   // "module" | "biweekly"
+  score       Int
+  totalPoints Int
+  passed      Boolean
+  answers     Json
+  createdAt   DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+
+  @@map("quiz_attempts")
+}
+
+model Reward {
+  id          String @id @default(cuid())
+  title       String
+  description String
+  pointsCost  Int
+  category    String
+  available   Boolean @default(true)
+  stock       Int     @default(-1) // -1 = unlimited
+  createdAt   DateTime @default(now())
+
+  redemptions RewardRedemption[]
+
+  @@map("rewards")
+}
+
+model RewardRedemption {
+  id         String   @id @default(cuid())
+  userId     String
+  rewardId   String
+  pointsSpent Int
+  redeemedAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward Reward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@map("reward_redemptions")
+}
