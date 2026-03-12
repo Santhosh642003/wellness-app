@@ -33,6 +33,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       PORT: 3001
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      ADMIN_URL: ${ADMIN_URL:-http://localhost:8080}
     ports:
       - "3001:3001"
     networks:
@@ -48,6 +49,19 @@ services:
       - backend
     ports:
       - "80:80"
+    networks:
+      - wellness_net
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: wellness_admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:8080"
     networks:
       - wellness_net
 

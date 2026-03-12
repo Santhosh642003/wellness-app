@@ -80,6 +80,36 @@ CREATE TABLE IF NOT EXISTS reward_redemptions (
   "pointsSpent" INTEGER NOT NULL,
   "redeemedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS admin_users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  name TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS quizzes (
+  id TEXT PRIMARY KEY,
+  "moduleId" TEXT REFERENCES modules(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  "passingScore" INTEGER NOT NULL DEFAULT 70,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS quiz_questions (
+  id TEXT PRIMARY KEY,
+  "quizId" TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  options JSONB NOT NULL,
+  "answerIndex" INTEGER NOT NULL,
+  points INTEGER NOT NULL DEFAULT 10,
+  explanation TEXT,
+  "orderIndex" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `;
 
 export async function migrate() {

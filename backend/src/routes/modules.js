@@ -44,4 +44,33 @@ router.get('/:moduleId', async (req, res, next) => {
   }
 });
 
+// GET /api/modules/:moduleId/quiz  — fetch quiz questions for a module
+router.get('/:moduleId/quiz', async (req, res, next) => {
+  try {
+    const { rows: [quiz] } = await pool.query(
+      `SELECT * FROM quizzes WHERE "moduleId"=$1 AND type='module' LIMIT 1`,
+      [req.params.moduleId]
+    );
+    if (!quiz) return res.status(404).json({ error: 'No quiz found for this module' });
+    const { rows: questions } = await pool.query(
+      `SELECT * FROM quiz_questions WHERE "quizId"=$1 ORDER BY "orderIndex"`,
+      [quiz.id]
+    );
+    res.json({ ...quiz, questions });
+  } catch (err) { next(err); }
+});
+
+// GET /api/modules/quiz/biweekly  — fetch biweekly quiz questions
+router.get('/quiz/biweekly', async (req, res, next) => {
+  try {
+    const { rows: [quiz] } = await pool.query(`SELECT * FROM quizzes WHERE type='biweekly' LIMIT 1`);
+    if (!quiz) return res.status(404).json({ error: 'Biweekly quiz not found' });
+    const { rows: questions } = await pool.query(
+      `SELECT * FROM quiz_questions WHERE "quizId"=$1 ORDER BY "orderIndex"`,
+      [quiz.id]
+    );
+    res.json({ ...quiz, questions });
+  } catch (err) { next(err); }
+});
+
 export default router;
