@@ -2,10 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-body { margin: 0; background: #0b0b0b; color: white; }
-
-html {
-  scroll-behavior: smooth;
+:root {
+  --bg-page: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-inner: #f1f5f9;
+  --bg-btn: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --border: #e2e8f0;
 }
 
+.dark {
+  --bg-page: #0b0b0b;
+  --bg-card: #121212;
+  --bg-inner: #0f0f0f;
+  --bg-btn: #1a1a1a;
+  --text: #ffffff;
+  --text-muted: #9ca3af;
+  --text-subtle: #6b7280;
+  --border: #1f2937;
+}
 
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text);
+  transition: background 0.15s, color 0.15s;
+}
