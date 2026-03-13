@@ -6,15 +6,12 @@ import { MODULE_CONTENT } from "../data/moduleContent";
 import { useAuth } from "../contexts/AuthContext";
 import { modules as modulesApi, users as usersApi } from "../lib/api";
 
-// Map backend module slug → MODULE_CONTENT key
-// (moduleContent.js keys are m1..m6 by orderIndex)
+// Map backend module orderIndex → MODULE_CONTENT key
 const ORDER_TO_KEY = ["m1", "m2", "m3", "m4", "m5", "m6"];
 
 function getContent(mod) {
   if (!mod) return MODULE_CONTENT["m1"];
-  // Try slug-based lookup first (if moduleContent keys are slugs)
   if (MODULE_CONTENT[mod.slug]) return MODULE_CONTENT[mod.slug];
-  // Fall back to orderIndex
   const key = ORDER_TO_KEY[mod.orderIndex] || "m1";
   return MODULE_CONTENT[key] || MODULE_CONTENT["m1"];
 }
@@ -29,9 +26,7 @@ export default function ModulePlayer() {
   const [loading, setLoading] = useState(true);
   const [captionsOn, setCaptionsOn] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
-  const [iframePlaying, setIframePlaying] = useState(false);
-  const captionIntervalRef = useRef(null);
-  const simulatedTimeRef = useRef(0);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
@@ -61,27 +56,11 @@ export default function ModulePlayer() {
 
   const activeCaption = activeCaptionIdx >= 0 ? content.transcript[activeCaptionIdx] : null;
 
-  const togglePlay = useCallback(() => {
-    if (iframePlaying) {
-      setIframePlaying(false);
-      if (captionIntervalRef.current) clearInterval(captionIntervalRef.current);
-    } else {
-      setIframePlaying(true);
-      captionIntervalRef.current = setInterval(() => {
-        simulatedTimeRef.current += 1;
-        setVideoTime(simulatedTimeRef.current);
-      }, 1000);
+  const handleTimeUpdate = useCallback(() => {
+    if (videoRef.current) {
+      setVideoTime(Math.floor(videoRef.current.currentTime));
     }
-  }, [iframePlaying]);
-
-  useEffect(() => () => { if (captionIntervalRef.current) clearInterval(captionIntervalRef.current); }, []);
-
-  const resetCaptions = () => {
-    simulatedTimeRef.current = 0;
-    setVideoTime(0);
-    setIframePlaying(false);
-    if (captionIntervalRef.current) clearInterval(captionIntervalRef.current);
-  };
+  }, []);
 
   const saveProgress = useCallback(async (watchedPercent) => {
     if (!user?.id || !moduleId) return;
@@ -131,37 +110,32 @@ export default function ModulePlayer() {
             {/* Video */}
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
               <div className="aspect-video bg-black">
-                <iframe
+                <video
+                  ref={videoRef}
                   key={moduleId}
-                  src={`https://www.youtube.com/embed/${content.youtubeId}?rel=0&modestbranding=1`}
-                  title={mod?.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
+                  src={content.videoUrl}
+                  controls
+                  onTimeUpdate={handleTimeUpdate}
                   className="w-full h-full"
-                />
+                  preload="metadata"
+                >
+                  Your browser does not support HTML5 video.
+                </video>
               </div>
 
               {/* Caption Controls */}
               <div className="px-5 py-3 flex items-center justify-between border-t border-slate-200 dark:border-gray-800">
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => { setCaptionsOn((v) => !v); if (!captionsOn && !iframePlaying) togglePlay(); }}
+                    onClick={() => setCaptionsOn((v) => !v)}
                     className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${captionsOn ? "bg-blue-500/10 border-blue-400/30 text-blue-500 dark:text-blue-300" : "bg-slate-100 dark:bg-[#1a1a1a] border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200"}`}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
                     {captionsOn ? "Captions ON" : "Live Captions"}
                   </button>
-                  {captionsOn && (
-                    <>
-                      <button onClick={togglePlay} className="text-xs text-slate-400 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-[#1a1a1a]">
-                        {iframePlaying ? "⏸ Pause" : "▶ Sync"}
-                      </button>
-                      <button onClick={resetCaptions} className="text-xs text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300">Reset</button>
-                    </>
-                  )}
                 </div>
                 <span className="text-xs text-slate-400 dark:text-gray-600">
-                  {iframePlaying ? `${Math.floor(videoTime / 60)}:${String(videoTime % 60).padStart(2, "0")}` : "sync with video"}
+                  {`${Math.floor(videoTime / 60)}:${String(videoTime % 60).padStart(2, "0")}`}
                 </span>
               </div>
             </div>
@@ -171,17 +145,15 @@ export default function ModulePlayer() {
               <div className="bg-blue-50 dark:bg-[#0d1117] border border-blue-200 dark:border-blue-500/20 rounded-2xl p-5 min-h-[80px] flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="flex h-2 w-2 relative">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${iframePlaying ? "bg-blue-400" : "bg-slate-400"}`} />
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${iframePlaying ? "bg-blue-500" : "bg-slate-400"}`} />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-blue-400" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
                   </span>
-                  <span className="text-xs font-medium text-slate-400 dark:text-gray-500 uppercase tracking-wider">{iframePlaying ? "Live Captions" : "Captions paused"}</span>
+                  <span className="text-xs font-medium text-slate-400 dark:text-gray-500 uppercase tracking-wider">Live Captions</span>
                 </div>
                 {activeCaption ? (
                   <p className="text-slate-900 dark:text-white text-base leading-relaxed font-medium">{activeCaption.text}</p>
                 ) : (
-                  <p className="text-slate-400 dark:text-gray-600 text-sm italic">
-                    {iframePlaying ? "Waiting for captions…" : "Press 'Sync' then play the video"}
-                  </p>
+                  <p className="text-slate-400 dark:text-gray-600 text-sm italic">Play the video to see captions…</p>
                 )}
                 <div className="flex gap-1 mt-3 flex-wrap">
                   {(content.transcript || []).map((_, i) => (
@@ -272,7 +244,7 @@ export default function ModulePlayer() {
             <div className="bg-blue-50 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/15 rounded-2xl p-5">
               <div className="text-xs font-semibold text-blue-600 dark:text-blue-300 mb-1">Live Captions</div>
               <div className="text-xs text-slate-500 dark:text-gray-500 leading-relaxed">
-                Click "Live Captions" below the video, then "Sync" when you start playing to follow along in real time.
+                Click "Live Captions" below the video, then play to follow along with synced captions in real time.
               </div>
             </div>
           </aside>
