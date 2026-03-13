@@ -9,6 +9,7 @@ import ModulePlayer from "./pages/ModulePlayer.jsx";
 import Profile from "./pages/Profile.jsx";
 import BiWeeklyQuiz from "./pages/BiWeeklyQuiz.jsx";
 import ModuleQuiz from "./pages/ModuleQuiz.jsx";
+import Plans from "./pages/Plans.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 
 function ProtectedRoute({ children }) {
@@ -85,6 +86,15 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ModuleQuiz />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/plans"
+        element={
+          <ProtectedRoute>
+            <Plans />
           </ProtectedRoute>
         }
       />

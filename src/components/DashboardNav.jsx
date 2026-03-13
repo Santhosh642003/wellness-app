@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, BookOpen, Gift, User } from "lucide-react";
+import { Home, BookOpen, Gift, User, Star } from "lucide-react";
 
 function NavItem({ to, children }) {
   return (
@@ -23,6 +23,7 @@ export default function DashboardNav({
   points = 0,
   streakDays = 0,
   initials = "SN",
+  isPlus = false,
 }) {
   const navigate = useNavigate();
 
@@ -67,6 +68,11 @@ export default function DashboardNav({
             <Gift size={16} />
             Rewards
           </NavItem>
+
+          <NavItem to="/plans">
+            <Star size={16} />
+            Plans
+          </NavItem>
         </nav>
 
         {/* Right: Stats + Profile */}
@@ -83,14 +89,18 @@ export default function DashboardNav({
             </div>
           </div>
 
-          {/* ✅ Clickable profile avatar */}
+          {/* Clickable profile avatar */}
           <button
             onClick={() => navigate("/profile")}
             title="Profile"
-            className="h-10 w-10 rounded-2xl bg-[#121212] border border-gray-800 flex items-center justify-center font-semibold text-white hover:bg-[#151515] transition hover:ring-2 hover:ring-blue-500/40
-"
+            className="relative h-10 w-10 rounded-2xl bg-[#121212] border border-gray-800 flex items-center justify-center font-semibold text-white hover:bg-[#151515] transition hover:ring-2 hover:ring-blue-500/40"
           >
             {initials}
+            {isPlus && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-yellow-400 flex items-center justify-center">
+                <Star size={8} className="text-yellow-900 fill-yellow-900" />
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -115,6 +125,11 @@ export default function DashboardNav({
         <NavItem to="/profile">
           <User size={16} />
           Profile
+        </NavItem>
+
+        <NavItem to="/plans">
+          <Star size={16} />
+          Plans
         </NavItem>
       </div>
     </header>

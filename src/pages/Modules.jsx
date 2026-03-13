@@ -168,11 +168,24 @@ export default function Modules() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center">
-                      {m.completed ? "✅" : "📘"}
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-lg ${
+                      m.completed
+                        ? "bg-emerald-400/10 border border-emerald-400/20"
+                        : m.locked
+                        ? "bg-gray-800 border border-gray-700"
+                        : "bg-blue-400/10 border border-blue-400/20"
+                    }`}>
+                      {m.completed ? "✅" : m.locked ? "🔒" : "📘"}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold">{m.title}</h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold">{m.title}</h3>
+                        {m.category && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-gray-800 text-gray-500">
+                            {m.category}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-gray-400 text-xs mt-1">{m.desc}</p>
                     </div>
                   </div>

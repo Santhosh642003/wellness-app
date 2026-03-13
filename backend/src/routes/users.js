@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import prisma from '../lib/prisma.js';
+import { randomUUID } from 'crypto';
+import pool from '../lib/db.js';
 import { authenticate, requireSelf } from '../middleware/auth.js';
 
 const router = Router();
@@ -9,24 +10,27 @@ router.use(authenticate);
 // GET /api/users/:userId
 router.get('/:userId', requireSelf, async (req, res, next) => {
   try {
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { id: req.params.userId },
-      include: {
-        progress: true,
-        moduleProgresses: {
-          include: { module: true },
-          orderBy: { module: { orderIndex: 'asc' } },
-        },
-        redemptions: {
-          include: { reward: true },
-          orderBy: { redeemedAt: 'desc' },
-          take: 20,
-        },
-      },
-    });
-
+    const { rows: [user] } = await pool.query('SELECT * FROM users WHERE id=$1', [req.params.userId]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [req.params.userId]);
+    const { rows: moduleProgresses } = await pool.query(
+      `SELECT ump.*, m.title, m.slug, m.category, m."orderIndex", m."pointsValue", m.locked
+       FROM user_module_progress ump
+       JOIN modules m ON m.id = ump."moduleId"
+       WHERE ump."userId"=$1
+       ORDER BY m."orderIndex"`,
+      [req.params.userId]
+    );
+    const { rows: redemptions } = await pool.query(
+      `SELECT rr.*, r.title, r.description, r."pointsCost", r.category
+       FROM reward_redemptions rr
+       JOIN rewards r ON r.id = rr."rewardId"
+       WHERE rr."userId"=$1
+       ORDER BY rr."redeemedAt" DESC LIMIT 20`,
+      [req.params.userId]
+    );
     const { password, ...safe } = user;
-    res.json(safe);
+    res.json({ ...safe, progress, moduleProgresses, redemptions });
   } catch (err) {
     next(err);
   }
@@ -42,21 +46,25 @@ const profileSchema = z.object({
 router.patch('/:userId/profile', requireSelf, async (req, res, next) => {
   try {
     const data = profileSchema.parse(req.body);
-    const updates = { ...data };
-
+    const sets = [];
+    const vals = [];
+    let i = 1;
     if (data.name) {
       const parts = data.name.trim().split(' ');
-      updates.initials = parts.length >= 2
+      const initials = parts.length >= 2
         ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
         : data.name.slice(0, 2).toUpperCase();
-      updates.name = data.name.trim();
+      sets.push(`name=$${i++}`, `initials=$${i++}`);
+      vals.push(data.name.trim(), initials);
     }
-
-    const user = await prisma.user.update({
-      where: { id: req.params.userId },
-      data: updates,
-    });
-
+    if (data.role) { sets.push(`role=$${i++}`); vals.push(data.role); }
+    if (data.campus) { sets.push(`campus=$${i++}`); vals.push(data.campus); }
+    if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+    vals.push(req.params.userId);
+    const { rows: [user] } = await pool.query(
+      `UPDATE users SET ${sets.join(',')} WHERE id=$${i} RETURNING *`,
+      vals
+    );
     const { password, ...safe } = user;
     res.json(safe);
   } catch (err) {
@@ -67,63 +75,33 @@ router.patch('/:userId/profile', requireSelf, async (req, res, next) => {
 // POST /api/users/:userId/daily-claim
 router.post('/:userId/daily-claim', requireSelf, async (req, res, next) => {
   try {
-    const progress = await prisma.userProgress.findUnique({
-      where: { userId: req.params.userId },
-    });
-
-    if (!progress) {
-      return res.status(404).json({ error: 'User progress not found' });
-    }
+    const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [req.params.userId]);
+    if (!progress) return res.status(404).json({ error: 'User progress not found' });
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     if (progress.lastClaimDate) {
       const lastClaim = new Date(progress.lastClaimDate);
-      const lastClaimDay = new Date(lastClaim.getFullYear(), lastClaim.getMonth(), lastClaim.getDate());
-      if (lastClaimDay.getTime() === today.getTime()) {
+      const lastDay = new Date(lastClaim.getFullYear(), lastClaim.getMonth(), lastClaim.getDate());
+      if (lastDay.getTime() === today.getTime()) {
         return res.status(409).json({ error: 'Already claimed today' });
       }
-
-      // Check if streak continues (claimed yesterday)
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      const streakContinues = lastClaimDay.getTime() === yesterday.getTime();
-
-      const dailyPoints = 25;
-      const updated = await prisma.userProgress.update({
-        where: { userId: req.params.userId },
-        data: {
-          points: { increment: dailyPoints },
-          streakDays: streakContinues ? { increment: 1 } : 1,
-          lastClaimDate: now,
-        },
-      });
-
-      return res.json({
-        claimed: true,
-        pointsEarned: dailyPoints,
-        streakDays: updated.streakDays,
-        totalPoints: updated.points,
-      });
+      const streakContinues = lastDay.getTime() === yesterday.getTime();
+      const { rows: [updated] } = await pool.query(
+        `UPDATE user_progress SET points=points+25, "streakDays"=$1, "lastClaimDate"=$2 WHERE "userId"=$3 RETURNING *`,
+        [streakContinues ? progress.streakDays + 1 : 1, now, req.params.userId]
+      );
+      return res.json({ claimed: true, pointsEarned: 25, streakDays: updated.streakDays, totalPoints: updated.points });
     }
 
-    // First ever claim
-    const updated = await prisma.userProgress.update({
-      where: { userId: req.params.userId },
-      data: {
-        points: { increment: 25 },
-        streakDays: 1,
-        lastClaimDate: now,
-      },
-    });
-
-    res.json({
-      claimed: true,
-      pointsEarned: 25,
-      streakDays: updated.streakDays,
-      totalPoints: updated.points,
-    });
+    const { rows: [updated] } = await pool.query(
+      `UPDATE user_progress SET points=points+25, "streakDays"=1, "lastClaimDate"=$1 WHERE "userId"=$2 RETURNING *`,
+      [now, req.params.userId]
+    );
+    res.json({ claimed: true, pointsEarned: 25, streakDays: updated.streakDays, totalPoints: updated.points });
   } catch (err) {
     next(err);
   }
@@ -132,12 +110,15 @@ router.post('/:userId/daily-claim', requireSelf, async (req, res, next) => {
 // GET /api/users/:userId/module-progress
 router.get('/:userId/module-progress', requireSelf, async (req, res, next) => {
   try {
-    const progresses = await prisma.userModuleProgress.findMany({
-      where: { userId: req.params.userId },
-      include: { module: true },
-      orderBy: { module: { orderIndex: 'asc' } },
-    });
-    res.json(progresses);
+    const { rows } = await pool.query(
+      `SELECT ump.*, m.title, m.slug, m.category, m."orderIndex", m."pointsValue", m.locked
+       FROM user_module_progress ump
+       JOIN modules m ON m.id = ump."moduleId"
+       WHERE ump."userId"=$1
+       ORDER BY m."orderIndex"`,
+      [req.params.userId]
+    );
+    res.json(rows);
   } catch (err) {
     next(err);
   }
@@ -152,60 +133,44 @@ const moduleProgressSchema = z.object({
 router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res, next) => {
   try {
     const data = moduleProgressSchema.parse(req.body);
+    const { rows: [module] } = await pool.query('SELECT * FROM modules WHERE id=$1', [req.params.moduleId]);
+    if (!module) return res.status(404).json({ error: 'Module not found' });
 
-    const module = await prisma.module.findUniqueOrThrow({
-      where: { id: req.params.moduleId },
-    });
-
-    const updates = { ...data };
-    if (data.completed && data.completed === true) {
-      updates.completedAt = new Date();
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    if (data.watchedPercent !== undefined) { sets.push(`"watchedPercent"=$${i++}`); vals.push(data.watchedPercent); }
+    if (data.completed !== undefined) {
+      sets.push(`completed=$${i++}`);
+      vals.push(data.completed);
+      if (data.completed) { sets.push(`"completedAt"=$${i++}`); vals.push(new Date()); }
     }
+    sets.push(`"updatedAt"=$${i++}`);
+    vals.push(new Date());
 
-    const progress = await prisma.userModuleProgress.upsert({
-      where: {
-        userId_moduleId: {
-          userId: req.params.userId,
-          moduleId: req.params.moduleId,
-        },
-      },
-      update: updates,
-      create: {
-        userId: req.params.userId,
-        moduleId: req.params.moduleId,
-        ...updates,
-      },
-    });
+    const { rows: [progress] } = await pool.query(
+      `INSERT INTO user_module_progress (id, "userId", "moduleId", ${sets.map((s, idx) => s.split('=')[0]).join(',')})
+       VALUES ($${i++},$${i++},$${i++},${vals.map((_, idx) => `$${idx + 1}`).join(',')})
+       ON CONFLICT ("userId","moduleId") DO UPDATE SET ${sets.join(',')}
+       RETURNING *`,
+      [...vals, randomUUID(), req.params.userId, req.params.moduleId]
+    );
 
-    // Award points if newly completed
-    if (data.completed && updates.completedAt) {
-      await prisma.userProgress.upsert({
-        where: { userId: req.params.userId },
-        update: { points: { increment: module.pointsValue } },
-        create: { userId: req.params.userId, points: module.pointsValue },
-      });
-    }
-
-    // Unlock next module when this one completes
     if (data.completed) {
-      const nextModule = await prisma.module.findFirst({
-        where: { orderIndex: module.orderIndex + 1 },
-      });
+      await pool.query(
+        `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
+         ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
+        [randomUUID(), req.params.userId, module.pointsValue]
+      );
+      const { rows: [nextModule] } = await pool.query(
+        `SELECT * FROM modules WHERE "orderIndex"=$1`, [module.orderIndex + 1]
+      );
       if (nextModule) {
-        await prisma.module.update({
-          where: { id: nextModule.id },
-          data: { locked: false },
-        });
-        await prisma.userModuleProgress.upsert({
-          where: {
-            userId_moduleId: {
-              userId: req.params.userId,
-              moduleId: nextModule.id,
-            },
-          },
-          update: {},
-          create: { userId: req.params.userId, moduleId: nextModule.id },
-        });
+        await pool.query(`UPDATE modules SET locked=false WHERE id=$1`, [nextModule.id]);
+        await pool.query(
+          `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+          [randomUUID(), req.params.userId, nextModule.id]
+        );
       }
     }
 
@@ -230,41 +195,24 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
     const passed = data.score / data.totalPoints >= 0.7;
     const pointsEarned = passed ? Math.round(data.score * 0.5) : 0;
 
-    const attempt = await prisma.quizAttempt.create({
-      data: {
-        userId: req.params.userId,
-        moduleId: data.moduleId || null,
-        quizType: data.quizType,
-        score: data.score,
-        totalPoints: data.totalPoints,
-        passed,
-        answers: data.answers,
-      },
-    });
+    const { rows: [attempt] } = await pool.query(
+      `INSERT INTO quiz_attempts (id, "userId", "moduleId", "quizType", score, "totalPoints", passed, answers)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [randomUUID(), req.params.userId, data.moduleId || null, data.quizType, data.score, data.totalPoints, passed, JSON.stringify(data.answers)]
+    );
 
     if (passed && pointsEarned > 0) {
-      await prisma.userProgress.upsert({
-        where: { userId: req.params.userId },
-        update: { points: { increment: pointsEarned } },
-        create: { userId: req.params.userId, points: pointsEarned },
-      });
-
-      // Mark quiz as passed in module progress
+      await pool.query(
+        `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
+         ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
+        [randomUUID(), req.params.userId, pointsEarned]
+      );
       if (data.moduleId) {
-        await prisma.userModuleProgress.upsert({
-          where: {
-            userId_moduleId: {
-              userId: req.params.userId,
-              moduleId: data.moduleId,
-            },
-          },
-          update: { quizPassed: true },
-          create: {
-            userId: req.params.userId,
-            moduleId: data.moduleId,
-            quizPassed: true,
-          },
-        });
+        await pool.query(
+          `INSERT INTO user_module_progress (id, "userId", "moduleId", "quizPassed") VALUES ($1,$2,$3,true)
+           ON CONFLICT ("userId","moduleId") DO UPDATE SET "quizPassed"=true`,
+          [randomUUID(), req.params.userId, data.moduleId]
+        );
       }
     }
 
