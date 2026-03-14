@@ -125,7 +125,7 @@ export default function Dashboard() {
         </section>
 
         <aside className="lg:col-span-4">
-          <RightSidebar points={points} streakDays={streakDays} />
+          <RightSidebar points={points} streakDays={streakDays} lastClaimDate={lastClaimDate} />
         </aside>
       </main>
 

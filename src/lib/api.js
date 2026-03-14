@@ -4,6 +4,12 @@ function getToken() {
   return localStorage.getItem('wellness_token');
 }
 
+// Set from AuthContext so api.js can trigger logout on 401 without a circular dep
+let _onUnauthorized = null;
+export function setUnauthorizedHandler(fn) {
+  _onUnauthorized = fn;
+}
+
 async function request(path, options = {}) {
   const token = getToken();
   const headers = {
@@ -12,17 +18,21 @@ async function request(path, options = {}) {
     ...options.headers,
   };
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
-
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
     const err = new Error(data.error || `HTTP ${res.status}`);
     err.status = res.status;
     err.data = data;
+
+    // Auto-logout on expired / invalid token (but not on login/register)
+    if (res.status === 401 && !path.startsWith('/auth/')) {
+      localStorage.removeItem('wellness_token');
+      localStorage.removeItem('wellness_logged_in');
+      _onUnauthorized?.();
+    }
+
     throw err;
   }
 
@@ -45,6 +55,7 @@ export const users = {
   updateModuleProgress: (userId, moduleId, body) =>
     request(`/users/${userId}/module-progress/${moduleId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   submitQuiz: (userId, body) => request(`/users/${userId}/quiz`, { method: 'POST', body: JSON.stringify(body) }),
+  activity: (userId) => request(`/users/${userId}/activity`),
 };
 
 // Modules
@@ -58,4 +69,9 @@ export const rewards = {
   list: () => request('/rewards'),
   redeem: (userId, rewardId) => request('/rewards/redeem', { method: 'POST', body: JSON.stringify({ userId, rewardId }) }),
   history: (userId) => request(`/rewards/history/${userId}`),
+};
+
+// Leaderboard
+export const leaderboard = {
+  list: () => request('/leaderboard'),
 };

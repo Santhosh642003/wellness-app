@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { auth as authApi } from '../lib/api.js';
+import { auth as authApi, setUnauthorizedHandler } from '../lib/api.js';
 
 const AuthContext = createContext(null);
 
@@ -12,6 +12,14 @@ const STALE_KEYS = [
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Register 401 handler so api.js can trigger logout on expired tokens
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearStaleData();
+      setUser(null);
+    });
+  }, []);
 
   // Restore session from token on mount
   useEffect(() => {

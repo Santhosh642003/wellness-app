@@ -6,7 +6,6 @@ import { MODULE_CONTENT } from "../data/moduleContent";
 import { useAuth } from "../contexts/AuthContext";
 import { modules as modulesApi, users as usersApi } from "../lib/api";
 
-// Map backend module orderIndex → MODULE_CONTENT key
 const ORDER_TO_KEY = ["m1", "m2", "m3", "m4", "m5", "m6"];
 
 function getContent(mod) {
@@ -14,6 +13,24 @@ function getContent(mod) {
   if (MODULE_CONTENT[mod.slug]) return MODULE_CONTENT[mod.slug];
   const key = ORDER_TO_KEY[mod.orderIndex] || "m1";
   return MODULE_CONTENT[key] || MODULE_CONTENT["m1"];
+}
+
+// Resample an AudioBuffer to 16 kHz mono Float32Array for Whisper
+async function resampleTo16kMono(blob) {
+  const arrayBuffer = await blob.arrayBuffer();
+  const tempCtx = new AudioContext();
+  const decoded = await tempCtx.decodeAudioData(arrayBuffer);
+  await tempCtx.close();
+
+  const targetRate = 16000;
+  const length = Math.ceil(decoded.duration * targetRate);
+  const offCtx = new OfflineAudioContext(1, length, targetRate);
+  const src = offCtx.createBufferSource();
+  src.buffer = decoded;
+  src.connect(offCtx.destination);
+  src.start(0);
+  const rendered = await offCtx.startRendering();
+  return rendered.getChannelData(0);
 }
 
 export default function ModulePlayer() {
@@ -24,27 +41,38 @@ export default function ModulePlayer() {
   const [mod, setMod] = useState(null);
   const [allModules, setAllModules] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Preset caption state
   const [captionsOn, setCaptionsOn] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
   const videoRef = useRef(null);
 
+  // AI transcription state
+  const [aiMode, setAiMode] = useState(false);
+  const [aiStatus, setAiStatus] = useState(""); // loading message
+  const [aiReady, setAiReady] = useState(false);
+  const [aiTranscript, setAiTranscript] = useState([]); // [{text}]
+  const [aiRecording, setAiRecording] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const workerRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
+
+  // Load module data
   useEffect(() => {
-    Promise.all([
-      modulesApi.get(moduleId),
-      modulesApi.list(),
-    ]).then(([m, all]) => {
-      setMod(m);
-      setAllModules(all);
-    }).catch(console.error).finally(() => setLoading(false));
+    Promise.all([modulesApi.get(moduleId), modulesApi.list()])
+      .then(([m, all]) => { setMod(m); setAllModules(all); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [moduleId]);
 
   const content = useMemo(() => getContent(mod), [mod]);
-
   const modules = allModules;
   const currentIdx = modules.findIndex((m) => m.id === moduleId);
   const nextModule = modules[currentIdx + 1] || null;
   const completedCount = modules.filter((m) => m.userProgress?.completed).length;
 
+  // Preset caption index driven by real video time
   const activeCaptionIdx = useMemo(() => {
     if (!content.transcript) return -1;
     let idx = -1;
@@ -53,22 +81,107 @@ export default function ModulePlayer() {
     }
     return idx;
   }, [videoTime, content.transcript]);
-
   const activeCaption = activeCaptionIdx >= 0 ? content.transcript[activeCaptionIdx] : null;
 
   const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      setVideoTime(Math.floor(videoRef.current.currentTime));
-    }
+    if (videoRef.current) setVideoTime(Math.floor(videoRef.current.currentTime));
   }, []);
+
+  // ─── Whisper worker lifecycle ──────────────────────────────────────────────
+  useEffect(() => {
+    const worker = new Worker(
+      new URL("../workers/whisper.worker.js", import.meta.url),
+      { type: "module" }
+    );
+    worker.onmessage = ({ data }) => {
+      if (data.type === "status")  setAiStatus(data.message);
+      if (data.type === "ready")   { setAiReady(true); setAiStatus(""); }
+      if (data.type === "result")  setAiTranscript((prev) => [...prev, { text: data.text }]);
+      if (data.type === "error")   setAiError(data.message);
+    };
+    workerRef.current = worker;
+    return () => worker.terminate();
+  }, []);
+
+  const loadAiModel = () => {
+    setAiMode(true);
+    setAiError("");
+    setAiTranscript([]);
+    if (!aiReady) {
+      setAiStatus("Initialising…");
+      workerRef.current.postMessage({ type: "load" });
+    }
+  };
+
+  // Start capturing audio from the <video> in rolling 8-second windows
+  const startAiRecording = useCallback(async () => {
+    if (!videoRef.current) return;
+    setAiError("");
+
+    let stream;
+    try {
+      stream = videoRef.current.captureStream();
+    } catch {
+      setAiError("Your browser does not support video stream capture (use Chrome/Edge).");
+      return;
+    }
+
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) {
+      setAiError("No audio track found in this video.");
+      return;
+    }
+
+    const audioStream = new MediaStream(audioTracks);
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
+
+    const processChunk = async () => {
+      if (!chunksRef.current.length) return;
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      chunksRef.current = [];
+      try {
+        const float32 = await resampleTo16kMono(blob);
+        workerRef.current.postMessage({ type: "transcribe", audio: float32 }, [float32.buffer]);
+      } catch (err) {
+        console.warn("Audio processing error:", err);
+      }
+    };
+
+    const recorder = new MediaRecorder(audioStream, { mimeType });
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    recorder.onstop = () => { processChunk(); };
+
+    // Restart recorder every 8 seconds for rolling transcription
+    const cycle = () => {
+      if (recorder.state === "recording") {
+        recorder.stop();
+        recorder.start();
+        setTimeout(cycle, 8000);
+      }
+    };
+
+    recorder.start();
+    setAiRecording(true);
+    recorderRef.current = recorder;
+    setTimeout(cycle, 8000);
+  }, []);
+
+  const stopAiRecording = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    setAiRecording(false);
+  }, []);
+
+  // Stop recorder when leaving
+  useEffect(() => () => stopAiRecording(), [stopAiRecording]);
 
   const saveProgress = useCallback(async (watchedPercent) => {
     if (!user?.id || !moduleId) return;
-    try {
-      await usersApi.updateModuleProgress(user.id, moduleId, { watchedPercent });
-    } catch (err) {
-      console.error("Failed to save progress", err);
-    }
+    try { await usersApi.updateModuleProgress(user.id, moduleId, { watchedPercent }); }
+    catch (err) { console.error("Failed to save progress", err); }
   }, [user?.id, moduleId]);
 
   const goToQuiz = async () => {
@@ -79,7 +192,7 @@ export default function ModulePlayer() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
-        <div className="text-[var(--text-muted)] animate-pulse">Loading module…</div>
+        <div className="text-slate-400 animate-pulse">Loading module…</div>
       </div>
     );
   }
@@ -107,7 +220,8 @@ export default function ModulePlayer() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <section className="lg:col-span-8 space-y-4">
-            {/* Video */}
+
+            {/* ── Video Player ─────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
               <div className="aspect-video bg-black">
                 <video
@@ -118,30 +232,73 @@ export default function ModulePlayer() {
                   onTimeUpdate={handleTimeUpdate}
                   className="w-full h-full"
                   preload="metadata"
+                  crossOrigin="anonymous"
                 >
                   Your browser does not support HTML5 video.
                 </video>
               </div>
 
-              {/* Caption Controls */}
-              <div className="px-5 py-3 flex items-center justify-between border-t border-slate-200 dark:border-gray-800">
-                <div className="flex items-center gap-3">
+              {/* Caption control bar */}
+              <div className="px-5 py-3 flex items-center justify-between border-t border-slate-200 dark:border-gray-800 flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Preset captions toggle */}
                   <button
-                    onClick={() => setCaptionsOn((v) => !v)}
-                    className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${captionsOn ? "bg-blue-500/10 border-blue-400/30 text-blue-500 dark:text-blue-300" : "bg-slate-100 dark:bg-[#1a1a1a] border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200"}`}
+                    onClick={() => { setCaptionsOn((v) => !v); setAiMode(false); stopAiRecording(); }}
+                    className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all
+                      ${captionsOn && !aiMode
+                        ? "bg-blue-500/10 border-blue-400/30 text-blue-500 dark:text-blue-300"
+                        : "bg-slate-100 dark:bg-[#1a1a1a] border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200"}`}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                    {captionsOn ? "Captions ON" : "Live Captions"}
+                    {captionsOn && !aiMode ? "Captions ON" : "Captions"}
                   </button>
+
+                  {/* AI Transcription button */}
+                  {!aiMode ? (
+                    <button
+                      onClick={loadAiModel}
+                      className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30 text-violet-600 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                      AI Live Transcribe
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {aiReady && !aiRecording && (
+                        <button
+                          onClick={startAiRecording}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all"
+                        >
+                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          Start Transcribing
+                        </button>
+                      )}
+                      {aiRecording && (
+                        <button
+                          onClick={stopAiRecording}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-500/20 transition-all"
+                        >
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                          Stop
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { setAiMode(false); stopAiRecording(); setAiTranscript([]); setAiStatus(""); setAiError(""); }}
+                        className="text-xs text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 px-2"
+                      >
+                        ✕ Close AI
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <span className="text-xs text-slate-400 dark:text-gray-600">
-                  {`${Math.floor(videoTime / 60)}:${String(videoTime % 60).padStart(2, "0")}`}
+                <span className="text-xs text-slate-400 dark:text-gray-600 font-mono">
+                  {Math.floor(videoTime / 60)}:{String(videoTime % 60).padStart(2, "0")}
                 </span>
               </div>
             </div>
 
-            {/* Live Caption Display */}
-            {captionsOn && (
+            {/* ── Preset Caption Display ──────────────────────────────────── */}
+            {captionsOn && !aiMode && (
               <div className="bg-blue-50 dark:bg-[#0d1117] border border-blue-200 dark:border-blue-500/20 rounded-2xl p-5 min-h-[80px] flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="flex h-2 w-2 relative">
@@ -150,11 +307,10 @@ export default function ModulePlayer() {
                   </span>
                   <span className="text-xs font-medium text-slate-400 dark:text-gray-500 uppercase tracking-wider">Live Captions</span>
                 </div>
-                {activeCaption ? (
-                  <p className="text-slate-900 dark:text-white text-base leading-relaxed font-medium">{activeCaption.text}</p>
-                ) : (
-                  <p className="text-slate-400 dark:text-gray-600 text-sm italic">Play the video to see captions…</p>
-                )}
+                {activeCaption
+                  ? <p className="text-slate-900 dark:text-white text-base leading-relaxed font-medium">{activeCaption.text}</p>
+                  : <p className="text-slate-400 dark:text-gray-600 text-sm italic">Play the video to see captions…</p>
+                }
                 <div className="flex gap-1 mt-3 flex-wrap">
                   {(content.transcript || []).map((_, i) => (
                     <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i < activeCaptionIdx ? "w-4 bg-blue-400/60" : i === activeCaptionIdx ? "w-6 bg-blue-500" : "w-2 bg-slate-200 dark:bg-gray-800"}`} />
@@ -163,7 +319,71 @@ export default function ModulePlayer() {
               </div>
             )}
 
-            {/* Key Points */}
+            {/* ── AI Transcription Panel ──────────────────────────────────── */}
+            {aiMode && (
+              <div className="bg-violet-50 dark:bg-[#0e0b1a] border border-violet-200 dark:border-violet-500/20 rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="flex h-2 w-2 relative">
+                    {aiRecording
+                      ? <><span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-violet-500" /><span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" /></>
+                      : <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400" />
+                    }
+                  </span>
+                  <span className="text-xs font-medium text-violet-500 dark:text-violet-400 uppercase tracking-wider">
+                    AI Transcription {aiRecording ? "— Recording" : aiReady ? "— Ready" : ""}
+                  </span>
+                </div>
+
+                {/* Status / loading */}
+                {aiStatus && !aiReady && (
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="h-4 w-4 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+                    <p className="text-sm text-violet-600 dark:text-violet-300">{aiStatus}</p>
+                  </div>
+                )}
+
+                {/* Error */}
+                {aiError && (
+                  <p className="text-sm text-red-500 dark:text-red-400 mb-2">{aiError}</p>
+                )}
+
+                {/* Transcription output */}
+                {aiReady && (
+                  <>
+                    {!aiRecording && !aiTranscript.length && (
+                      <p className="text-slate-400 dark:text-gray-500 text-sm italic">
+                        Press <strong>Start Transcribing</strong> then play the video — Whisper will transcribe audio every 8 seconds.
+                      </p>
+                    )}
+                    {aiTranscript.length > 0 && (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {aiTranscript.map((entry, i) => (
+                          <p key={i} className={`text-sm leading-relaxed rounded-lg px-3 py-2 ${i === aiTranscript.length - 1 ? "bg-violet-100 dark:bg-violet-500/15 text-slate-900 dark:text-white font-medium" : "text-slate-600 dark:text-gray-400"}`}>
+                            {entry.text}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {aiRecording && (
+                      <div className="mt-3 flex items-center gap-2 text-xs text-violet-500 dark:text-violet-400">
+                        <div className="flex gap-0.5">
+                          {[0,1,2,3,4].map((i) => (
+                            <div key={i} className="w-1 bg-violet-400 rounded-full animate-bounce" style={{ height: `${8 + (i % 3) * 4}px`, animationDelay: `${i * 0.1}s` }} />
+                          ))}
+                        </div>
+                        Listening… next transcription in ~8 s
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <p className="text-[10px] text-slate-400 dark:text-gray-600 mt-3">
+                  Powered by OpenAI Whisper (tiny.en) · runs locally in your browser · no data sent to any server
+                </p>
+              </div>
+            )}
+
+            {/* ── Key Points ─────────────────────────────────────────────── */}
             {content.keyPoints && (
               <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
                 <h2 className="text-sm font-semibold text-slate-500 dark:text-gray-300 uppercase tracking-wider mb-4">Key Takeaways</h2>
@@ -178,7 +398,7 @@ export default function ModulePlayer() {
               </div>
             )}
 
-            {/* Transcript */}
+            {/* ── Full Transcript ─────────────────────────────────────────── */}
             {content.transcript && (
               <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Full Transcript</h2>
@@ -186,7 +406,7 @@ export default function ModulePlayer() {
                   {content.transcript.map((line, idx) => {
                     const mins = Math.floor(line.time / 60);
                     const secs = String(line.time % 60).padStart(2, "0");
-                    const isActive = idx === activeCaptionIdx && captionsOn;
+                    const isActive = idx === activeCaptionIdx && captionsOn && !aiMode;
                     return (
                       <div key={idx} className={`flex gap-3 p-2 rounded-xl transition-colors ${isActive ? "bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20" : ""}`}>
                         <span className="text-slate-400 dark:text-gray-600 font-mono text-xs mt-0.5 shrink-0 w-12">[{mins}:{secs}]</span>
@@ -198,14 +418,18 @@ export default function ModulePlayer() {
               </div>
             )}
 
-            {/* Actions */}
+            {/* ── Actions ────────────────────────────────────────────────── */}
             <div className="flex flex-wrap gap-4">
-              <button onClick={goToQuiz} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition">Take Module Quiz</button>
-              <button onClick={() => navigate("/modules")} className="px-6 py-3 rounded-xl font-semibold bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]">All Modules</button>
+              <button onClick={goToQuiz} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition">
+                Take Module Quiz
+              </button>
+              <button onClick={() => navigate("/modules")} className="px-6 py-3 rounded-xl font-semibold bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]">
+                All Modules
+              </button>
             </div>
           </section>
 
-          {/* Sidebar */}
+          {/* ── Sidebar ──────────────────────────────────────────────────── */}
           <aside className="lg:col-span-4 space-y-5">
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5">
               <div className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Your Progress</div>
@@ -224,11 +448,10 @@ export default function ModulePlayer() {
                 <div className="bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 rounded-xl p-4">
                   <div className="text-xs font-medium text-slate-700 dark:text-gray-400 mb-1">{nextModule.title}</div>
                   <div className="text-[11px] text-slate-400 dark:text-gray-600">{nextModule.description}</div>
-                  {!nextModule.locked ? (
-                    <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="mt-3 w-full px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#1f1f1f]">Start</button>
-                  ) : (
-                    <div className="mt-3 text-xs text-slate-400 dark:text-gray-600">🔒 Complete this module first</div>
-                  )}
+                  {!nextModule.locked
+                    ? <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="mt-3 w-full px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#1f1f1f]">Start</button>
+                    : <div className="mt-3 text-xs text-slate-400 dark:text-gray-600">🔒 Complete this module first</div>
+                  }
                 </div>
               </div>
             )}
@@ -241,10 +464,10 @@ export default function ModulePlayer() {
               </div>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/15 rounded-2xl p-5">
-              <div className="text-xs font-semibold text-blue-600 dark:text-blue-300 mb-1">Live Captions</div>
+            <div className="bg-violet-50 dark:bg-violet-500/5 border border-violet-200 dark:border-violet-500/15 rounded-2xl p-5">
+              <div className="text-xs font-semibold text-violet-600 dark:text-violet-300 mb-1">✨ AI Live Transcription</div>
               <div className="text-xs text-slate-500 dark:text-gray-500 leading-relaxed">
-                Click "Live Captions" below the video, then play to follow along with synced captions in real time.
+                Click <strong>AI Live Transcribe</strong> to run OpenAI Whisper locally in your browser — no server, no internet needed after model load.
               </div>
             </div>
           </aside>
