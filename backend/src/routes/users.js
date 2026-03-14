@@ -162,11 +162,11 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
          ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
         [randomUUID(), req.params.userId, module.pointsValue]
       );
+      // Seed progress row for the next module so the per-user lock query works
       const { rows: [nextModule] } = await pool.query(
         `SELECT * FROM modules WHERE "orderIndex"=$1`, [module.orderIndex + 1]
       );
       if (nextModule) {
-        await pool.query(`UPDATE modules SET locked=false WHERE id=$1`, [nextModule.id]);
         await pool.query(
           `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
           [randomUUID(), req.params.userId, nextModule.id]
@@ -217,6 +217,42 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
     }
 
     res.status(201).json({ ...attempt, pointsEarned });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/users/:userId/activity
+// Returns active dates (YYYY-MM-DD) for the last 90 days derived from
+// quiz attempts, module completions, and daily claims.
+router.get('/:userId/activity', requireSelf, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT TO_CHAR(day::date, 'YYYY-MM-DD') AS date
+       FROM (
+         SELECT created_at AS day
+         FROM quiz_attempts
+         WHERE "userId" = $1 AND created_at >= NOW() - INTERVAL '90 days'
+         UNION ALL
+         SELECT "completedAt" AS day
+         FROM user_module_progress
+         WHERE "userId" = $1 AND "completedAt" IS NOT NULL
+           AND "completedAt" >= NOW() - INTERVAL '90 days'
+         UNION ALL
+         SELECT "updatedAt" AS day
+         FROM user_module_progress
+         WHERE "userId" = $1 AND "watchedPercent" > 0
+           AND "updatedAt" >= NOW() - INTERVAL '90 days'
+         UNION ALL
+         SELECT "lastClaimDate" AS day
+         FROM user_progress
+         WHERE "userId" = $1 AND "lastClaimDate" IS NOT NULL
+       ) sub
+       WHERE day IS NOT NULL
+       ORDER BY date DESC`,
+      [req.params.userId]
+    );
+    res.json(rows.map((r) => r.date));
   } catch (err) {
     next(err);
   }

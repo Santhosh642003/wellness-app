@@ -3,10 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import QuizEngine from "../components/QuizEngine";
+import { useAuth } from "../contexts/AuthContext";
+import { users as usersApi } from "../lib/api";
 
 export default function ModuleQuiz() {
   const { moduleId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [questions, setQuestions] = useState(null);
   const [error, setError] = useState(null);
 
@@ -29,26 +32,40 @@ export default function ModuleQuiz() {
       .catch((err) => setError(err.message));
   }, [moduleId]);
 
-  const onFinish = (result) => {
-    localStorage.setItem(`module_quiz_result_${moduleId}_v1`, JSON.stringify(result));
+  const onFinish = async (result) => {
+    if (user?.id) {
+      try {
+        await usersApi.submitQuiz(user.id, {
+          moduleId,
+          quizType: "module",
+          score: result.score,
+          totalPoints: result.total,
+          answers: result.answers,
+        });
+      } catch (err) {
+        console.error("Failed to submit quiz", err);
+      }
+    }
     navigate("/modules");
   };
 
+  const pageStyle = { background: "var(--bg-page)", minHeight: "100vh", display: "flex", flexDirection: "column" };
+
   if (error) return (
-    <div className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center">
-      <p className="text-red-400">{error}</p>
+    <div style={pageStyle} className="items-center justify-center">
+      <p className="text-red-500">{error}</p>
     </div>
   );
 
   if (!questions) return (
-    <div className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center">
-      <p className="text-gray-400">Loading quiz…</p>
+    <div style={pageStyle} className="items-center justify-center">
+      <p className="text-[var(--text-muted)] animate-pulse">Loading quiz…</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0b0b0b] text-white">
-      <DashboardNav points={870} streakDays={7} initials="SN" />
+    <div style={pageStyle}>
+      <DashboardNav initials={user?.initials || "SN"} />
       <div className="flex-1">
         <QuizEngine
           title="Module Quiz"

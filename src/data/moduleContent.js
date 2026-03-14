@@ -1,5 +1,5 @@
 // Rich content for each learning module
-// youtubeId: YouTube video ID (embedded from CDC/NIH educational content)
+// videoUrl: path to locally hosted video file (served from /public/videos/)
 // transcript: timed captions [{time: seconds, text: "..."}]
 
 export const MODULE_CONTENT = {
@@ -9,7 +9,7 @@ export const MODULE_CONTENT = {
     category: "Foundations",
     duration: "20 min",
     points: 100,
-    youtubeId: "rb5RIngq1G4",
+    videoUrl: "/videos/demo.mp4",
     keyPoints: [
       "Vaccines train your immune system without causing disease",
       "Herd immunity protects those who cannot be vaccinated",
@@ -43,7 +43,7 @@ export const MODULE_CONTENT = {
     category: "HPV",
     duration: "15 min",
     points: 100,
-    youtubeId: "vOiLM8S0jAs",
+    videoUrl: "/videos/demo.mp4",
     keyPoints: [
       "HPV (Human Papillomavirus) is the most common sexually transmitted infection",
       "Most sexually active people will have HPV at some point in their lives",
@@ -76,7 +76,7 @@ export const MODULE_CONTENT = {
     category: "HPV",
     duration: "22 min",
     points: 150,
-    youtubeId: "aBkPIVORt6g",
+    videoUrl: "/videos/demo.mp4",
     keyPoints: [
       "HPV causes nearly 36,000 cases of cancer in the US each year",
       "Cervical cancer is the most well-known HPV-related cancer, but not the only one",
@@ -110,7 +110,7 @@ export const MODULE_CONTENT = {
     category: "MenB",
     duration: "10 min",
     points: 100,
-    youtubeId: "S_YSJxQlIOQ",
+    videoUrl: "/videos/demo.mp4",
     keyPoints: [
       "Meningitis B is a life-threatening bacterial infection of the brain and spinal cord lining",
       "College students in dorms have a 3-6x higher risk than other young adults",
@@ -143,7 +143,7 @@ export const MODULE_CONTENT = {
     category: "Bonus",
     duration: "20 min",
     points: 200,
-    youtubeId: "6GbsJBxUCgY",
+    videoUrl: "/videos/demo.mp4",
     keyPoints: [
       "Vaccines do NOT cause autism — the 1998 study was retracted and found to be fraudulent",
       "Vaccine ingredients exist in safe, trace amounts well below harmful levels",
@@ -177,7 +177,7 @@ export const MODULE_CONTENT = {
     category: "Bonus",
     duration: "12 min",
     points: 75,
-    youtubeId: "DVG5GprBFXc",
+    videoUrl: "/videos/demo.mp4",
     keyPoints: [
       "NJIT Student Health Center offers vaccinations, physicals, and mental health referrals",
       "All registered students can access campus health services",

@@ -10,6 +10,7 @@ import userRoutes from './routes/users.js';
 import moduleRoutes from './routes/modules.js';
 import rewardRoutes from './routes/rewards.js';
 import adminRoutes from './routes/admin.js';
+import leaderboardRoutes from './routes/leaderboard.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { migrate } from './lib/migrate.js';
 import { seed } from './lib/seed.js';
@@ -55,6 +56,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/rewards', rewardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

@@ -2,13 +2,44 @@ import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import pool from './db.js';
 
+// Modules synced with frontend moduleContent.js (mapped by orderIndex → m1..m6)
 const MODULES = [
-  { slug: 'hpv-understanding', title: 'Understanding HPV', description: 'Learn the fundamentals of HPV, how it spreads, and why vaccination matters.', duration: '12 min', category: 'HPV', orderIndex: 0, pointsValue: 100, locked: false },
-  { slug: 'hpv-cancer-prevention', title: 'HPV & Cancer Prevention', description: 'Discover how HPV vaccination prevents several types of cancer.', duration: '15 min', category: 'HPV', orderIndex: 1, pointsValue: 150, locked: true },
-  { slug: 'menb-overview', title: 'Meningitis B Overview', description: 'Understand Meningitis B — its causes, symptoms, and risks for college students.', duration: '10 min', category: 'MenB', orderIndex: 2, pointsValue: 100, locked: true },
-  { slug: 'menb-vaccine', title: 'MenB Vaccination Guide', description: 'Everything you need to know about the Meningitis B vaccine and its benefits.', duration: '18 min', category: 'MenB', orderIndex: 3, pointsValue: 150, locked: true },
-  { slug: 'myths-vs-facts', title: 'Vaccine Myths vs Facts', description: 'Debunking common misconceptions about vaccines with scientific evidence.', duration: '20 min', category: 'Bonus', orderIndex: 4, pointsValue: 200, locked: true },
-  { slug: 'campus-wellness', title: 'Campus Wellness Resources', description: 'Explore the health resources available to you at NJIT.', duration: '8 min', category: 'Bonus', orderIndex: 5, pointsValue: 75, locked: true },
+  {
+    slug: 'hpv-understanding',
+    title: 'Introduction to Vaccines',
+    description: 'Learn the basics of how vaccines work and why they matter for public health.',
+    duration: '20 min', category: 'Foundations', orderIndex: 0, pointsValue: 100, locked: false,
+  },
+  {
+    slug: 'hpv-cancer-prevention',
+    title: 'HPV Vaccine Basics',
+    description: 'Understanding HPV, its risks, and how the Gardasil vaccine protects you.',
+    duration: '15 min', category: 'HPV', orderIndex: 1, pointsValue: 100, locked: true,
+  },
+  {
+    slug: 'menb-overview',
+    title: 'HPV & Cancer Prevention',
+    description: 'Learn how HPV vaccines reduce cancer risk in both men and women.',
+    duration: '22 min', category: 'HPV', orderIndex: 2, pointsValue: 150, locked: true,
+  },
+  {
+    slug: 'menb-vaccine',
+    title: 'MenB Meningitis Overview',
+    description: 'What meningococcal disease is and why college students are at higher risk.',
+    duration: '10 min', category: 'MenB', orderIndex: 3, pointsValue: 100, locked: true,
+  },
+  {
+    slug: 'myths-vs-facts',
+    title: 'Vaccine Myths vs Facts',
+    description: 'Common misconceptions debunked with real scientific evidence.',
+    duration: '20 min', category: 'Bonus', orderIndex: 4, pointsValue: 200, locked: true,
+  },
+  {
+    slug: 'campus-wellness',
+    title: 'Campus Wellness Resources',
+    description: 'Explore the full range of health services available to you at NJIT.',
+    duration: '12 min', category: 'Bonus', orderIndex: 5, pointsValue: 75, locked: true,
+  },
 ];
 
 const REWARDS = [
@@ -21,12 +52,12 @@ const REWARDS = [
 ];
 
 const MODULE_QUESTIONS = [
-  { question: 'What does HPV stand for?', options: ['Human Papillomavirus', 'Human Protection Vaccine', 'Health Prevention Virus', 'Hepatitis Prevention Vaccine'], answerIndex: 0, points: 10 },
+  { question: 'What does HPV stand for?', options: ['Human Papillomavirus', 'Human Protection Vaccine', 'Health Prevention Virus', 'Hepatitis Prevention Vaccine'], answerIndex: 0, points: 10, explanation: 'HPV stands for Human Papillomavirus.' },
   { question: 'HPV is most commonly spread through…', options: ['Air droplets', 'Skin-to-skin intimate contact', 'Mosquito bites', 'Sharing food'], answerIndex: 1, points: 10 },
-  { question: 'HPV infections are often…', options: ['Always severe', 'Symptom-free', 'Always visible', 'Only bacterial'], answerIndex: 1, points: 10 },
+  { question: 'HPV infections are often…', options: ['Always severe', 'Symptom-free', 'Always visible', 'Only bacterial'], answerIndex: 1, points: 10, explanation: 'Most HPV infections have no symptoms and clear on their own.' },
   { question: 'HPV vaccination is most effective…', options: ['Before exposure to HPV', 'Only after infection', 'Only after age 50', 'Only if symptoms appear'], answerIndex: 0, points: 10 },
   { question: 'Some HPV types can cause…', options: ['Certain cancers', 'Diabetes', 'Broken bones', 'Asthma'], answerIndex: 0, points: 10 },
-  { question: 'MenB refers to meningococcal disease caused by…', options: ['Group A', 'Group B', 'Group C', 'A virus'], answerIndex: 1, points: 10 },
+  { question: 'MenB refers to meningococcal disease caused by…', options: ['Group A', 'Group B', 'Group C', 'A virus'], answerIndex: 1, points: 10, explanation: 'MenB is caused by serogroup B Neisseria meningitidis.' },
   { question: 'A serious warning sign of meningitis can include…', options: ['Stiff neck and fever', 'Better vision', 'Stronger nails', 'Improved sleep'], answerIndex: 0, points: 10 },
   { question: 'MenB can spread through…', options: ['Sharing respiratory secretions', 'Handshakes only', 'Insect bites', 'Water'], answerIndex: 0, points: 10 },
   { question: 'If meningitis is suspected, the best action is to…', options: ['Wait a few days', 'Seek medical help immediately', 'Ignore symptoms', 'Only drink water'], answerIndex: 1, points: 10 },
@@ -57,16 +88,23 @@ const BIWEEKLY_QUESTIONS = [
 ];
 
 export async function seed() {
-  // Seed modules
+  // Upsert modules — update title/description/category if slug already exists
   for (const m of MODULES) {
     await pool.query(
       `INSERT INTO modules (id, slug, title, description, duration, category, "orderIndex", "pointsValue", locked)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (slug) DO NOTHING`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (slug) DO UPDATE SET
+         title=EXCLUDED.title,
+         description=EXCLUDED.description,
+         duration=EXCLUDED.duration,
+         category=EXCLUDED.category,
+         "orderIndex"=EXCLUDED."orderIndex",
+         "pointsValue"=EXCLUDED."pointsValue"`,
       [randomUUID(), m.slug, m.title, m.description, m.duration, m.category, m.orderIndex, m.pointsValue, m.locked]
     );
   }
 
-  // Seed rewards
+  // Seed rewards (only if empty)
   const { rows: rCount } = await pool.query('SELECT COUNT(*) FROM rewards');
   if (parseInt(rCount[0].count) === 0) {
     for (const r of REWARDS) {
@@ -77,7 +115,7 @@ export async function seed() {
     }
   }
 
-  // Seed default admin user
+  // Default admin
   const { rows: adminRows } = await pool.query(`SELECT id FROM admin_users WHERE email='admin@njit.edu'`);
   if (adminRows.length === 0) {
     const hashed = await bcrypt.hash('Admin@1234', 12);
@@ -87,10 +125,9 @@ export async function seed() {
     );
   }
 
-  // Seed quizzes and questions
+  // Seed quizzes (only if empty)
   const { rows: qCount } = await pool.query('SELECT COUNT(*) FROM quizzes');
   if (parseInt(qCount[0].count) === 0) {
-    // One module quiz per module (shared questions)
     const { rows: modules } = await pool.query('SELECT id, title FROM modules ORDER BY "orderIndex"');
     for (const mod of modules) {
       const quizId = randomUUID();
@@ -108,7 +145,6 @@ export async function seed() {
       }
     }
 
-    // Biweekly quiz
     const biweeklyId = randomUUID();
     await pool.query(
       `INSERT INTO quizzes (id, "moduleId", type, title, "passingScore") VALUES ($1,NULL,'biweekly','Bi-Weekly Competition',70)`,

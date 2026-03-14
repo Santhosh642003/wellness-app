@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -9,7 +8,7 @@ import ModulePlayer from "./pages/ModulePlayer.jsx";
 import Profile from "./pages/Profile.jsx";
 import BiWeeklyQuiz from "./pages/BiWeeklyQuiz.jsx";
 import ModuleQuiz from "./pages/ModuleQuiz.jsx";
-import Plans from "./pages/Plans.jsx";
+import NotFound from "./pages/NotFound.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 
 function ProtectedRoute({ children }) {
@@ -22,85 +21,16 @@ function ProtectedRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      {/* Public */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
-
-      {/* Protected */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/modules"
-        element={
-          <ProtectedRoute>
-            <Modules />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/modules/:moduleId"
-        element={
-          <ProtectedRoute>
-            <ModulePlayer />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/rewards"
-        element={
-          <ProtectedRoute>
-            <Rewards />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/quiz/biweekly"
-        element={
-          <ProtectedRoute>
-            <BiWeeklyQuiz />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/quiz/module/:moduleId"
-        element={
-          <ProtectedRoute>
-            <ModuleQuiz />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/plans"
-        element={
-          <ProtectedRoute>
-            <Plans />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/modules" element={<ProtectedRoute><Modules /></ProtectedRoute>} />
+      <Route path="/modules/:moduleId" element={<ProtectedRoute><ModulePlayer /></ProtectedRoute>} />
+      <Route path="/rewards" element={<ProtectedRoute><Rewards /></ProtectedRoute>} />
+      <Route path="/quiz/biweekly" element={<ProtectedRoute><BiWeeklyQuiz /></ProtectedRoute>} />
+      <Route path="/quiz/module/:moduleId" element={<ProtectedRoute><ModuleQuiz /></ProtectedRoute>} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

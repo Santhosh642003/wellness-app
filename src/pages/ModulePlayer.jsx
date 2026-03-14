@@ -3,398 +3,471 @@ import { useNavigate, useParams } from "react-router-dom";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import { MODULE_CONTENT } from "../data/moduleContent";
-import { INITIAL, safeLoad, safeSave } from "../store/dashboardStore";
+import { useAuth } from "../contexts/AuthContext";
+import { modules as modulesApi, users as usersApi } from "../lib/api";
 
-const CATEGORY_COLORS = {
-  Foundations: "bg-blue-400/10 border-blue-400/20 text-blue-300",
-  HPV: "bg-emerald-400/10 border-emerald-400/20 text-emerald-300",
-  MenB: "bg-purple-400/10 border-purple-400/20 text-purple-300",
-  Bonus: "bg-yellow-400/10 border-yellow-400/20 text-yellow-300",
-};
+const ORDER_TO_KEY = ["m1", "m2", "m3", "m4", "m5", "m6"];
+
+function getContent(mod) {
+  if (!mod) return MODULE_CONTENT["m1"];
+  if (MODULE_CONTENT[mod.slug]) return MODULE_CONTENT[mod.slug];
+  const key = ORDER_TO_KEY[mod.orderIndex] || "m1";
+  return MODULE_CONTENT[key] || MODULE_CONTENT["m1"];
+}
+
+// Resample an AudioBuffer to 16 kHz mono Float32Array for Whisper
+async function resampleTo16kMono(blob) {
+  const arrayBuffer = await blob.arrayBuffer();
+  const tempCtx = new AudioContext();
+  const decoded = await tempCtx.decodeAudioData(arrayBuffer);
+  await tempCtx.close();
+
+  const targetRate = 16000;
+  const length = Math.ceil(decoded.duration * targetRate);
+  const offCtx = new OfflineAudioContext(1, length, targetRate);
+  const src = offCtx.createBufferSource();
+  src.buffer = decoded;
+  src.connect(offCtx.destination);
+  src.start(0);
+  const rendered = await offCtx.startRendering();
+  return rendered.getChannelData(0);
+}
 
 export default function ModulePlayer() {
   const { moduleId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const [data, setData] = useState(INITIAL);
+  const [mod, setMod] = useState(null);
+  const [allModules, setAllModules] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Preset caption state
   const [captionsOn, setCaptionsOn] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
-  const [iframePlaying, setIframePlaying] = useState(false);
-  const captionIntervalRef = useRef(null);
-  const simulatedTimeRef = useRef(0);
+  const videoRef = useRef(null);
 
-  // Load dashboard state for progress/nav
+  // AI transcription state
+  const [aiMode, setAiMode] = useState(false);
+  const [aiStatus, setAiStatus] = useState(""); // loading message
+  const [aiReady, setAiReady] = useState(false);
+  const [aiTranscript, setAiTranscript] = useState([]); // [{text}]
+  const [aiRecording, setAiRecording] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const workerRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
+
+  // Load module data
   useEffect(() => {
-    const loaded = safeLoad();
-    if (loaded) {
-      setData((prev) => ({
-        ...prev,
-        ...loaded,
-        user: { ...prev.user, ...(loaded.user || {}) },
-        modules: Array.isArray(loaded.modules) ? loaded.modules : prev.modules,
-      }));
-    }
-  }, []);
+    Promise.all([modulesApi.get(moduleId), modulesApi.list()])
+      .then(([m, all]) => { setMod(m); setAllModules(all); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [moduleId]);
 
-  const content = useMemo(
-    () => MODULE_CONTENT[moduleId] || MODULE_CONTENT["m1"],
-    [moduleId]
-  );
-
-  const modules = data.modules || [];
+  const content = useMemo(() => getContent(mod), [mod]);
+  const modules = allModules;
   const currentIdx = modules.findIndex((m) => m.id === moduleId);
-  const currentModule = modules[currentIdx] || null;
   const nextModule = modules[currentIdx + 1] || null;
-  const completedCount = modules.filter((m) => m.completed).length;
-  const totalCount = modules.length;
+  const completedCount = modules.filter((m) => m.userProgress?.completed).length;
 
-  // Active caption line: find the latest transcript entry whose time <= videoTime
+  // Preset caption index driven by real video time
   const activeCaptionIdx = useMemo(() => {
-    const entries = content.transcript;
+    if (!content.transcript) return -1;
     let idx = -1;
-    for (let i = 0; i < entries.length; i++) {
-      if (entries[i].time <= videoTime) idx = i;
+    for (let i = 0; i < content.transcript.length; i++) {
+      if (content.transcript[i].time <= videoTime) idx = i;
     }
     return idx;
   }, [videoTime, content.transcript]);
-
   const activeCaption = activeCaptionIdx >= 0 ? content.transcript[activeCaptionIdx] : null;
 
-  // Simulate video time advancing when iframePlaying (since we can't read YouTube's currentTime)
-  const togglePlay = useCallback(() => {
-    if (iframePlaying) {
-      setIframePlaying(false);
-      if (captionIntervalRef.current) clearInterval(captionIntervalRef.current);
-    } else {
-      setIframePlaying(true);
-      captionIntervalRef.current = setInterval(() => {
-        simulatedTimeRef.current += 1;
-        setVideoTime(simulatedTimeRef.current);
-      }, 1000);
-    }
-  }, [iframePlaying]);
-
-  // Clean up interval on unmount
-  useEffect(() => {
-    return () => {
-      if (captionIntervalRef.current) clearInterval(captionIntervalRef.current);
-    };
+  const handleTimeUpdate = useCallback(() => {
+    if (videoRef.current) setVideoTime(Math.floor(videoRef.current.currentTime));
   }, []);
 
-  const resetCaptions = () => {
-    simulatedTimeRef.current = 0;
-    setVideoTime(0);
-    setIframePlaying(false);
-    if (captionIntervalRef.current) clearInterval(captionIntervalRef.current);
+  // ─── Whisper worker lifecycle ──────────────────────────────────────────────
+  useEffect(() => {
+    const worker = new Worker(
+      new URL("../workers/whisper.worker.js", import.meta.url),
+      { type: "module" }
+    );
+    worker.onmessage = ({ data }) => {
+      if (data.type === "status")  setAiStatus(data.message);
+      if (data.type === "ready")   { setAiReady(true); setAiStatus(""); }
+      if (data.type === "result")  setAiTranscript((prev) => [...prev, { text: data.text }]);
+      if (data.type === "error")   setAiError(data.message);
+    };
+    workerRef.current = worker;
+    return () => worker.terminate();
+  }, []);
+
+  const loadAiModel = () => {
+    setAiMode(true);
+    setAiError("");
+    setAiTranscript([]);
+    if (!aiReady) {
+      setAiStatus("Initialising…");
+      workerRef.current.postMessage({ type: "load" });
+    }
   };
 
-  // Mark progress when navigating to quiz
-  const goToQuiz = () => {
-    // Update module progress to reflect watched
-    setData((prev) => {
-      const modules = prev.modules.map((m) => {
-        if (m.id !== moduleId) return m;
-        const newProgress = Math.max(m.progress || 0, 0.8);
-        return { ...m, progress: newProgress };
-      });
-      const next = { ...prev, modules };
-      safeSave(next);
-      return next;
-    });
+  // Start capturing audio from the <video> in rolling 8-second windows
+  const startAiRecording = useCallback(async () => {
+    if (!videoRef.current) return;
+    setAiError("");
+
+    let stream;
+    try {
+      stream = videoRef.current.captureStream();
+    } catch {
+      setAiError("Your browser does not support video stream capture (use Chrome/Edge).");
+      return;
+    }
+
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) {
+      setAiError("No audio track found in this video.");
+      return;
+    }
+
+    const audioStream = new MediaStream(audioTracks);
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
+
+    const processChunk = async () => {
+      if (!chunksRef.current.length) return;
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      chunksRef.current = [];
+      try {
+        const float32 = await resampleTo16kMono(blob);
+        workerRef.current.postMessage({ type: "transcribe", audio: float32 }, [float32.buffer]);
+      } catch (err) {
+        console.warn("Audio processing error:", err);
+      }
+    };
+
+    const recorder = new MediaRecorder(audioStream, { mimeType });
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    recorder.onstop = () => { processChunk(); };
+
+    // Restart recorder every 8 seconds for rolling transcription
+    const cycle = () => {
+      if (recorder.state === "recording") {
+        recorder.stop();
+        recorder.start();
+        setTimeout(cycle, 8000);
+      }
+    };
+
+    recorder.start();
+    setAiRecording(true);
+    recorderRef.current = recorder;
+    setTimeout(cycle, 8000);
+  }, []);
+
+  const stopAiRecording = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    setAiRecording(false);
+  }, []);
+
+  // Stop recorder when leaving
+  useEffect(() => () => stopAiRecording(), [stopAiRecording]);
+
+  const saveProgress = useCallback(async (watchedPercent) => {
+    if (!user?.id || !moduleId) return;
+    try { await usersApi.updateModuleProgress(user.id, moduleId, { watchedPercent }); }
+    catch (err) { console.error("Failed to save progress", err); }
+  }, [user?.id, moduleId]);
+
+  const goToQuiz = async () => {
+    await saveProgress(80);
     navigate(`/quiz/module/${moduleId}`);
   };
 
-  const categoryColor =
-    CATEGORY_COLORS[content.category] ||
-    "bg-gray-400/10 border-gray-400/20 text-gray-300";
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
+        <div className="text-slate-400 animate-pulse">Loading module…</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0b0b0b] text-white">
-      <DashboardNav
-        points={data.points || 0}
-        streakDays={data.streakDays || 0}
-        initials={data.user?.initials || "SN"}
-      />
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
+      <DashboardNav initials={user?.initials || "SN"} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
-        {/* Breadcrumb */}
-        <button
-          onClick={() => navigate("/modules")}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-300 mb-6 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+        <button onClick={() => navigate("/modules")} className="flex items-center gap-2 text-sm text-slate-500 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300 mb-6 transition">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Back to Modules
         </button>
 
-        {/* Title */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
-            <span className={`text-xs px-3 py-1 rounded-full border font-medium ${categoryColor}`}>
-              {content.category}
+            <span className="text-xs px-3 py-1 rounded-full border bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 font-medium">
+              {content.category || mod?.category}
             </span>
-            <span className="text-xs text-gray-500">{content.duration}</span>
+            <span className="text-xs text-slate-400 dark:text-gray-500">{content.duration || mod?.duration}</span>
           </div>
-          <h1 className="text-3xl font-semibold">{content.title}</h1>
-          <p className="text-gray-400 mt-2">{content.subtitle}</p>
+          <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">{mod?.title || content.title}</h1>
+          <p className="text-slate-500 dark:text-gray-400 mt-2">{mod?.description || content.subtitle}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Video + Captions */}
           <section className="lg:col-span-8 space-y-4">
-            {/* Video Player */}
-            <div className="bg-[#121212] border border-gray-800 rounded-2xl overflow-hidden">
-              <div className="aspect-video bg-black relative">
-                <iframe
+
+            {/* ── Video Player ─────────────────────────────────────────────── */}
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+              <div className="aspect-video bg-black">
+                <video
+                  ref={videoRef}
                   key={moduleId}
-                  src={`https://www.youtube.com/embed/${content.youtubeId}?rel=0&modestbranding=1`}
-                  title={content.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
+                  src={content.videoUrl}
+                  controls
+                  onTimeUpdate={handleTimeUpdate}
                   className="w-full h-full"
-                />
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                >
+                  Your browser does not support HTML5 video.
+                </video>
               </div>
 
-              {/* Caption controls bar */}
-              <div className="px-5 py-3 flex items-center justify-between border-t border-gray-800">
-                <div className="flex items-center gap-3">
+              {/* Caption control bar */}
+              <div className="px-5 py-3 flex items-center justify-between border-t border-slate-200 dark:border-gray-800 flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Preset captions toggle */}
                   <button
-                    onClick={() => {
-                      setCaptionsOn((v) => !v);
-                      if (!iframePlaying && !captionsOn) togglePlay();
-                    }}
-                    className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
-                      captionsOn
-                        ? "bg-blue-500/20 border-blue-400/30 text-blue-300"
-                        : "bg-[#1a1a1a] border-gray-700 text-gray-400 hover:text-gray-200"
-                    }`}
+                    onClick={() => { setCaptionsOn((v) => !v); setAiMode(false); stopAiRecording(); }}
+                    className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all
+                      ${captionsOn && !aiMode
+                        ? "bg-blue-500/10 border-blue-400/30 text-blue-500 dark:text-blue-300"
+                        : "bg-slate-100 dark:bg-[#1a1a1a] border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200"}`}
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                    </svg>
-                    {captionsOn ? "Captions ON" : "Live Captions"}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                    {captionsOn && !aiMode ? "Captions ON" : "Captions"}
                   </button>
 
-                  {captionsOn && (
-                    <>
+                  {/* AI Transcription button */}
+                  {!aiMode ? (
+                    <button
+                      onClick={loadAiModel}
+                      className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30 text-violet-600 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                      AI Live Transcribe
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {aiReady && !aiRecording && (
+                        <button
+                          onClick={startAiRecording}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all"
+                        >
+                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          Start Transcribing
+                        </button>
+                      )}
+                      {aiRecording && (
+                        <button
+                          onClick={stopAiRecording}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-500/20 transition-all"
+                        >
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                          Stop
+                        </button>
+                      )}
                       <button
-                        onClick={togglePlay}
-                        className="text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700 bg-[#1a1a1a]"
+                        onClick={() => { setAiMode(false); stopAiRecording(); setAiTranscript([]); setAiStatus(""); setAiError(""); }}
+                        className="text-xs text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 px-2"
                       >
-                        {iframePlaying ? "⏸ Pause captions" : "▶ Sync captions"}
+                        ✕ Close AI
                       </button>
-                      <button
-                        onClick={resetCaptions}
-                        className="text-xs text-gray-500 hover:text-gray-300"
-                      >
-                        Reset
-                      </button>
-                    </>
+                    </div>
                   )}
                 </div>
-
-                <span className="text-xs text-gray-600">
-                  {iframePlaying
-                    ? `${Math.floor(videoTime / 60)}:${String(videoTime % 60).padStart(2, "0")}`
-                    : "sync with video"}
+                <span className="text-xs text-slate-400 dark:text-gray-600 font-mono">
+                  {Math.floor(videoTime / 60)}:{String(videoTime % 60).padStart(2, "0")}
                 </span>
               </div>
             </div>
 
-            {/* Live Caption Display */}
-            {captionsOn && (
-              <div className="bg-[#0d1117] border border-blue-500/20 rounded-2xl p-5 min-h-[80px] flex flex-col justify-center">
+            {/* ── Preset Caption Display ──────────────────────────────────── */}
+            {captionsOn && !aiMode && (
+              <div className="bg-blue-50 dark:bg-[#0d1117] border border-blue-200 dark:border-blue-500/20 rounded-2xl p-5 min-h-[80px] flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="flex h-2 w-2 relative">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${iframePlaying ? "bg-blue-400" : "bg-gray-600"}`} />
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${iframePlaying ? "bg-blue-500" : "bg-gray-600"}`} />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-blue-400" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
                   </span>
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {iframePlaying ? "Live Captions" : "Captions paused"}
-                  </span>
+                  <span className="text-xs font-medium text-slate-400 dark:text-gray-500 uppercase tracking-wider">Live Captions</span>
                 </div>
-                {activeCaption ? (
-                  <p className="text-white text-base leading-relaxed font-medium">
-                    {activeCaption.text}
-                  </p>
-                ) : (
-                  <p className="text-gray-600 text-sm italic">
-                    {iframePlaying ? "Waiting for captions..." : "Press 'Sync captions' then play the video"}
-                  </p>
-                )}
-                {/* Caption progress dots */}
+                {activeCaption
+                  ? <p className="text-slate-900 dark:text-white text-base leading-relaxed font-medium">{activeCaption.text}</p>
+                  : <p className="text-slate-400 dark:text-gray-600 text-sm italic">Play the video to see captions…</p>
+                }
                 <div className="flex gap-1 mt-3 flex-wrap">
-                  {content.transcript.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-1 rounded-full transition-all duration-300 ${
-                        i < activeCaptionIdx
-                          ? "w-4 bg-blue-500/60"
-                          : i === activeCaptionIdx
-                          ? "w-6 bg-blue-400"
-                          : "w-2 bg-gray-800"
-                      }`}
-                    />
+                  {(content.transcript || []).map((_, i) => (
+                    <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i < activeCaptionIdx ? "w-4 bg-blue-400/60" : i === activeCaptionIdx ? "w-6 bg-blue-500" : "w-2 bg-slate-200 dark:bg-gray-800"}`} />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Key Points */}
-            <div className="bg-[#121212] border border-gray-800 rounded-2xl p-6">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-                Key Takeaways
-              </h2>
-              <ul className="space-y-3">
-                {content.keyPoints.map((point, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
-                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center text-emerald-400 text-xs font-bold mt-0.5">
-                      {i + 1}
-                    </span>
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* ── AI Transcription Panel ──────────────────────────────────── */}
+            {aiMode && (
+              <div className="bg-violet-50 dark:bg-[#0e0b1a] border border-violet-200 dark:border-violet-500/20 rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="flex h-2 w-2 relative">
+                    {aiRecording
+                      ? <><span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-violet-500" /><span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" /></>
+                      : <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400" />
+                    }
+                  </span>
+                  <span className="text-xs font-medium text-violet-500 dark:text-violet-400 uppercase tracking-wider">
+                    AI Transcription {aiRecording ? "— Recording" : aiReady ? "— Ready" : ""}
+                  </span>
+                </div>
 
-            {/* Full Transcript */}
-            <div className="bg-[#121212] border border-gray-800 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Full Transcript</h2>
-              <div className="space-y-3 text-sm leading-relaxed max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                {content.transcript.map((line, idx) => {
-                  const mins = Math.floor(line.time / 60);
-                  const secs = String(line.time % 60).padStart(2, "0");
-                  const isActive = idx === activeCaptionIdx && captionsOn;
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex gap-3 p-2 rounded-xl transition-colors ${
-                        isActive ? "bg-blue-500/10 border border-blue-500/20" : ""
-                      }`}
-                    >
-                      <span className="text-gray-600 font-mono text-xs mt-0.5 shrink-0 w-12">
-                        [{mins}:{secs}]
-                      </span>
-                      <span className={isActive ? "text-white font-medium" : "text-gray-400"}>
-                        {line.text}
-                      </span>
-                    </div>
-                  );
-                })}
+                {/* Status / loading */}
+                {aiStatus && !aiReady && (
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="h-4 w-4 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+                    <p className="text-sm text-violet-600 dark:text-violet-300">{aiStatus}</p>
+                  </div>
+                )}
+
+                {/* Error */}
+                {aiError && (
+                  <p className="text-sm text-red-500 dark:text-red-400 mb-2">{aiError}</p>
+                )}
+
+                {/* Transcription output */}
+                {aiReady && (
+                  <>
+                    {!aiRecording && !aiTranscript.length && (
+                      <p className="text-slate-400 dark:text-gray-500 text-sm italic">
+                        Press <strong>Start Transcribing</strong> then play the video — Whisper will transcribe audio every 8 seconds.
+                      </p>
+                    )}
+                    {aiTranscript.length > 0 && (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {aiTranscript.map((entry, i) => (
+                          <p key={i} className={`text-sm leading-relaxed rounded-lg px-3 py-2 ${i === aiTranscript.length - 1 ? "bg-violet-100 dark:bg-violet-500/15 text-slate-900 dark:text-white font-medium" : "text-slate-600 dark:text-gray-400"}`}>
+                            {entry.text}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {aiRecording && (
+                      <div className="mt-3 flex items-center gap-2 text-xs text-violet-500 dark:text-violet-400">
+                        <div className="flex gap-0.5">
+                          {[0,1,2,3,4].map((i) => (
+                            <div key={i} className="w-1 bg-violet-400 rounded-full animate-bounce" style={{ height: `${8 + (i % 3) * 4}px`, animationDelay: `${i * 0.1}s` }} />
+                          ))}
+                        </div>
+                        Listening… next transcription in ~8 s
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <p className="text-[10px] text-slate-400 dark:text-gray-600 mt-3">
+                  Powered by OpenAI Whisper (tiny.en) · runs locally in your browser · no data sent to any server
+                </p>
               </div>
-            </div>
+            )}
 
-            {/* Actions */}
+            {/* ── Key Points ─────────────────────────────────────────────── */}
+            {content.keyPoints && (
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+                <h2 className="text-sm font-semibold text-slate-500 dark:text-gray-300 uppercase tracking-wider mb-4">Key Takeaways</h2>
+                <ul className="space-y-3">
+                  {content.keyPoints.map((point, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-slate-700 dark:text-gray-300">
+                      <span className="flex-shrink-0 h-5 w-5 rounded-full bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center text-emerald-500 text-xs font-bold mt-0.5">{i + 1}</span>
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* ── Full Transcript ─────────────────────────────────────────── */}
+            {content.transcript && (
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Full Transcript</h2>
+                <div className="space-y-3 text-sm leading-relaxed max-h-80 overflow-y-auto pr-2">
+                  {content.transcript.map((line, idx) => {
+                    const mins = Math.floor(line.time / 60);
+                    const secs = String(line.time % 60).padStart(2, "0");
+                    const isActive = idx === activeCaptionIdx && captionsOn && !aiMode;
+                    return (
+                      <div key={idx} className={`flex gap-3 p-2 rounded-xl transition-colors ${isActive ? "bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20" : ""}`}>
+                        <span className="text-slate-400 dark:text-gray-600 font-mono text-xs mt-0.5 shrink-0 w-12">[{mins}:{secs}]</span>
+                        <span className={isActive ? "text-slate-900 dark:text-white font-medium" : "text-slate-500 dark:text-gray-400"}>{line.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Actions ────────────────────────────────────────────────── */}
             <div className="flex flex-wrap gap-4">
-              <button
-                onClick={goToQuiz}
-                className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 hover:opacity-90 transition"
-              >
+              <button onClick={goToQuiz} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition">
                 Take Module Quiz
               </button>
-              <button
-                onClick={() => navigate("/modules")}
-                className="px-6 py-3 rounded-xl font-semibold bg-[#141414] border border-gray-800 hover:bg-[#171717]"
-              >
+              <button onClick={() => navigate("/modules")} className="px-6 py-3 rounded-xl font-semibold bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]">
                 All Modules
               </button>
             </div>
           </section>
 
-          {/* Right Sidebar */}
+          {/* ── Sidebar ──────────────────────────────────────────────────── */}
           <aside className="lg:col-span-4 space-y-5">
-            {/* Progress Card */}
-            <div className="bg-[#121212] border border-gray-800 rounded-2xl p-5">
-              <div className="text-sm font-semibold mb-1">Your Progress</div>
-              <div className="text-xs text-gray-500">Keep going! You're doing great</div>
-
-              <div className="mt-4 flex items-baseline justify-between">
-                <div className="text-2xl font-semibold">{completedCount}/{totalCount}</div>
-                <div className="text-xs text-gray-500">Modules Completed</div>
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5">
+              <div className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Your Progress</div>
+              <div className="mt-3 flex items-baseline justify-between">
+                <div className="text-2xl font-semibold text-slate-900 dark:text-white">{completedCount}/{modules.length}</div>
+                <div className="text-xs text-slate-400 dark:text-gray-500">Modules</div>
               </div>
-
-              <div className="mt-3">
-                <div className="text-xs text-gray-500 mb-2">
-                  {Math.round((completedCount / Math.max(totalCount, 1)) * 100)}% complete
-                </div>
-                <div className="h-2 rounded-full bg-[#0f0f0f] border border-gray-800 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all"
-                    style={{ width: `${Math.round((completedCount / Math.max(totalCount, 1)) * 100)}%` }}
-                  />
-                </div>
+              <div className="mt-3 h-2 rounded-full bg-slate-100 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all" style={{ width: `${Math.round((completedCount / Math.max(modules.length, 1)) * 100)}%` }} />
               </div>
-
-              {currentModule && (
-                <div className="mt-4 pt-4 border-t border-gray-800">
-                  <div className="text-xs text-gray-500 mb-1">This module</div>
-                  <div className="h-1.5 rounded-full bg-[#0f0f0f] border border-gray-800 overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 transition-all"
-                      style={{ width: `${Math.round((currentModule.progress || 0) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    {Math.round((currentModule.progress || 0) * 100)}% watched
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Next Module */}
             {nextModule && (
-              <div className="bg-[#121212] border border-gray-800 rounded-2xl p-5">
-                <div className="text-sm font-semibold mb-3">Up Next</div>
-                <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-4">
-                  <div className="text-xs text-gray-400 font-medium mb-1">{nextModule.title}</div>
-                  <div className="text-[11px] text-gray-600 leading-relaxed">{nextModule.desc}</div>
-                  {!nextModule.locked ? (
-                    <button
-                      onClick={() => navigate(`/modules/${nextModule.id}`)}
-                      className="mt-4 w-full px-4 py-2 rounded-xl text-sm font-semibold bg-[#1a1a1a] border border-gray-800 hover:bg-[#1f1f1f]"
-                    >
-                      Start Module
-                    </button>
-                  ) : (
-                    <div className="mt-4 text-xs text-gray-600 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Complete this module to unlock
-                    </div>
-                  )}
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5">
+                <div className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Up Next</div>
+                <div className="bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 rounded-xl p-4">
+                  <div className="text-xs font-medium text-slate-700 dark:text-gray-400 mb-1">{nextModule.title}</div>
+                  <div className="text-[11px] text-slate-400 dark:text-gray-600">{nextModule.description}</div>
+                  {!nextModule.locked
+                    ? <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="mt-3 w-full px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#1f1f1f]">Start</button>
+                    : <div className="mt-3 text-xs text-slate-400 dark:text-gray-600">🔒 Complete this module first</div>
+                  }
                 </div>
               </div>
             )}
 
-            {/* Points for this module */}
-            <div className="bg-[#121212] border border-gray-800 rounded-2xl p-5">
-              <div className="text-sm font-semibold mb-3">Completion Reward</div>
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5">
+              <div className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Completion Reward</div>
               <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-500">Points earned on completion</div>
-                <span className="text-lg font-bold text-yellow-300">+{content.points}</span>
-              </div>
-              <div className="text-xs text-gray-600 mt-2">
-                Pass the quiz to unlock the next module
+                <div className="text-xs text-slate-400 dark:text-gray-500">Points on completion</div>
+                <span className="text-lg font-bold text-yellow-600 dark:text-yellow-300">+{mod?.pointsValue || content.points}</span>
               </div>
             </div>
 
-            {/* Caption tip */}
-            <div className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-5">
-              <div className="flex items-start gap-3">
-                <svg className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                </svg>
-                <div>
-                  <div className="text-xs font-semibold text-blue-300 mb-1">Live Captions</div>
-                  <div className="text-xs text-gray-500 leading-relaxed">
-                    Click "Live Captions" below the video, then press "Sync captions" when you start playing to follow along in real time.
-                  </div>
-                </div>
+            <div className="bg-violet-50 dark:bg-violet-500/5 border border-violet-200 dark:border-violet-500/15 rounded-2xl p-5">
+              <div className="text-xs font-semibold text-violet-600 dark:text-violet-300 mb-1">✨ AI Live Transcription</div>
+              <div className="text-xs text-slate-500 dark:text-gray-500 leading-relaxed">
+                Click <strong>AI Live Transcribe</strong> to run OpenAI Whisper locally in your browser — no server, no internet needed after model load.
               </div>
             </div>
           </aside>
