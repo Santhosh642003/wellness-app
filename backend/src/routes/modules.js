@@ -46,10 +46,11 @@ router.get('/', async (req, res, next) => {
 // GET /api/modules/:moduleId
 router.get('/:moduleId', async (req, res, next) => {
   try {
-    const { rows } = await pool.query(
-      `${PER_USER_MODULES_QUERY.replace('ORDER BY m."orderIndex"', 'AND m.id = $2 ORDER BY m."orderIndex"')}`,
-      [req.userId, req.params.moduleId]
+    const query = PER_USER_MODULES_QUERY.replace(
+      'ORDER BY m."orderIndex"',
+      'WHERE m.id = $2\n  ORDER BY m."orderIndex"'
     );
+    const { rows } = await pool.query(query, [req.userId, req.params.moduleId]);
     if (!rows[0]) return res.status(404).json({ error: 'Module not found' });
     const { completed, watchedPercent, quizPassed, completedAt, ...module } = rows[0];
     res.json({ ...module, userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt } : null });
