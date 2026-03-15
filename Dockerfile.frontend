@@ -5,6 +5,11 @@ COPY package.json ./
 RUN npm install --frozen-lockfile
 
 COPY . .
+
+# Pass VITE env vars at build time (Vite replaces import.meta.env.VITE_* at build time, not runtime)
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 RUN npm run build
 
 # Serve with nginx

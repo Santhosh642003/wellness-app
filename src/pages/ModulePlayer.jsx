@@ -37,7 +37,6 @@ export default function ModulePlayer() {
   const [aiRecording, setAiRecording] = useState(false);
   const [aiError, setAiError] = useState("");
   const recorderRef = useRef(null);
-  const chunksRef = useRef([]);
 
   // Load module data
   useEffect(() => {
@@ -98,39 +97,27 @@ export default function ModulePlayer() {
       ? "audio/webm;codecs=opus"
       : "audio/webm";
 
-    const processChunk = async () => {
-      if (!chunksRef.current.length) return;
-      const blob = new Blob(chunksRef.current, { type: mimeType });
-      chunksRef.current = [];
+    const recorder = new MediaRecorder(audioStream, { mimeType });
+
+    // timeslice: ondataavailable fires every 8 seconds automatically — no stop/start cycle needed
+    recorder.ondataavailable = async (e) => {
+      if (e.data.size < 2000) return; // skip near-empty chunks (silence)
       try {
-        const result = await transcribe(blob);
+        const result = await transcribe(new Blob([e.data], { type: mimeType }));
         if (result.text?.trim()) {
           setAiTranscript((prev) => [...prev, { text: result.text.trim() }]);
         }
       } catch (err) {
         console.warn("Transcription error:", err);
-        if (err.message?.includes('short') || err.message?.includes('format')) return;
-        setAiError("Transcription failed — check your GROQ_API_KEY is set.");
+        if (!err.message?.includes('short') && !err.message?.includes('format')) {
+          setAiError("Transcription failed — check your GROQ_API_KEY is set.");
+        }
       }
     };
 
-    const recorder = new MediaRecorder(audioStream, { mimeType });
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-    recorder.onstop = () => { processChunk(); };
-
-    // Restart recorder every 8 seconds for rolling transcription
-    const cycle = () => {
-      if (recorder.state === "recording") {
-        recorder.stop();
-        recorder.start();
-        setTimeout(cycle, 8000);
-      }
-    };
-
-    recorder.start();
+    recorder.start(8000); // fires ondataavailable every 8 seconds
     setAiRecording(true);
     recorderRef.current = recorder;
-    setTimeout(cycle, 8000);
   }, []);
 
   const stopAiRecording = useCallback(() => {
@@ -248,7 +235,7 @@ export default function ModulePlayer() {
                         </button>
                       )}
                       <button
-                        onClick={() => { setAiMode(false); stopAiRecording(); setAiTranscript([]); setAiStatus(""); setAiError(""); }}
+                        onClick={() => { setAiMode(false); stopAiRecording(); setAiTranscript([]); setAiError(""); }}
                         className="text-xs text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 px-2"
                       >
                         ✕ Close AI
