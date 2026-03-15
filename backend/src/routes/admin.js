@@ -2,9 +2,29 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+import path from 'path';
 import { z } from 'zod';
+import multer from 'multer';
 import pool from '../lib/db.js';
 import { adminAuth } from '../middleware/adminAuth.js';
+
+const videoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(process.cwd(), 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${Date.now()}-${safe}`);
+  },
+});
+const uploadVideo = multer({
+  storage: videoStorage,
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('video/')) cb(null, true);
+    else cb(new Error('Only video files are allowed'));
+  },
+});
 
 const router = Router();
 
@@ -75,6 +95,16 @@ router.get('/users/:id', async (req, res, next) => {
     const { password, ...safe } = user;
     res.json({ ...safe, progress: progress.rows[0], moduleProgress: moduleProgress.rows, quizAttempts: quizAttempts.rows, redemptions: redemptions.rows });
   } catch (err) { next(err); }
+});
+
+// POST /api/admin/videos/upload
+router.post('/videos/upload', uploadVideo.single('video'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No video file provided' });
+    res.json({ url: `/uploads/${req.file.filename}` });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- MODULES CRUD ---

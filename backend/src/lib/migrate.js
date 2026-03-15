@@ -112,9 +112,16 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
 );
 `;
 
+const PROFILE_FIELDS = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS major TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "graduationYear" TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
+    await pool.query(PROFILE_FIELDS);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

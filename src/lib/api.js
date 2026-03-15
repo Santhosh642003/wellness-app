@@ -43,7 +43,23 @@ async function request(path, options = {}) {
 export const auth = {
   register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  google: (credential) => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
   me: () => request('/auth/me'),
+};
+
+// Transcription
+export const transcribe = async (audioBlob) => {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'audio.webm');
+  const res = await fetch(`${BASE_URL}/transcribe`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
 };
 
 // Users
