@@ -10,6 +10,25 @@ import { sendOtpEmail } from '../lib/email.js';
 
 const router = Router();
 
+// In-memory login rate limiter: max 10 failed attempts per IP per 15 min
+const loginAttempts = new Map(); // ip -> { count, resetAt }
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 0, resetAt: now + 15 * 60 * 1000 });
+    return false; // not rate limited
+  }
+  return entry.count >= 10;
+}
+function recordFailedLogin(ip) {
+  const entry = loginAttempts.get(ip);
+  if (entry) entry.count++;
+}
+function clearLoginAttempts(ip) {
+  loginAttempts.delete(ip);
+}
+
 // Strong password: 8+ chars, uppercase, lowercase, number, special char
 const passwordSchema = z.string()
   .min(8, 'Password must be at least 8 characters')
@@ -67,6 +86,12 @@ router.post('/send-otp', async (req, res, next) => {
     if (parseInt(recent[0].count) >= 3) {
       return res.status(429).json({ error: 'Too many verification attempts. Please wait 15 minutes.' });
     }
+
+    // Clean up expired or used OTPs for this email to keep the table lean
+    await pool.query(
+      `DELETE FROM email_otps WHERE email=$1 AND ("expiresAt" < NOW() OR "usedAt" IS NOT NULL)`,
+      [normalEmail]
+    );
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -151,12 +176,17 @@ router.post('/register', async (req, res, next) => {
 // POST /api/auth/login
 router.post('/login', async (req, res, next) => {
   try {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (checkLoginRateLimit(ip)) {
+      return res.status(429).json({ error: 'Too many failed login attempts. Please wait 15 minutes.' });
+    }
     const { email, password } = loginSchema.parse(req.body);
     const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [email.toLowerCase()]);
     const user = rows[0];
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!user) { recordFailedLogin(ip); return res.status(401).json({ error: 'Invalid email or password' }); }
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!valid) { recordFailedLogin(ip); return res.status(401).json({ error: 'Invalid email or password' }); }
+    clearLoginAttempts(ip);
     const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [user.id]);
     res.json({ token: signToken(user.id), user: { ...safeUser(user), progress } });
   } catch (err) {
