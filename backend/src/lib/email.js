@@ -44,3 +44,42 @@ export async function sendOtpEmail(toEmail, code) {
     `,
   });
 }
+
+export async function sendPasswordResetEmail(toEmail, resetUrl) {
+  if (!transporter) {
+    console.log(`[DEV] Password reset link for ${toEmail}: ${resetUrl}`);
+    return { devMode: true };
+  }
+
+  const from = process.env.SMTP_FROM || `"NJIT Campus Wellness" <${process.env.SMTP_USER}>`;
+  await transporter.sendMail({
+    from,
+    to: toEmail,
+    subject: 'Reset your NJIT Wellness password',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0;padding:0;background:#0b0b0b;font-family:'Segoe UI',Helvetica,sans-serif;color:#fff;">
+        <div style="max-width:480px;margin:40px auto;background:#121212;border:1px solid #222;border-radius:16px;padding:40px;">
+          <div style="margin-bottom:24px;">
+            <span style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#6b7280;">NJIT Campus Wellness</span>
+          </div>
+          <h2 style="margin:0 0 8px;font-size:22px;font-weight:600;">Reset your password</h2>
+          <p style="color:#9ca3af;font-size:14px;margin:0 0 32px;">
+            We received a request to reset the password for your account. Click the button below to choose a new password.
+            This link expires in <strong style="color:#e5e7eb;">1 hour</strong>.
+          </p>
+          <a href="${resetUrl}" style="display:block;text-align:center;background:linear-gradient(135deg,#3b82f6,#10b981);color:#fff;text-decoration:none;font-weight:600;font-size:16px;padding:16px 32px;border-radius:12px;margin-bottom:32px;">
+            Reset Password
+          </a>
+          <p style="color:#6b7280;font-size:12px;margin:0 0 8px;">
+            If the button above doesn't work, copy and paste this URL into your browser:
+          </p>
+          <p style="color:#9ca3af;font-size:11px;word-break:break-all;margin:0 0 24px;">${resetUrl}</p>
+          <p style="color:#6b7280;font-size:12px;margin:0;">If you didn't request a password reset, you can safely ignore this email. Your password will not change.</p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+}

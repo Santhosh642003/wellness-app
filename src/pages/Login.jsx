@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { auth as authApi } from "../lib/api.js";
@@ -181,7 +181,10 @@ export default function Login() {
                 <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} type="email" placeholder="yourname@njit.edu" className={INPUT_CLS} />
               </div>
               <div>
-                <label className={LABEL_CLS}>Password</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className={LABEL_CLS} style={{ marginBottom: 0 }}>Password</label>
+                  <Link to="/forgot-password" className="text-xs text-gray-500 hover:text-emerald-400 transition-colors">Forgot password?</Link>
+                </div>
                 <input value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} type="password" placeholder="Your password" className={INPUT_CLS} />
               </div>
               {error && <p className="text-sm text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3">{error}</p>}
