@@ -26,6 +26,24 @@ const uploadVideo = multer({
   },
 });
 
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(process.cwd(), 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${Date.now()}-${safe}`);
+  },
+});
+const uploadImage = multer({
+  storage: imageStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
+
 const router = Router();
 
 // POST /api/admin/auth/login
@@ -101,6 +119,16 @@ router.get('/users/:id', async (req, res, next) => {
 router.post('/videos/upload', uploadVideo.single('video'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No video file provided' });
+    res.json({ url: `/uploads/${req.file.filename}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/images/upload
+router.post('/images/upload', uploadImage.single('image'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image file provided' });
     res.json({ url: `/uploads/${req.file.filename}` });
   } catch (err) {
     next(err);
@@ -252,7 +280,7 @@ router.post('/rewards', async (req, res, next) => {
 
 router.patch('/rewards/:id', async (req, res, next) => {
   try {
-    const d = z.object({ title: z.string().optional(), description: z.string().optional(), pointsCost: z.number().optional(), category: z.string().optional(), stock: z.number().optional(), available: z.boolean().optional() }).parse(req.body);
+    const d = z.object({ title: z.string().optional(), description: z.string().optional(), pointsCost: z.number().optional(), category: z.string().optional(), stock: z.number().optional(), available: z.boolean().optional(), imageUrl: z.string().optional() }).parse(req.body);
     const fields = Object.keys(d);
     if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
     const sets = fields.map((k, i) => `"${k}"=$${i + 1}`);

@@ -84,8 +84,8 @@ router.get('/quiz/biweekly', async (req, res, next) => {
     // Check if user already attempted within the last 14 days
     const { rows: [recentAttempt] } = await pool.query(
       `SELECT * FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
-       AND created_at > NOW() - INTERVAL '14 days'
-       ORDER BY created_at DESC LIMIT 1`,
+       AND "createdAt" > NOW() - INTERVAL '14 days'
+       ORDER BY "createdAt" DESC LIMIT 1`,
       [req.userId]
     );
 

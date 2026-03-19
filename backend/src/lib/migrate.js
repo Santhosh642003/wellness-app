@@ -116,12 +116,31 @@ const PROFILE_FIELDS = `
 ALTER TABLE users ADD COLUMN IF NOT EXISTS major TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "graduationYear" TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "yearOfStudy" TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ethnicity TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS "keyPoints" JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS transcript JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE rewards ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;
+`;
+
+const OTP_TABLE = `
+CREATE TABLE IF NOT EXISTS email_otps (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "usedAt" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS email_otps_email_idx ON email_otps(email);
 `;
 
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
     await pool.query(PROFILE_FIELDS);
+    await pool.query(OTP_TABLE);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);
