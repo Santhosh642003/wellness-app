@@ -204,12 +204,12 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
     // Enforce 14-day cooldown for bi-weekly quiz
     if (data.quizType === 'biweekly') {
       const { rows: [recent] } = await pool.query(
-        `SELECT created_at FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
-         AND created_at > NOW() - INTERVAL '14 days' ORDER BY created_at DESC LIMIT 1`,
+        `SELECT "createdAt" FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
+         AND "createdAt" > NOW() - INTERVAL '14 days' ORDER BY "createdAt" DESC LIMIT 1`,
         [req.params.userId]
       );
       if (recent) {
-        const nextAvailable = new Date(recent.created_at);
+        const nextAvailable = new Date(recent.createdAt);
         nextAvailable.setDate(nextAvailable.getDate() + 14);
         return res.status(409).json({ error: 'Already completed this period', nextAvailable: nextAvailable.toISOString() });
       }
@@ -253,9 +253,9 @@ router.get('/:userId/activity', requireSelf, async (req, res, next) => {
     const { rows } = await pool.query(
       `SELECT DISTINCT TO_CHAR(day::date, 'YYYY-MM-DD') AS date
        FROM (
-         SELECT created_at AS day
+         SELECT "createdAt" AS day
          FROM quiz_attempts
-         WHERE "userId" = $1 AND created_at >= NOW() - INTERVAL '90 days'
+         WHERE "userId" = $1 AND "createdAt" >= NOW() - INTERVAL '90 days'
          UNION ALL
          SELECT "completedAt" AS day
          FROM user_module_progress

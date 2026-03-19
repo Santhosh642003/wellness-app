@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
+import VideoPlayer from "../components/VideoPlayer";
 import { MODULE_CONTENT } from "../data/moduleContent";
 import { useAuth } from "../contexts/AuthContext";
 import { modules as modulesApi, users as usersApi, transcribe } from "../lib/api";
@@ -176,18 +177,13 @@ export default function ModulePlayer() {
             {/* ── Video Player ─────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
               <div className="aspect-video bg-black">
-                <video
-                  ref={videoRef}
+                <VideoPlayer
                   key={moduleId}
                   src={mod?.videoUrl || content.videoUrl}
-                  controls
+                  videoRef={videoRef}
                   onTimeUpdate={handleTimeUpdate}
                   className="w-full h-full"
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                >
-                  Your browser does not support HTML5 video.
-                </video>
+                />
               </div>
 
               {/* Caption control bar */}
