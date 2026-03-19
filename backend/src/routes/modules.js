@@ -46,10 +46,11 @@ router.get('/', async (req, res, next) => {
 // GET /api/modules/:moduleId
 router.get('/:moduleId', async (req, res, next) => {
   try {
-    const { rows } = await pool.query(
-      `${PER_USER_MODULES_QUERY.replace('ORDER BY m."orderIndex"', 'AND m.id = $2 ORDER BY m."orderIndex"')}`,
-      [req.userId, req.params.moduleId]
+    const query = PER_USER_MODULES_QUERY.replace(
+      'ORDER BY m."orderIndex"',
+      'WHERE m.id = $2\n  ORDER BY m."orderIndex"'
     );
+    const { rows } = await pool.query(query, [req.userId, req.params.moduleId]);
     if (!rows[0]) return res.status(404).json({ error: 'Module not found' });
     const { completed, watchedPercent, quizPassed, completedAt, ...module } = rows[0];
     res.json({ ...module, userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt } : null });
@@ -79,11 +80,34 @@ router.get('/quiz/biweekly', async (req, res, next) => {
   try {
     const { rows: [quiz] } = await pool.query(`SELECT * FROM quizzes WHERE type='biweekly' LIMIT 1`);
     if (!quiz) return res.status(404).json({ error: 'Biweekly quiz not found' });
+
+    // Check if user already attempted within the last 14 days
+    const { rows: [recentAttempt] } = await pool.query(
+      `SELECT * FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
+       AND created_at > NOW() - INTERVAL '14 days'
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.userId]
+    );
+
+    if (recentAttempt) {
+      const nextAvailable = new Date(recentAttempt.created_at);
+      nextAvailable.setDate(nextAvailable.getDate() + 14);
+      return res.json({
+        ...quiz,
+        questions: [],
+        alreadyAttempted: true,
+        score: recentAttempt.score,
+        totalPoints: recentAttempt.totalPoints,
+        passed: recentAttempt.passed,
+        nextAvailable: nextAvailable.toISOString(),
+      });
+    }
+
     const { rows: questions } = await pool.query(
       `SELECT * FROM quiz_questions WHERE "quizId"=$1 ORDER BY "orderIndex"`,
       [quiz.id]
     );
-    res.json({ ...quiz, questions });
+    res.json({ ...quiz, questions, alreadyAttempted: false });
   } catch (err) { next(err); }
 });
 

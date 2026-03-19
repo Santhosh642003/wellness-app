@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function Login() {
-  const { login, register } = useAuth();
+  const { login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState("login"); // "login" | "register"
@@ -158,6 +159,38 @@ export default function Login() {
             </>
           )}
         </p>
+
+        {/* Google Sign-In */}
+        {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+          <div className="mt-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-gray-800" />
+              <span className="text-xs text-gray-600">or continue with Google</span>
+              <div className="flex-1 h-px bg-gray-800" />
+            </div>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={async ({ credential }) => {
+                  setLoading(true);
+                  setError("");
+                  try {
+                    await loginWithGoogle(credential);
+                    navigate("/dashboard");
+                  } catch (err) {
+                    setError(err.message || "Google sign-in failed. Ensure you use an @njit.edu account.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                onError={() => setError("Google sign-in was cancelled or failed.")}
+                theme="filled_black"
+                shape="rectangular"
+                text={mode === "register" ? "signup_with" : "signin_with"}
+              />
+            </div>
+            <p className="text-xs text-gray-600 mt-3 text-center">Only @njit.edu Google accounts are accepted.</p>
+          </div>
+        )}
 
         <p className="text-xs text-gray-600 mt-4">
           Your password is securely hashed and never stored in plain text.

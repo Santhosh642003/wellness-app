@@ -6,16 +6,64 @@ import Toast from "../components/Toast";
 import { useAuth } from "../contexts/AuthContext";
 import { users as usersApi } from "../lib/api";
 
+function ProfileCompletionBar({ profileData }) {
+  const fields = [
+    { key: "major", label: "Major" },
+    { key: "graduationYear", label: "Graduation Year" },
+    { key: "bio", label: "Bio" },
+    { key: "campus", label: "Campus", check: (v) => v && v !== "NJIT Newark" },
+  ];
+  const filled = fields.filter(({ key, check }) =>
+    check ? check(profileData?.[key]) : !!profileData?.[key]
+  ).length;
+  const pct = Math.round((filled / fields.length) * 100);
+  const missing = fields
+    .filter(({ key, check }) => !(check ? check(profileData?.[key]) : !!profileData?.[key]))
+    .map(({ label }) => label);
+
+  if (pct === 100) {
+    return (
+      <div className="mb-6 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl px-5 py-3 flex items-center gap-3">
+        <span className="text-emerald-500 text-lg">✓</span>
+        <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Profile complete!</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-6 bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl px-5 py-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-slate-700 dark:text-gray-300">Profile {pct}% complete</span>
+        <span className="text-xs text-slate-400 dark:text-gray-500">{filled}/{fields.length} fields</span>
+      </div>
+      <div className="h-2 rounded-full bg-slate-100 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {missing.length > 0 && (
+        <p className="text-xs text-slate-400 dark:text-gray-500 mt-2">
+          Add your {missing.join(", ")} to complete your profile
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [toast, setToast] = useState("");
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(""), 2000);
+    const t = setTimeout(() => setToast(""), 3000);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -47,6 +95,35 @@ export default function Profile() {
   }, [moduleProgresses, totalModules]);
 
   const nextModule = moduleProgresses.find((m) => !m.locked && !m.completed);
+
+  const startEdit = () => {
+    setForm({
+      name: profileData?.name || "",
+      role: profileData?.role || "Student",
+      campus: profileData?.campus || "NJIT Newark",
+      major: profileData?.major || "",
+      graduationYear: profileData?.graduationYear || "",
+      bio: profileData?.bio || "",
+    });
+    setEditing(true);
+  };
+
+  const cancelEdit = () => setEditing(false);
+
+  const saveEdit = async () => {
+    if (!user?.id) return;
+    setSaving(true);
+    try {
+      const updated = await usersApi.updateProfile(user.id, form);
+      setProfileData((prev) => ({ ...prev, ...updated }));
+      setEditing(false);
+      setToast("Profile saved!");
+    } catch (err) {
+      setToast(err.message || "Failed to save profile");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const signOut = () => {
     logout();
@@ -80,23 +157,122 @@ export default function Profile() {
           </button>
         </div>
 
+        {/* Profile completion progress */}
+        <ProfileCompletionBar profileData={profileData} />
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <section className="lg:col-span-8 space-y-6">
             {/* User Card */}
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-emerald-400/20 border border-slate-200 dark:border-gray-700 flex items-center justify-center text-lg font-semibold text-slate-900 dark:text-white">
-                    {user?.initials || "SN"}
+              {!editing ? (
+                <>
+                  <div className="flex items-start justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-emerald-400/20 border border-slate-200 dark:border-gray-700 flex items-center justify-center text-lg font-semibold text-slate-900 dark:text-white">
+                        {user?.initials || "SN"}
+                      </div>
+                      <div>
+                        <div className="text-xl font-semibold text-slate-900 dark:text-white">{profileData?.name || user?.name || "Student"}</div>
+                        <div className="text-slate-500 dark:text-gray-400 text-sm">{user?.email}</div>
+                        <div className="text-slate-400 dark:text-gray-500 text-xs mt-1">
+                          {profileData?.role || "Student"} · {profileData?.campus || "NJIT"}
+                          {profileData?.major && ` · ${profileData.major}`}
+                          {profileData?.graduationYear && ` · Class of ${profileData.graduationYear}`}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={startEdit} className="text-sm px-4 py-2 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-[#141414]">
+                      Edit
+                    </button>
                   </div>
-                  <div>
-                    <div className="text-xl font-semibold text-slate-900 dark:text-white">{user?.name || "Student"}</div>
-                    <div className="text-slate-500 dark:text-gray-400 text-sm">{user?.email}</div>
-                    <div className="text-slate-400 dark:text-gray-500 text-xs mt-1">{profileData?.role || "Student"} · {profileData?.campus || "NJIT"}</div>
+                  {profileData?.bio && (
+                    <p className="mt-4 text-sm text-slate-600 dark:text-gray-400 leading-relaxed border-t border-slate-100 dark:border-gray-800 pt-4">
+                      {profileData.bio}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-5">Edit Profile</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Full Name</label>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                        className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Role</label>
+                        <select
+                          value={form.role}
+                          onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        >
+                          {["Student", "Faculty", "Staff"].map((r) => <option key={r}>{r}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Campus</label>
+                        <select
+                          value={form.campus}
+                          onChange={(e) => setForm((f) => ({ ...f, campus: e.target.value }))}
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        >
+                          {["NJIT Newark", "NJIT Jersey City"].map((c) => <option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Major</label>
+                        <input
+                          value={form.major}
+                          onChange={(e) => setForm((f) => ({ ...f, major: e.target.value }))}
+                          placeholder="e.g. Computer Science"
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Graduation Year</label>
+                        <input
+                          value={form.graduationYear}
+                          onChange={(e) => setForm((f) => ({ ...f, graduationYear: e.target.value }))}
+                          placeholder="e.g. 2026"
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">
+                        Bio <span className="font-normal text-slate-400">({(form.bio || "").length}/500)</span>
+                      </label>
+                      <textarea
+                        value={form.bio}
+                        onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value.slice(0, 500) }))}
+                        rows={3}
+                        placeholder="Tell us a little about yourself…"
+                        className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        onClick={saveEdit}
+                        disabled={saving}
+                        className="px-5 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 disabled:opacity-50"
+                      >
+                        {saving ? "Saving…" : "Save changes"}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="px-5 py-2 rounded-xl text-sm border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-[#141414]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <button onClick={() => setToast("Edit profile coming soon")} className="text-sm px-4 py-2 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-[#141414]">Edit</button>
-              </div>
+              )}
             </div>
 
             {/* Learning Progress */}

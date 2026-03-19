@@ -56,6 +56,15 @@ export function AuthProvider({ children }) {
     return u;
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential) => {
+    const { token, user: u } = await authApi.google(credential);
+    localStorage.setItem('wellness_token', token);
+    localStorage.setItem('wellness_logged_in', 'true');
+    clearStaleData();
+    setUser(u);
+    return u;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('wellness_token');
     localStorage.removeItem('wellness_logged_in');
@@ -66,7 +75,7 @@ export function AuthProvider({ children }) {
   const isLoggedIn = !!user || localStorage.getItem('wellness_logged_in') === 'true';
 
   return (
-    <AuthContext.Provider value={{ user, loading, isLoggedIn, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, isLoggedIn, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

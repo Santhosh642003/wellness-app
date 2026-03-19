@@ -3,6 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import 'dotenv/config';
 
 import authRoutes from './routes/auth.js';
@@ -11,9 +14,14 @@ import moduleRoutes from './routes/modules.js';
 import rewardRoutes from './routes/rewards.js';
 import adminRoutes from './routes/admin.js';
 import leaderboardRoutes from './routes/leaderboard.js';
+import transcribeRoutes from './routes/transcribe.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { migrate } from './lib/migrate.js';
 import { seed } from './lib/seed.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -51,12 +59,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Serve uploaded videos as static files
+app.use('/uploads', express.static(uploadsDir));
+
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/rewards', rewardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api', transcribeRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

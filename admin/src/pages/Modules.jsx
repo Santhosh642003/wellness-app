@@ -1,12 +1,80 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, Upload } from 'lucide-react';
 
 const EMPTY = { slug: '', title: '', description: '', duration: '', category: 'HPV', orderIndex: 0, pointsValue: 100, locked: true, videoUrl: '' };
 
+function VideoUploader({ value, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    setProgress(0);
+    setError('');
+    try {
+      const result = await api.uploadVideo(file, setProgress);
+      onChange(result.url);
+    } catch (err) {
+      setError(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm hover:bg-gray-700 disabled:opacity-50"
+        >
+          <Upload size={14} />
+          {uploading ? `Uploading ${progress}%` : 'Upload video'}
+        </button>
+        <span className="text-gray-500 text-sm self-center">or paste URL below</span>
+      </div>
+
+      {uploading && (
+        <div className="h-1.5 w-full rounded-full bg-gray-800 overflow-hidden">
+          <div
+            className="h-full bg-emerald-500 transition-all duration-200 rounded-full"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https://... or /uploads/filename.mp4"
+        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+      />
+
+      {value && (
+        <p className="text-gray-500 text-xs truncate">Current: {value}</p>
+      )}
+    </div>
+  );
+}
+
 export default function Modules() {
   const [modules, setModules] = useState([]);
-  const [form, setForm] = useState(null); // null | { ...module } for edit, or EMPTY for new
+  const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const load = () => api.modules().then(setModules).catch(console.error);
@@ -40,18 +108,28 @@ export default function Modules() {
         <div className="bg-gray-900 border border-emerald-600/40 rounded-xl p-6 mb-6">
           <h3 className="text-white font-semibold mb-4">{form.id ? 'Edit Module' : 'New Module'}</h3>
           <div className="grid grid-cols-2 gap-4">
-            {[['title','Title'],['slug','Slug'],['description','Description'],['duration','Duration (e.g. 12 min)'],['videoUrl','Video URL']].map(([k,label]) => (
-              <div key={k} className={k === 'description' || k === 'videoUrl' ? 'col-span-2' : ''}>
+            {[['title','Title'],['slug','Slug'],['description','Description'],['duration','Duration (e.g. 12 min)']].map(([k,label]) => (
+              <div key={k} className={k === 'description' ? 'col-span-2' : ''}>
                 <label className="block text-gray-400 text-xs mb-1">{label}</label>
                 <input value={form[k]} onChange={e => setForm(f => ({...f,[k]:e.target.value}))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
               </div>
             ))}
+
+            {/* Video upload section */}
+            <div className="col-span-2">
+              <label className="block text-gray-400 text-xs mb-2">Video</label>
+              <VideoUploader
+                value={form.videoUrl}
+                onChange={(url) => setForm(f => ({ ...f, videoUrl: url }))}
+              />
+            </div>
+
             <div>
               <label className="block text-gray-400 text-xs mb-1">Category</label>
               <select value={form.category} onChange={e => setForm(f => ({...f,category:e.target.value}))}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm">
-                {['HPV','MenB','Bonus'].map(c => <option key={c}>{c}</option>)}
+                {['HPV','MenB','Bonus', 'Foundations'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
@@ -81,7 +159,7 @@ export default function Modules() {
           <thead className="border-b border-gray-800">
             <tr className="text-gray-400 text-left">
               <th className="px-4 py-3">#</th><th className="px-4 py-3">Title</th><th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Duration</th><th className="px-4 py-3">Points</th><th className="px-4 py-3">Status</th><th className="px-4 py-3"></th>
+              <th className="px-4 py-3">Duration</th><th className="px-4 py-3">Points</th><th className="px-4 py-3">Video</th><th className="px-4 py-3">Status</th><th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -92,6 +170,12 @@ export default function Modules() {
                 <td className="px-4 py-3"><span className="px-2 py-1 rounded-full text-xs bg-blue-900/30 text-blue-300 border border-blue-800/30">{m.category}</span></td>
                 <td className="px-4 py-3 text-gray-400">{m.duration}</td>
                 <td className="px-4 py-3 text-emerald-400">{m.pointsValue}</td>
+                <td className="px-4 py-3">
+                  {m.videoUrl
+                    ? <span className="text-xs text-emerald-400">✓ set</span>
+                    : <span className="text-xs text-gray-600">—</span>
+                  }
+                </td>
                 <td className="px-4 py-3"><span className={`text-xs ${m.locked ? 'text-red-400':'text-emerald-400'}`}>{m.locked?'Locked':'Unlocked'}</span></td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">

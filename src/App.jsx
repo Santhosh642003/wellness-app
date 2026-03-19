@@ -8,6 +8,7 @@ import ModulePlayer from "./pages/ModulePlayer.jsx";
 import Profile from "./pages/Profile.jsx";
 import BiWeeklyQuiz from "./pages/BiWeeklyQuiz.jsx";
 import ModuleQuiz from "./pages/ModuleQuiz.jsx";
+import Leaderboard from "./pages/Leaderboard.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="/rewards" element={<ProtectedRoute><Rewards /></ProtectedRoute>} />
       <Route path="/quiz/biweekly" element={<ProtectedRoute><BiWeeklyQuiz /></ProtectedRoute>} />
       <Route path="/quiz/module/:moduleId" element={<ProtectedRoute><ModuleQuiz /></ProtectedRoute>} />
+      <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

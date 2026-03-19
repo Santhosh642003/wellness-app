@@ -4,7 +4,7 @@ import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import { MODULE_CONTENT } from "../data/moduleContent";
 import { useAuth } from "../contexts/AuthContext";
-import { modules as modulesApi, users as usersApi } from "../lib/api";
+import { modules as modulesApi, users as usersApi, transcribe } from "../lib/api";
 
 const ORDER_TO_KEY = ["m1", "m2", "m3", "m4", "m5", "m6"];
 
@@ -15,23 +15,6 @@ function getContent(mod) {
   return MODULE_CONTENT[key] || MODULE_CONTENT["m1"];
 }
 
-// Resample an AudioBuffer to 16 kHz mono Float32Array for Whisper
-async function resampleTo16kMono(blob) {
-  const arrayBuffer = await blob.arrayBuffer();
-  const tempCtx = new AudioContext();
-  const decoded = await tempCtx.decodeAudioData(arrayBuffer);
-  await tempCtx.close();
-
-  const targetRate = 16000;
-  const length = Math.ceil(decoded.duration * targetRate);
-  const offCtx = new OfflineAudioContext(1, length, targetRate);
-  const src = offCtx.createBufferSource();
-  src.buffer = decoded;
-  src.connect(offCtx.destination);
-  src.start(0);
-  const rendered = await offCtx.startRendering();
-  return rendered.getChannelData(0);
-}
 
 export default function ModulePlayer() {
   const { moduleId } = useParams();
@@ -49,14 +32,11 @@ export default function ModulePlayer() {
 
   // AI transcription state
   const [aiMode, setAiMode] = useState(false);
-  const [aiStatus, setAiStatus] = useState(""); // loading message
-  const [aiReady, setAiReady] = useState(false);
+  const [aiReady] = useState(true); // always ready — API-based, no model download
   const [aiTranscript, setAiTranscript] = useState([]); // [{text}]
   const [aiRecording, setAiRecording] = useState(false);
   const [aiError, setAiError] = useState("");
-  const workerRef = useRef(null);
   const recorderRef = useRef(null);
-  const chunksRef = useRef([]);
 
   // Load module data
   useEffect(() => {
@@ -87,30 +67,10 @@ export default function ModulePlayer() {
     if (videoRef.current) setVideoTime(Math.floor(videoRef.current.currentTime));
   }, []);
 
-  // ─── Whisper worker lifecycle ──────────────────────────────────────────────
-  useEffect(() => {
-    const worker = new Worker(
-      new URL("../workers/whisper.worker.js", import.meta.url),
-      { type: "module" }
-    );
-    worker.onmessage = ({ data }) => {
-      if (data.type === "status")  setAiStatus(data.message);
-      if (data.type === "ready")   { setAiReady(true); setAiStatus(""); }
-      if (data.type === "result")  setAiTranscript((prev) => [...prev, { text: data.text }]);
-      if (data.type === "error")   setAiError(data.message);
-    };
-    workerRef.current = worker;
-    return () => worker.terminate();
-  }, []);
-
   const loadAiModel = () => {
     setAiMode(true);
     setAiError("");
     setAiTranscript([]);
-    if (!aiReady) {
-      setAiStatus("Initialising…");
-      workerRef.current.postMessage({ type: "load" });
-    }
   };
 
   // Start capturing audio from the <video> in rolling 8-second windows
@@ -137,35 +97,27 @@ export default function ModulePlayer() {
       ? "audio/webm;codecs=opus"
       : "audio/webm";
 
-    const processChunk = async () => {
-      if (!chunksRef.current.length) return;
-      const blob = new Blob(chunksRef.current, { type: mimeType });
-      chunksRef.current = [];
-      try {
-        const float32 = await resampleTo16kMono(blob);
-        workerRef.current.postMessage({ type: "transcribe", audio: float32 }, [float32.buffer]);
-      } catch (err) {
-        console.warn("Audio processing error:", err);
-      }
-    };
-
     const recorder = new MediaRecorder(audioStream, { mimeType });
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-    recorder.onstop = () => { processChunk(); };
 
-    // Restart recorder every 8 seconds for rolling transcription
-    const cycle = () => {
-      if (recorder.state === "recording") {
-        recorder.stop();
-        recorder.start();
-        setTimeout(cycle, 8000);
+    // timeslice: ondataavailable fires every 8 seconds automatically — no stop/start cycle needed
+    recorder.ondataavailable = async (e) => {
+      if (e.data.size < 2000) return; // skip near-empty chunks (silence)
+      try {
+        const result = await transcribe(new Blob([e.data], { type: mimeType }));
+        if (result.text?.trim()) {
+          setAiTranscript((prev) => [...prev, { text: result.text.trim() }]);
+        }
+      } catch (err) {
+        console.warn("Transcription error:", err);
+        if (!err.message?.includes('short') && !err.message?.includes('format')) {
+          setAiError("Transcription failed — check your GROQ_API_KEY is set.");
+        }
       }
     };
 
-    recorder.start();
+    recorder.start(8000); // fires ondataavailable every 8 seconds
     setAiRecording(true);
     recorderRef.current = recorder;
-    setTimeout(cycle, 8000);
   }, []);
 
   const stopAiRecording = useCallback(() => {
@@ -227,7 +179,7 @@ export default function ModulePlayer() {
                 <video
                   ref={videoRef}
                   key={moduleId}
-                  src={content.videoUrl}
+                  src={mod?.videoUrl || content.videoUrl}
                   controls
                   onTimeUpdate={handleTimeUpdate}
                   className="w-full h-full"
@@ -283,7 +235,7 @@ export default function ModulePlayer() {
                         </button>
                       )}
                       <button
-                        onClick={() => { setAiMode(false); stopAiRecording(); setAiTranscript([]); setAiStatus(""); setAiError(""); }}
+                        onClick={() => { setAiMode(false); stopAiRecording(); setAiTranscript([]); setAiError(""); }}
                         className="text-xs text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 px-2"
                       >
                         ✕ Close AI
@@ -330,17 +282,9 @@ export default function ModulePlayer() {
                     }
                   </span>
                   <span className="text-xs font-medium text-violet-500 dark:text-violet-400 uppercase tracking-wider">
-                    AI Transcription {aiRecording ? "— Recording" : aiReady ? "— Ready" : ""}
+                    AI Transcription {aiRecording ? "— Recording" : "— Ready"}
                   </span>
                 </div>
-
-                {/* Status / loading */}
-                {aiStatus && !aiReady && (
-                  <div className="flex items-center gap-3 py-2">
-                    <div className="h-4 w-4 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
-                    <p className="text-sm text-violet-600 dark:text-violet-300">{aiStatus}</p>
-                  </div>
-                )}
 
                 {/* Error */}
                 {aiError && (
@@ -378,7 +322,7 @@ export default function ModulePlayer() {
                 )}
 
                 <p className="text-[10px] text-slate-400 dark:text-gray-600 mt-3">
-                  Powered by OpenAI Whisper (tiny.en) · runs locally in your browser · no data sent to any server
+                  Powered by Groq Whisper · fast cloud transcription · audio processed securely
                 </p>
               </div>
             )}
@@ -467,7 +411,7 @@ export default function ModulePlayer() {
             <div className="bg-violet-50 dark:bg-violet-500/5 border border-violet-200 dark:border-violet-500/15 rounded-2xl p-5">
               <div className="text-xs font-semibold text-violet-600 dark:text-violet-300 mb-1">✨ AI Live Transcription</div>
               <div className="text-xs text-slate-500 dark:text-gray-500 leading-relaxed">
-                Click <strong>AI Live Transcribe</strong> to run OpenAI Whisper locally in your browser — no server, no internet needed after model load.
+                Click <strong>AI Live Transcribe</strong> to transcribe video audio every 8 seconds using Groq Whisper — instant, cloud-powered, always ready.
               </div>
             </div>
           </aside>

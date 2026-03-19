@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import pool from '../lib/db.js';
 import { authenticate } from '../middleware/auth.js';
 
@@ -90,6 +91,69 @@ router.post('/login', async (req, res, next) => {
     const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [user.id]);
     res.json({ token: signToken(user.id), user: { ...safeUser(user), progress } });
   } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/google
+router.post('/google', async (req, res, next) => {
+  try {
+    const { credential } = z.object({ credential: z.string() }).parse(req.body);
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) return res.status(503).json({ error: 'Google auth not configured' });
+
+    const client = new OAuth2Client(clientId);
+    const ticket = await client.verifyIdToken({ idToken: credential, audience: clientId });
+    const payload = ticket.getPayload();
+    const email = (payload.email || '').toLowerCase();
+
+    if (!email.endsWith('@njit.edu')) {
+      return res.status(403).json({ error: 'Only NJIT email addresses (@njit.edu) are allowed' });
+    }
+
+    const { rows: existing } = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
+    let user = existing[0];
+
+    if (!user) {
+      const fullName = payload.name || email.split('@')[0];
+      const nameParts = fullName.trim().split(' ');
+      const initials = nameParts.length >= 2
+        ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+        : fullName.slice(0, 2).toUpperCase();
+      const userId = randomUUID();
+
+      const dbClient = await pool.connect();
+      try {
+        await dbClient.query('BEGIN');
+        await dbClient.query(
+          `INSERT INTO users (id, email, name, password, initials, role, campus)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [userId, email, fullName.trim(), '', initials, 'Student', 'NJIT Newark']
+        );
+        await dbClient.query(`INSERT INTO user_progress (id, "userId") VALUES ($1,$2)`, [randomUUID(), userId]);
+        const { rows: modules } = await dbClient.query('SELECT id FROM modules');
+        for (const m of modules) {
+          await dbClient.query(
+            `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+            [randomUUID(), userId, m.id]
+          );
+        }
+        await dbClient.query('COMMIT');
+      } catch (err) {
+        await dbClient.query('ROLLBACK');
+        throw err;
+      } finally {
+        dbClient.release();
+      }
+
+      const { rows: [newUser] } = await pool.query('SELECT * FROM users WHERE id=$1', [userId]);
+      user = newUser;
+    }
+
+    const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [user.id]);
+    res.json({ token: signToken(user.id), user: { ...safeUser(user), progress } });
+  } catch (err) {
+    if (err.message?.includes('Invalid token')) return res.status(401).json({ error: 'Invalid Google token' });
     next(err);
   }
 });
