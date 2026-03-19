@@ -200,6 +200,21 @@ const quizSchema = z.object({
 router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
   try {
     const data = quizSchema.parse(req.body);
+
+    // Enforce 14-day cooldown for bi-weekly quiz
+    if (data.quizType === 'biweekly') {
+      const { rows: [recent] } = await pool.query(
+        `SELECT created_at FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
+         AND created_at > NOW() - INTERVAL '14 days' ORDER BY created_at DESC LIMIT 1`,
+        [req.params.userId]
+      );
+      if (recent) {
+        const nextAvailable = new Date(recent.created_at);
+        nextAvailable.setDate(nextAvailable.getDate() + 14);
+        return res.status(409).json({ error: 'Already completed this period', nextAvailable: nextAvailable.toISOString() });
+      }
+    }
+
     const passed = data.score / data.totalPoints >= 0.7;
     const pointsEarned = passed ? Math.round(data.score * 0.5) : 0;
 

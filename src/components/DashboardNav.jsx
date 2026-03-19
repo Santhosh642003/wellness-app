@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, BookOpen, Gift, User, Sun, Moon } from "lucide-react";
+import { Home, BookOpen, Gift, User, Sun, Moon, Trophy } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 
 function NavItem({ to, children }) {
@@ -41,6 +41,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "S
           <NavItem to="/dashboard"><Home size={16} />Dashboard</NavItem>
           <NavItem to="/modules"><BookOpen size={16} />Modules</NavItem>
           <NavItem to="/rewards"><Gift size={16} />Rewards</NavItem>
+          <NavItem to="/leaderboard"><Trophy size={16} />Leaderboard</NavItem>
           <NavItem to="/profile"><User size={16} />Profile</NavItem>
         </nav>
 
@@ -82,6 +83,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "S
         <NavItem to="/dashboard"><Home size={15} />Home</NavItem>
         <NavItem to="/modules"><BookOpen size={15} />Modules</NavItem>
         <NavItem to="/rewards"><Gift size={15} />Rewards</NavItem>
+        <NavItem to="/leaderboard"><Trophy size={15} />Leaderboard</NavItem>
         <NavItem to="/profile"><User size={15} />Profile</NavItem>
       </div>
     </header>

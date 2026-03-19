@@ -179,7 +179,7 @@ export default function ModulePlayer() {
                 <video
                   ref={videoRef}
                   key={moduleId}
-                  src={content.videoUrl}
+                  src={mod?.videoUrl || content.videoUrl}
                   controls
                   onTimeUpdate={handleTimeUpdate}
                   className="w-full h-full"
