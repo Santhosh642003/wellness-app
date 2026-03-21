@@ -4,9 +4,16 @@ import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import pool from '../lib/db.js';
 import { adminAuth } from '../middleware/adminAuth.js';
 import { uploadFile, deleteFile } from '../lib/storage.js';
+
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts, please try again later.' },
+});
 
 // Use memory storage — the file buffer is passed to the storage module
 const uploadVideo = multer({
@@ -30,7 +37,7 @@ const uploadImage = multer({
 const router = Router();
 
 // POST /api/admin/auth/login
-router.post('/auth/login', async (req, res, next) => {
+router.post('/auth/login', adminLoginLimiter, async (req, res, next) => {
   try {
     const { email, password } = z.object({ email: z.string().email(), password: z.string() }).parse(req.body);
     const { rows } = await pool.query('SELECT * FROM admin_users WHERE email=$1', [email.toLowerCase()]);

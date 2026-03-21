@@ -56,7 +56,7 @@ export default function BiWeeklyQuiz() {
 
   if (error) return (
     <div style={pageStyle} className="items-center justify-center flex">
-      <DashboardNav initials={user?.initials || "SN"} />
+      <DashboardNav initials={user?.initials || "?"} />
       <p className="text-red-500 mt-20 text-center">{error}</p>
     </div>
   );
@@ -74,7 +74,7 @@ export default function BiWeeklyQuiz() {
       : 0;
     return (
       <div style={pageStyle}>
-        <DashboardNav initials={user?.initials || "SN"} />
+        <DashboardNav initials={user?.initials || "?"} />
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md w-full text-center">
             <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 flex items-center justify-center mx-auto mb-6 text-4xl">
@@ -111,7 +111,7 @@ export default function BiWeeklyQuiz() {
 
   return (
     <div style={pageStyle}>
-      <DashboardNav initials={user?.initials || "SN"} />
+      <DashboardNav initials={user?.initials || "?"} />
       <div className="flex-1">
         <QuizEngine
           title="Bi-Weekly Competition"

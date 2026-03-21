@@ -65,7 +65,7 @@ export default function ModuleQuiz() {
 
   return (
     <div style={pageStyle}>
-      <DashboardNav initials={user?.initials || "SN"} />
+      <DashboardNav initials={user?.initials || "?"} />
       <div className="flex-1">
         <QuizEngine
           title="Module Quiz"

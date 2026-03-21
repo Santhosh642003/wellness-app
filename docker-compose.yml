@@ -36,6 +36,8 @@ services:
       ADMIN_URL: ${ADMIN_URL:-http://localhost:8080}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@njit.edu}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@1234}
       DB_SSL: ${DB_SSL:-false}
       # Email (SMTP)
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}

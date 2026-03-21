@@ -18,6 +18,22 @@ import transcribeRoutes from './routes/transcribe.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { migrate } from './lib/migrate.js';
 import { seed } from './lib/seed.js';
+import pool from './lib/db.js';
+
+// ── Fail-fast env validation ─────────────────────────────────────────────────
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET'];
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length) {
+  console.error(`[startup] Missing required env vars: ${missing.join(', ')}`);
+  process.exit(1);
+}
+if (
+  process.env.NODE_ENV === 'production' &&
+  process.env.JWT_SECRET === 'change-me-in-production-use-a-long-random-string'
+) {
+  console.error('[startup] JWT_SECRET is still the default placeholder — set a real secret in production.');
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -52,11 +68,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('dev'));
+  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      storage: process.env.S3_BUCKET ? 's3' : 'local',
+    });
+  } catch (err) {
+    res.status(503).json({ status: 'error', error: 'Database unreachable' });
+  }
 });
 
 // Serve uploaded videos as static files

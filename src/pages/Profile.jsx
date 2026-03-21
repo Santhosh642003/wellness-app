@@ -143,7 +143,7 @@ export default function Profile() {
       <DashboardNav
         points={progress.points || 0}
         streakDays={progress.streakDays || 0}
-        initials={user?.initials || "SN"}
+        initials={user?.initials || "?"}
       />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
@@ -169,7 +169,7 @@ export default function Profile() {
                   <div className="flex items-start justify-between gap-6">
                     <div className="flex items-center gap-4">
                       <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-emerald-400/20 border border-slate-200 dark:border-gray-700 flex items-center justify-center text-lg font-semibold text-slate-900 dark:text-white">
-                        {user?.initials || "SN"}
+                        {user?.initials || "?"}
                       </div>
                       <div>
                         <div className="text-xl font-semibold text-slate-900 dark:text-white">{profileData?.name || user?.name || "Student"}</div>
