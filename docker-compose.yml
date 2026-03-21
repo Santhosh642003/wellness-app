@@ -28,7 +28,8 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-wellness_user}:${POSTGRES_PASSWORD:-wellness_secret}@db:5432/${POSTGRES_DB:-wellness_db}
+      # If DATABASE_URL is set in .env it takes priority; otherwise fall back to local docker postgres
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-wellness_user}:${POSTGRES_PASSWORD:-wellness_secret}@db:5432/${POSTGRES_DB:-wellness_db}}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       PORT: 3001
@@ -54,6 +55,9 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - uploads_data:/app/uploads
     ports:

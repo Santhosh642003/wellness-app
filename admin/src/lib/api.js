@@ -43,8 +43,15 @@ export const api = {
   createReward: (body) => req('/rewards', { method: 'POST', body: JSON.stringify(body) }),
   updateReward: (id, body) => req(`/rewards/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteReward: (id) => req(`/rewards/${id}`, { method: 'DELETE' }),
+  // user points adjustment
+  adjustPoints: (userId, delta, reason) => req(`/users/${userId}/points`, { method: 'PATCH', body: JSON.stringify({ delta, reason }) }),
   // redemptions
   redemptions: () => req('/redemptions'),
+  // notifications
+  notifications: () => req('/notifications'),
+  createNotification: (body) => req('/notifications', { method: 'POST', body: JSON.stringify(body) }),
+  updateNotification: (id, body) => req(`/notifications/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteNotification: (id) => req(`/notifications/${id}`, { method: 'DELETE' }),
 
   // image upload (returns { url })
   uploadImage: (file, onProgress) => {

@@ -16,6 +16,7 @@ import adminRoutes from './routes/admin.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import transcribeRoutes from './routes/transcribe.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { authenticate } from './middleware/auth.js';
 import { migrate } from './lib/migrate.js';
 import { seed } from './lib/seed.js';
 import pool from './lib/db.js';
@@ -94,6 +95,18 @@ app.use('/api/rewards', rewardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api', transcribeRoutes);
+
+// Notifications — authenticated users fetch active notifications
+app.get('/api/notifications', authenticate, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM notifications WHERE active=true ORDER BY "createdAt" DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

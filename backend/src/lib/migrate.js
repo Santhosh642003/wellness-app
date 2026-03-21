@@ -148,12 +148,27 @@ CREATE TABLE IF NOT EXISTS password_resets (
 CREATE INDEX IF NOT EXISTS password_resets_token_idx ON password_resets(token);
 `;
 
+const SCHEDULING_AND_NOTIFICATIONS = `
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS "scheduledAt" TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  "imageUrl" TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
     await pool.query(PROFILE_FIELDS);
     await pool.query(OTP_TABLE);
     await pool.query(RESET_TABLE);
+    await pool.query(SCHEDULING_AND_NOTIFICATIONS);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

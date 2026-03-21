@@ -10,8 +10,11 @@ export default function BiWeeklyQuiz() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [questions, setQuestions] = useState(null);
-  const [alreadyAttempted, setAlreadyAttempted] = useState(null); // { nextAvailable, score, totalPoints, passed }
+  const [alreadyAttempted, setAlreadyAttempted] = useState(null);
+  const [scheduledLock, setScheduledLock] = useState(null); // { scheduledAt }
   const [error, setError] = useState(null);
+  const [points, setPoints] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("wellness_token");
@@ -21,7 +24,9 @@ export default function BiWeeklyQuiz() {
       .then((r) => r.json())
       .then((data) => {
         if (data.error) throw new Error(data.error);
-        if (data.alreadyAttempted) {
+        if (data.scheduledLock) {
+          setScheduledLock({ scheduledAt: data.scheduledAt });
+        } else if (data.alreadyAttempted) {
           setAlreadyAttempted({ nextAvailable: data.nextAvailable, score: data.score, totalPoints: data.totalPoints, passed: data.passed });
         } else {
           setQuestions(
@@ -34,7 +39,13 @@ export default function BiWeeklyQuiz() {
         }
       })
       .catch((err) => setError(err.message));
-  }, []);
+
+    if (user?.id) {
+      usersApi.get(user.id)
+        .then((d) => { setPoints(d.progress?.points || 0); setStreakDays(d.progress?.streakDays || 0); })
+        .catch(console.error);
+    }
+  }, [user?.id]);
 
   const onFinish = async (result) => {
     if (user?.id) {
@@ -55,17 +66,74 @@ export default function BiWeeklyQuiz() {
   const pageStyle = { background: "var(--bg-page)", minHeight: "100vh", display: "flex", flexDirection: "column" };
 
   if (error) return (
-    <div style={pageStyle} className="items-center justify-center flex">
-      <DashboardNav initials={user?.initials || "?"} />
-      <p className="text-red-500 mt-20 text-center">{error}</p>
+    <div style={pageStyle}>
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
+      <div className="flex-1 flex items-center justify-center px-6">
+        <div className="max-w-md w-full text-center">
+          <div className="w-20 h-20 rounded-full bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center mx-auto mb-6 text-4xl">⚠️</div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">Quiz Unavailable</h1>
+          <p className="text-slate-500 dark:text-gray-400 mb-6">{error}</p>
+          <button onClick={() => navigate("/dashboard")} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition">
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+      <Footer />
     </div>
   );
 
-  if (!questions && !alreadyAttempted) return (
+  if (!questions && !alreadyAttempted && !scheduledLock) return (
     <div style={pageStyle} className="items-center justify-center flex">
       <p className="text-[var(--text-muted)] animate-pulse">Loading quiz…</p>
     </div>
   );
+
+  // Quiz is scheduled but not yet available
+  if (scheduledLock) {
+    const unlockDate = new Date(scheduledLock.scheduledAt);
+    const now = new Date();
+    const diffMs = unlockDate - now;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return (
+      <div style={pageStyle}>
+        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
+        <div className="flex-1 flex items-center justify-center px-6">
+          <div className="max-w-md w-full text-center">
+            <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-center mx-auto mb-6 text-5xl">🔒</div>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">Quiz Not Yet Open</h1>
+            <p className="text-slate-500 dark:text-gray-400 mb-6">
+              The bi-weekly competition hasn't started yet. Check back when it goes live!
+            </p>
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5 mb-6">
+              <div className="text-xs text-slate-500 dark:text-gray-500 uppercase tracking-wider mb-2">Opens on</div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">
+                {unlockDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </div>
+              <div className="text-sm text-slate-500 dark:text-gray-400 mt-1">
+                {unlockDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+              {diffMs > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {[{ val: diffDays, label: "days" }, { val: diffHrs, label: "hours" }, { val: diffMins, label: "mins" }].map(({ val, label }) => (
+                    <div key={label} className="bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-gray-800 rounded-xl py-2">
+                      <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{val}</p>
+                      <p className="text-xs text-slate-400 dark:text-gray-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={() => navigate("/dashboard")} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition">
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   if (alreadyAttempted) {
     const next = new Date(alreadyAttempted.nextAvailable);
@@ -74,7 +142,7 @@ export default function BiWeeklyQuiz() {
       : 0;
     return (
       <div style={pageStyle}>
-        <DashboardNav initials={user?.initials || "?"} />
+        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md w-full text-center">
             <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 flex items-center justify-center mx-auto mb-6 text-4xl">
@@ -96,10 +164,7 @@ export default function BiWeeklyQuiz() {
                 {Math.ceil((next - new Date()) / (1000 * 60 * 60 * 24))} days from now
               </div>
             </div>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition"
-            >
+            <button onClick={() => navigate("/dashboard")} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition">
               Back to Dashboard
             </button>
           </div>
@@ -111,7 +176,7 @@ export default function BiWeeklyQuiz() {
 
   return (
     <div style={pageStyle}>
-      <DashboardNav initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
       <div className="flex-1">
         <QuizEngine
           title="Bi-Weekly Competition"
