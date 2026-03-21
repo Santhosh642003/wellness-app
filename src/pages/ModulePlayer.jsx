@@ -3,30 +3,19 @@ import { useNavigate, useParams } from "react-router-dom";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import VideoPlayer from "../components/VideoPlayer";
-import { MODULE_CONTENT } from "../data/moduleContent";
 import { useAuth } from "../contexts/AuthContext";
 import { modules as modulesApi, users as usersApi, transcribe } from "../lib/api";
 
-const ORDER_TO_KEY = ["m1", "m2", "m3", "m4", "m5", "m6"];
-
 function getContent(mod) {
-  // Base from static file for fallback fields
-  const staticKey = mod
-    ? (MODULE_CONTENT[mod.slug] ? mod.slug : (ORDER_TO_KEY[mod.orderIndex] || "m1"))
-    : "m1";
-  const staticData = MODULE_CONTENT[staticKey] || MODULE_CONTENT["m1"];
-  if (!mod) return staticData;
-  // DB values take priority; only fall back to static where DB is empty
   return {
-    ...staticData,
-    title: mod.title || staticData.title,
-    subtitle: mod.description || staticData.subtitle,
-    category: mod.category || staticData.category,
-    duration: mod.duration || staticData.duration,
-    points: mod.pointsValue || staticData.points,
-    videoUrl: mod.videoUrl || staticData.videoUrl,
-    keyPoints: (mod.keyPoints?.length > 0) ? mod.keyPoints : staticData.keyPoints,
-    transcript: (mod.transcript?.length > 0) ? mod.transcript : staticData.transcript,
+    title: mod?.title ?? "",
+    subtitle: mod?.description ?? "",
+    category: mod?.category ?? "",
+    duration: mod?.duration ?? "",
+    points: mod?.pointsValue ?? 0,
+    videoUrl: mod?.videoUrl || "/videos/demo.mp4",
+    keyPoints: mod?.keyPoints ?? [],
+    transcript: mod?.transcript ?? [],
   };
 }
 

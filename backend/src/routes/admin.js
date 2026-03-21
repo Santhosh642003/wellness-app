@@ -2,23 +2,15 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
-import path from 'path';
 import { z } from 'zod';
 import multer from 'multer';
 import pool from '../lib/db.js';
 import { adminAuth } from '../middleware/adminAuth.js';
+import { uploadFile, deleteFile } from '../lib/storage.js';
 
-const videoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(process.cwd(), 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}-${safe}`);
-  },
-});
+// Use memory storage — the file buffer is passed to the storage module
 const uploadVideo = multer({
-  storage: videoStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('video/')) cb(null, true);
@@ -26,17 +18,8 @@ const uploadVideo = multer({
   },
 });
 
-const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(process.cwd(), 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}-${safe}`);
-  },
-});
 const uploadImage = multer({
-  storage: imageStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
@@ -119,7 +102,8 @@ router.get('/users/:id', async (req, res, next) => {
 router.post('/videos/upload', uploadVideo.single('video'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No video file provided' });
-    res.json({ url: `/uploads/${req.file.filename}` });
+    const url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    res.json({ url });
   } catch (err) {
     next(err);
   }
@@ -129,7 +113,8 @@ router.post('/videos/upload', uploadVideo.single('video'), async (req, res, next
 router.post('/images/upload', uploadImage.single('image'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image file provided' });
-    res.json({ url: `/uploads/${req.file.filename}` });
+    const url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    res.json({ url });
   } catch (err) {
     next(err);
   }
@@ -168,7 +153,9 @@ router.patch('/modules/:id', async (req, res, next) => {
 
 router.delete('/modules/:id', async (req, res, next) => {
   try {
+    const { rows: [mod] } = await pool.query('SELECT "videoUrl" FROM modules WHERE id=$1', [req.params.id]);
     await pool.query('DELETE FROM modules WHERE id=$1', [req.params.id]);
+    if (mod?.videoUrl) deleteFile(mod.videoUrl).catch(() => {});
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -291,7 +278,9 @@ router.patch('/rewards/:id', async (req, res, next) => {
 
 router.delete('/rewards/:id', async (req, res, next) => {
   try {
+    const { rows: [reward] } = await pool.query('SELECT "imageUrl" FROM rewards WHERE id=$1', [req.params.id]);
     await pool.query('DELETE FROM rewards WHERE id=$1', [req.params.id]);
+    if (reward?.imageUrl) deleteFile(reward.imageUrl).catch(() => {});
     res.json({ success: true });
   } catch (err) { next(err); }
 });
