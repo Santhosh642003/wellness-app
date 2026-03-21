@@ -136,11 +136,24 @@ CREATE TABLE IF NOT EXISTS email_otps (
 CREATE INDEX IF NOT EXISTS email_otps_email_idx ON email_otps(email);
 `;
 
+const RESET_TABLE = `
+CREATE TABLE IF NOT EXISTS password_resets (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT UNIQUE NOT NULL,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "usedAt" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS password_resets_token_idx ON password_resets(token);
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
     await pool.query(PROFILE_FIELDS);
     await pool.query(OTP_TABLE);
+    await pool.query(RESET_TABLE);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

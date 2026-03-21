@@ -11,6 +11,7 @@ const PER_USER_MODULES_QUERY = `
   SELECT
     m.id, m.slug, m.title, m.description, m.duration, m.category,
     m."orderIndex", m."pointsValue", m."videoUrl", m."createdAt",
+    m."keyPoints", m.transcript,
     CASE
       WHEN m."orderIndex" = 0 THEN false
       WHEN prev_prog.completed = true THEN false

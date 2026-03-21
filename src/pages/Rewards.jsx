@@ -145,7 +145,13 @@ export default function Rewards() {
               const affordable = points >= r.pointsCost;
               const outOfStock = r.stock === 0;
               return (
-                <div key={r.id} className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex flex-col">
+                <div key={r.id} className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+                  {r.imageUrl && (
+                    <div className="h-40 bg-slate-100 dark:bg-[#0f0f0f] overflow-hidden">
+                      <img src={r.imageUrl} alt={r.title} className="w-full h-full object-cover" onError={(e) => { e.target.parentElement.style.display = 'none'; }} />
+                    </div>
+                  )}
+                  <div className="p-6 flex flex-col flex-1">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{r.title}</h3>
                   <p className="text-slate-500 dark:text-gray-400 text-sm mt-1 flex-1">{r.description}</p>
                   <div className="mt-4 inline-block px-4 py-2 rounded-xl bg-slate-100 dark:bg-black/30 border border-slate-200 dark:border-gray-800 text-sm font-semibold text-slate-700 dark:text-gray-200">
@@ -165,6 +171,7 @@ export default function Rewards() {
                   >
                     {outOfStock ? "Out of Stock" : affordable ? "Redeem" : "Need More Points"}
                   </button>
+                  </div>
                 </div>
               );
             })}

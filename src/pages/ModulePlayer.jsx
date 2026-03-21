@@ -3,17 +3,20 @@ import { useNavigate, useParams } from "react-router-dom";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import VideoPlayer from "../components/VideoPlayer";
-import { MODULE_CONTENT } from "../data/moduleContent";
 import { useAuth } from "../contexts/AuthContext";
 import { modules as modulesApi, users as usersApi, transcribe } from "../lib/api";
 
-const ORDER_TO_KEY = ["m1", "m2", "m3", "m4", "m5", "m6"];
-
 function getContent(mod) {
-  if (!mod) return MODULE_CONTENT["m1"];
-  if (MODULE_CONTENT[mod.slug]) return MODULE_CONTENT[mod.slug];
-  const key = ORDER_TO_KEY[mod.orderIndex] || "m1";
-  return MODULE_CONTENT[key] || MODULE_CONTENT["m1"];
+  return {
+    title: mod?.title ?? "",
+    subtitle: mod?.description ?? "",
+    category: mod?.category ?? "",
+    duration: mod?.duration ?? "",
+    points: mod?.pointsValue ?? 0,
+    videoUrl: mod?.videoUrl || "/videos/demo.mp4",
+    keyPoints: mod?.keyPoints ?? [],
+    transcript: mod?.transcript ?? [],
+  };
 }
 
 

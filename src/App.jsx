@@ -9,6 +9,8 @@ import Profile from "./pages/Profile.jsx";
 import BiWeeklyQuiz from "./pages/BiWeeklyQuiz.jsx";
 import ModuleQuiz from "./pages/ModuleQuiz.jsx";
 import Leaderboard from "./pages/Leaderboard.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 
@@ -24,6 +26,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/modules" element={<ProtectedRoute><Modules /></ProtectedRoute>} />

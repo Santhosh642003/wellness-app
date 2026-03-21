@@ -43,6 +43,8 @@ const profileSchema = z.object({
   campus: z.string().optional(),
   major: z.string().max(100).optional(),
   graduationYear: z.string().max(10).optional(),
+  yearOfStudy: z.string().max(50).optional(),
+  ethnicity: z.string().max(100).optional(),
   bio: z.string().max(500).optional(),
 });
 
@@ -64,6 +66,8 @@ router.patch('/:userId/profile', requireSelf, async (req, res, next) => {
     if (data.campus !== undefined) { sets.push(`campus=$${i++}`); vals.push(data.campus); }
     if (data.major !== undefined) { sets.push(`major=$${i++}`); vals.push(data.major); }
     if (data.graduationYear !== undefined) { sets.push(`"graduationYear"=$${i++}`); vals.push(data.graduationYear); }
+    if (data.yearOfStudy !== undefined) { sets.push(`"yearOfStudy"=$${i++}`); vals.push(data.yearOfStudy); }
+    if (data.ethnicity !== undefined) { sets.push(`ethnicity=$${i++}`); vals.push(data.ethnicity); }
     if (data.bio !== undefined) { sets.push(`bio=$${i++}`); vals.push(data.bio); }
     if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
     sets.push(`"updatedAt"=$${i++}`);

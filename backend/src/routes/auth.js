@@ -6,9 +6,28 @@ import { randomUUID } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import pool from '../lib/db.js';
 import { authenticate } from '../middleware/auth.js';
-import { sendOtpEmail } from '../lib/email.js';
+import { sendOtpEmail, sendPasswordResetEmail } from '../lib/email.js';
 
 const router = Router();
+
+// In-memory login rate limiter: max 10 failed attempts per IP per 15 min
+const loginAttempts = new Map(); // ip -> { count, resetAt }
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 0, resetAt: now + 15 * 60 * 1000 });
+    return false; // not rate limited
+  }
+  return entry.count >= 10;
+}
+function recordFailedLogin(ip) {
+  const entry = loginAttempts.get(ip);
+  if (entry) entry.count++;
+}
+function clearLoginAttempts(ip) {
+  loginAttempts.delete(ip);
+}
 
 // Strong password: 8+ chars, uppercase, lowercase, number, special char
 const passwordSchema = z.string()
@@ -67,6 +86,12 @@ router.post('/send-otp', async (req, res, next) => {
     if (parseInt(recent[0].count) >= 3) {
       return res.status(429).json({ error: 'Too many verification attempts. Please wait 15 minutes.' });
     }
+
+    // Clean up expired or used OTPs for this email to keep the table lean
+    await pool.query(
+      `DELETE FROM email_otps WHERE email=$1 AND ("expiresAt" < NOW() OR "usedAt" IS NOT NULL)`,
+      [normalEmail]
+    );
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -151,12 +176,17 @@ router.post('/register', async (req, res, next) => {
 // POST /api/auth/login
 router.post('/login', async (req, res, next) => {
   try {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (checkLoginRateLimit(ip)) {
+      return res.status(429).json({ error: 'Too many failed login attempts. Please wait 15 minutes.' });
+    }
     const { email, password } = loginSchema.parse(req.body);
     const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [email.toLowerCase()]);
     const user = rows[0];
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!user) { recordFailedLogin(ip); return res.status(401).json({ error: 'Invalid email or password' }); }
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!valid) { recordFailedLogin(ip); return res.status(401).json({ error: 'Invalid email or password' }); }
+    clearLoginAttempts(ip);
     const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [user.id]);
     res.json({ token: signToken(user.id), user: { ...safeUser(user), progress } });
   } catch (err) {
@@ -223,6 +253,76 @@ router.post('/google', async (req, res, next) => {
     res.json({ token: signToken(user.id), user: { ...safeUser(user), progress } });
   } catch (err) {
     if (err.message?.includes('Invalid token')) return res.status(401).json({ error: 'Invalid Google token' });
+    next(err);
+  }
+});
+
+// POST /api/auth/forgot-password
+// Accepts any NJIT email; always returns 200 to avoid account enumeration.
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { email } = z.object({
+      email: z.string().email().endsWith('@njit.edu', { message: 'Must be an NJIT email address' }),
+    }).parse(req.body);
+
+    const normalEmail = email.toLowerCase();
+    const { rows } = await pool.query('SELECT id FROM users WHERE email=$1', [normalEmail]);
+    // Always respond 200 — don't reveal whether the email exists
+    if (!rows[0]) return res.json({ sent: true });
+
+    // Rate-limit: max 3 reset requests per email per hour
+    const { rows: recent } = await pool.query(
+      `SELECT COUNT(*) FROM password_resets WHERE "userId"=$1 AND "createdAt" > NOW() - INTERVAL '1 hour'`,
+      [rows[0].id]
+    );
+    if (parseInt(recent[0].count) >= 3) return res.json({ sent: true });
+
+    // Expire any previous unused tokens for this user
+    await pool.query(
+      `UPDATE password_resets SET "usedAt"=NOW() WHERE "userId"=$1 AND "usedAt" IS NULL`,
+      [rows[0].id]
+    );
+
+    const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await pool.query(
+      `INSERT INTO password_resets (id, "userId", token, "expiresAt") VALUES ($1,$2,$3,$4)`,
+      [randomUUID(), rows[0].id, token, expiresAt]
+    );
+
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
+    const resetUrl = `${appUrl}/reset-password?token=${token}`;
+    const result = await sendPasswordResetEmail(normalEmail, resetUrl);
+
+    res.json({
+      sent: true,
+      ...(result?.devMode ? { devUrl: resetUrl, devNote: 'SMTP not configured — URL shown for dev only' } : {}),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { token, password } = z.object({
+      token: z.string().uuid(),
+      password: passwordSchema,
+    }).parse(req.body);
+
+    const { rows: [reset] } = await pool.query(
+      `SELECT * FROM password_resets WHERE token=$1 AND "expiresAt" > NOW() AND "usedAt" IS NULL`,
+      [token]
+    );
+    if (!reset) return res.status(400).json({ error: 'This reset link is invalid or has expired. Please request a new one.' });
+
+    const hashed = await bcrypt.hash(password, 14);
+    await pool.query(`UPDATE users SET password=$1, "updatedAt"=NOW() WHERE id=$2`, [hashed, reset.userId]);
+    await pool.query(`UPDATE password_resets SET "usedAt"=NOW() WHERE id=$1`, [reset.id]);
+
+    res.json({ success: true });
+  } catch (err) {
     next(err);
   }
 });
