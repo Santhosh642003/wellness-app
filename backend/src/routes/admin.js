@@ -137,10 +137,19 @@ router.get('/modules', async (req, res, next) => {
 
 router.post('/modules', async (req, res, next) => {
   try {
-    const d = z.object({ slug: z.string(), title: z.string(), description: z.string(), duration: z.string(), category: z.string(), orderIndex: z.number(), pointsValue: z.number().optional(), locked: z.boolean().optional(), videoUrl: z.string().optional() }).parse(req.body);
+    const d = z.object({
+      slug: z.string(), title: z.string(), description: z.string(), duration: z.string(),
+      category: z.string(), orderIndex: z.number(), pointsValue: z.number().optional(),
+      locked: z.boolean().optional(), videoUrl: z.string().optional(),
+      keyPoints: z.array(z.string()).optional(),
+      transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
+    }).parse(req.body);
     const { rows: [m] } = await pool.query(
-      `INSERT INTO modules (id, slug, title, description, duration, category, "orderIndex", "pointsValue", locked, "videoUrl") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [randomUUID(), d.slug, d.title, d.description, d.duration, d.category, d.orderIndex, d.pointsValue??100, d.locked??true, d.videoUrl??'']
+      `INSERT INTO modules (id, slug, title, description, duration, category, "orderIndex", "pointsValue", locked, "videoUrl", "keyPoints", transcript)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [randomUUID(), d.slug, d.title, d.description, d.duration, d.category, d.orderIndex,
+       d.pointsValue??100, d.locked??true, d.videoUrl??'',
+       JSON.stringify(d.keyPoints||[]), JSON.stringify(d.transcript||[])]
     );
     res.status(201).json(m);
   } catch (err) { next(err); }
@@ -148,11 +157,27 @@ router.post('/modules', async (req, res, next) => {
 
 router.patch('/modules/:id', async (req, res, next) => {
   try {
-    const d = z.object({ title: z.string().optional(), description: z.string().optional(), duration: z.string().optional(), category: z.string().optional(), orderIndex: z.number().optional(), pointsValue: z.number().optional(), locked: z.boolean().optional(), videoUrl: z.string().optional() }).parse(req.body);
+    const raw = z.object({
+      title: z.string().optional(), description: z.string().optional(),
+      duration: z.string().optional(), category: z.string().optional(),
+      orderIndex: z.number().optional(), pointsValue: z.number().optional(),
+      locked: z.boolean().optional(), videoUrl: z.string().optional(),
+      keyPoints: z.array(z.string()).optional(),
+      transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
+    }).parse(req.body);
+
+    // Serialize JSON fields before building SET clause
+    const d = { ...raw };
+    if (d.keyPoints !== undefined) d.keyPoints = JSON.stringify(d.keyPoints);
+    if (d.transcript !== undefined) d.transcript = JSON.stringify(d.transcript);
+
     const fields = Object.keys(d);
     if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
     const sets = fields.map((k, i) => `"${k}"=$${i + 1}`);
-    const { rows: [m] } = await pool.query(`UPDATE modules SET ${sets.join(',')} WHERE id=$${fields.length + 1} RETURNING *`, [...Object.values(d), req.params.id]);
+    const { rows: [m] } = await pool.query(
+      `UPDATE modules SET ${sets.join(',')} WHERE id=$${fields.length + 1} RETURNING *`,
+      [...Object.values(d), req.params.id]
+    );
     if (!m) return res.status(404).json({ error: 'Module not found' });
     res.json(m);
   } catch (err) { next(err); }
