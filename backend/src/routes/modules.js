@@ -91,7 +91,7 @@ router.get('/quiz/biweekly', async (req, res, next) => {
     );
 
     if (recentAttempt) {
-      const nextAvailable = new Date(recentAttempt.created_at);
+      const nextAvailable = new Date(recentAttempt.createdAt);
       nextAvailable.setDate(nextAvailable.getDate() + 14);
       return res.json({
         ...quiz,

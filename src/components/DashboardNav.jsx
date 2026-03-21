@@ -20,7 +20,7 @@ function NavItem({ to, children }) {
   );
 }
 
-export default function DashboardNav({ points = 0, streakDays = 0, initials = "SN" }) {
+export default function DashboardNav({ points = 0, streakDays = 0, initials = "?" }) {
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
 

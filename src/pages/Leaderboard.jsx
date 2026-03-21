@@ -25,7 +25,7 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav initials={user?.initials || "SN"} />
+      <DashboardNav initials={user?.initials || "?"} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         {/* Header */}

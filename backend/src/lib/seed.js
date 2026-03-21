@@ -94,7 +94,8 @@ const BIWEEKLY_QUESTIONS = [
 ];
 
 export async function seed() {
-  // Upsert modules — update all fields including keyPoints and transcript
+  // Upsert modules — metadata fields are always updated; keyPoints, transcript,
+  // and videoUrl are only set on first insert (to preserve admin edits).
   for (const m of MODULES) {
     await pool.query(
       `INSERT INTO modules (id, slug, title, description, duration, category, "orderIndex", "pointsValue", locked, "keyPoints", transcript)
@@ -106,8 +107,12 @@ export async function seed() {
          category=EXCLUDED.category,
          "orderIndex"=EXCLUDED."orderIndex",
          "pointsValue"=EXCLUDED."pointsValue",
-         "keyPoints"=EXCLUDED."keyPoints",
-         transcript=EXCLUDED.transcript`,
+         "keyPoints" = CASE
+           WHEN modules."keyPoints" IS NULL OR modules."keyPoints" = '[]'::jsonb
+           THEN EXCLUDED."keyPoints" ELSE modules."keyPoints" END,
+         transcript = CASE
+           WHEN modules.transcript IS NULL OR modules.transcript = '[]'::jsonb
+           THEN EXCLUDED.transcript ELSE modules.transcript END`,
       [randomUUID(), m.slug, m.title, m.description, m.duration, m.category, m.orderIndex, m.pointsValue, m.locked,
        JSON.stringify(m.keyPoints || []), JSON.stringify(m.transcript || [])]
     );
@@ -124,14 +129,17 @@ export async function seed() {
     }
   }
 
-  // Default admin
-  const { rows: adminRows } = await pool.query(`SELECT id FROM admin_users WHERE email='admin@njit.edu'`);
+  // Default admin — use ADMIN_EMAIL / ADMIN_PASSWORD env vars if set
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@njit.edu').toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@1234';
+  const { rows: adminRows } = await pool.query('SELECT id FROM admin_users WHERE email=$1', [adminEmail]);
   if (adminRows.length === 0) {
-    const hashed = await bcrypt.hash('Admin@1234', 12);
+    const hashed = await bcrypt.hash(adminPassword, 12);
     await pool.query(
-      `INSERT INTO admin_users (id, email, password, name) VALUES ($1,'admin@njit.edu',$2,'Administrator')`,
-      [randomUUID(), hashed]
+      `INSERT INTO admin_users (id, email, password, name) VALUES ($1,$2,$3,'Administrator')`,
+      [randomUUID(), adminEmail, hashed]
     );
+    console.log(`[seed] Admin account created: ${adminEmail}`);
   }
 
   // Seed quizzes (only if empty)

@@ -1,5 +1,9 @@
 export function errorHandler(err, req, res, next) {
-  console.error(err);
+  // Log full stack in dev, only unexpected 5xx in production
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd || !err.status || err.status >= 500) {
+    console.error(isProd ? err.message : (err.stack || err));
+  }
 
   if (err.name === 'ZodError') {
     return res.status(400).json({
@@ -8,12 +12,14 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
-  if (err.code === 'P2002') {
+  // PostgreSQL unique-constraint violation
+  if (err.code === '23505') {
     return res.status(409).json({ error: 'A record with this value already exists' });
   }
 
-  if (err.code === 'P2025') {
-    return res.status(404).json({ error: 'Record not found' });
+  // Multer file-size exceeded
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'File too large' });
   }
 
   const status = err.status || 500;
