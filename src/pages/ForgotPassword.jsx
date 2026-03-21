@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { auth as authApi } from "../lib/api.js";
 
-const INPUT_CLS = "w-full rounded-xl bg-[#0f0f0f] border border-gray-800 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
+const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-3 text-slate-900 dark:text-gray-100 placeholder:text-slate-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -32,8 +32,8 @@ export default function ForgotPassword() {
   };
 
   return (
-    <section className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-[#121212] border border-gray-800 rounded-2xl p-10 shadow-lg">
+    <section className="min-h-screen bg-slate-50 dark:bg-[#0b0b0b] flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-10 shadow-lg">
         {submitted ? (
           <>
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6">
@@ -41,29 +41,29 @@ export default function ForgotPassword() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-semibold mb-3">Check your inbox</h1>
-            <p className="text-gray-400 text-sm mb-6">
-              If an account exists for <span className="text-gray-200 font-medium">{email.trim().toLowerCase()}</span>, you'll receive a password reset link shortly. The link expires in 1 hour.
+            <h1 className="text-2xl font-semibold mb-3 text-slate-900 dark:text-white">Check your inbox</h1>
+            <p className="text-slate-500 dark:text-gray-400 text-sm mb-6">
+              If an account exists for <span className="text-slate-800 dark:text-gray-200 font-medium">{email.trim().toLowerCase()}</span>, you'll receive a password reset link shortly. The link expires in 1 hour.
             </p>
             {devUrl && (
-              <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl px-4 py-3 mb-6">
-                <p className="text-yellow-400 text-xs font-semibold mb-1">Dev mode — SMTP not configured</p>
-                <a href={devUrl} className="text-blue-400 text-xs break-all underline">{devUrl}</a>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700/40 rounded-xl px-4 py-3 mb-6">
+                <p className="text-yellow-700 dark:text-yellow-400 text-xs font-semibold mb-1">Dev mode — SMTP not configured</p>
+                <a href={devUrl} className="text-blue-500 text-xs break-all underline">{devUrl}</a>
               </div>
             )}
-            <Link to="/login" className="block text-center text-sm text-emerald-400 hover:underline font-medium">
+            <Link to="/login" className="block text-center text-sm text-emerald-500 hover:underline font-medium">
               Back to Sign In
             </Link>
           </>
         ) : (
           <>
-            <h1 className="text-3xl font-semibold mb-3">Forgot password?</h1>
-            <p className="text-gray-400 text-sm mb-8">
+            <h1 className="text-3xl font-semibold mb-3 text-slate-900 dark:text-white">Forgot password?</h1>
+            <p className="text-slate-500 dark:text-gray-400 text-sm mb-8">
               Enter your NJIT email and we'll send you a link to reset your password.
             </p>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-gray-200 mb-2">NJIT Email</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-2">NJIT Email</label>
                 <input
                   type="email"
                   value={email}
@@ -74,7 +74,7 @@ export default function ForgotPassword() {
                 />
               </div>
               {error && (
-                <p className="text-sm text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3">{error}</p>
+                <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl px-4 py-3">{error}</p>
               )}
               <button
                 type="submit"
@@ -84,9 +84,9 @@ export default function ForgotPassword() {
                 {loading ? "Sending…" : "Send Reset Link"}
               </button>
             </form>
-            <p className="text-sm text-gray-500 mt-6 text-center">
+            <p className="text-sm text-slate-400 dark:text-gray-500 mt-6 text-center">
               Remember it?{" "}
-              <Link to="/login" className="text-emerald-400 hover:underline font-medium">Back to Sign In</Link>
+              <Link to="/login" className="text-emerald-500 hover:underline font-medium">Back to Sign In</Link>
             </p>
           </>
         )}

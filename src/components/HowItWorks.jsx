@@ -29,8 +29,8 @@ export default function HowItWorks() {
     <section id="how-it-works" className="py-24 px-6">
       {/* Header */}
       <div className="text-center mb-16">
-        <h2 className="text-4xl font-semibold mb-4">How It Works</h2>
-        <p className="text-gray-400">
+        <h2 className="text-4xl font-semibold mb-4 text-slate-900 dark:text-white">How It Works</h2>
+        <p className="text-slate-500 dark:text-gray-400">
           Four simple steps to earn rewards while learning
         </p>
       </div>
@@ -42,13 +42,13 @@ export default function HowItWorks() {
           return (
             <div key={index} className="relative">
               {/* Card */}
-              <div className="bg-[#121212] border border-gray-800 rounded-2xl p-8 h-full text-center shadow-lg">
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-8 h-full text-center shadow-sm">
                 <div className="flex justify-center mb-6">
                   <Icon className="w-10 h-10 text-blue-400" />
                 </div>
 
-                <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3 text-slate-900 dark:text-white">{step.title}</h3>
+                <p className="text-slate-500 dark:text-gray-400 text-sm leading-relaxed">
                   {step.description}
                 </p>
               </div>
