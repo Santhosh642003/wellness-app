@@ -7,7 +7,7 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function VideoPlayer({ src, onTimeUpdate, videoRef: externalRef, className = "" }) {
+export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, className = "" }) {
   const internalRef = useRef(null);
   const videoRef = externalRef || internalRef;
   const containerRef = useRef(null);
@@ -117,8 +117,8 @@ export default function VideoPlayer({ src, onTimeUpdate, videoRef: externalRef, 
         onPlay={() => setPlaying(true)}
         onPause={() => { setPlaying(false); setShowControls(true); }}
         onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={() => { if (videoRef.current) setDuration(videoRef.current.duration); }}
-        onEnded={() => { setPlaying(false); setShowControls(true); }}
+        onLoadedMetadata={() => { if (videoRef.current) { setDuration(videoRef.current.duration); onLoadedMetadata?.(); } }}
+        onEnded={() => { setPlaying(false); setShowControls(true); onEnded?.(); }}
         onClick={(e) => e.stopPropagation()}
       />
 
