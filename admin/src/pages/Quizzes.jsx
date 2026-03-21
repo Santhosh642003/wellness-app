@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X, Check, Settings } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X, Check, Settings, Calendar } from 'lucide-react';
 
 function QuestionForm({ form, setForm, onSave, onCancel, saving }) {
   const opts = Array.isArray(form.options) ? form.options : ['', '', '', ''];
@@ -218,6 +218,16 @@ export default function Quizzes() {
     setSettingsQuizId(null);
   };
 
+  const createBiweeklyQuiz = async () => {
+    const title = prompt('Enter a title for the new Biweekly Quiz:', 'Biweekly Quiz');
+    if (!title?.trim()) return;
+    try {
+      const q = await api.createQuiz({ type: 'biweekly', title: title.trim(), passingScore: 70 });
+      setQuizzes(prev => [...prev, { ...q, questionCount: 0 }]);
+      setExpanded(q.id);
+    } catch (err) { alert(err.message); }
+  };
+
   const TYPE_COLORS = {
     module: 'bg-blue-600/10 border-blue-600/20 text-blue-400',
     biweekly: 'bg-purple-600/10 border-purple-600/20 text-purple-400',
@@ -225,9 +235,15 @@ export default function Quizzes() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white">Quizzes & Questions</h2>
-        <p className="text-gray-400 text-sm mt-1">{quizzes.length} quizzes · Manage questions, passing scores, and quiz settings</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Quizzes & Questions</h2>
+          <p className="text-gray-400 text-sm mt-1">{quizzes.length} quizzes · Manage questions, passing scores, and quiz settings</p>
+        </div>
+        <button onClick={createBiweeklyQuiz}
+          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          <Calendar size={15} /> New Biweekly Quiz
+        </button>
       </div>
 
       {loading ? (
