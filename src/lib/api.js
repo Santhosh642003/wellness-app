@@ -94,3 +94,8 @@ export const rewards = {
 export const leaderboard = {
   list: () => request('/leaderboard'),
 };
+
+// Notifications
+export const notifications = {
+  list: () => request('/notifications'),
+};

@@ -4,7 +4,7 @@ import { Trophy } from "lucide-react";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
-import { leaderboard as leaderboardApi } from "../lib/api";
+import { leaderboard as leaderboardApi, users as usersApi } from "../lib/api";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 
@@ -13,19 +13,26 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [points, setPoints] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
 
   useEffect(() => {
     leaderboardApi.list()
       .then(setEntries)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+    if (user?.id) {
+      usersApi.get(user.id)
+        .then((d) => { setPoints(d.progress?.points || 0); setStreakDays(d.progress?.streakDays || 0); })
+        .catch(console.error);
+    }
+  }, [user?.id]);
 
   const myEntry = entries.find((e) => e.id === user?.id);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         {/* Header */}

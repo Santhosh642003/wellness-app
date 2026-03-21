@@ -39,6 +39,7 @@ function Modal({ open, title, children, onClose }) {
 export default function Rewards() {
   const { user } = useAuth();
   const [points, setPoints] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
   const [rewardsList, setRewardsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
@@ -61,6 +62,7 @@ export default function Rewards() {
         rewardsApi.list(),
       ]);
       setPoints(userData.progress?.points || 0);
+      setStreakDays(userData.progress?.streakDays || 0);
       setRewardsList(rwds || []);
     } catch (err) {
       console.error("Failed to load rewards", err);
@@ -108,7 +110,7 @@ export default function Rewards() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav points={points} streakDays={0} initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
 
       <main className="max-w-7xl mx-auto px-6 py-10 space-y-8 w-full">
         <header>

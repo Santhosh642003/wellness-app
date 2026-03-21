@@ -64,19 +64,44 @@ function QuestionForm({ form, setForm, onSave, onCancel, saving }) {
 function QuizSettingsForm({ quiz, onSave, onClose }) {
   const [title, setTitle] = useState(quiz.title);
   const [passingScore, setPassingScore] = useState(quiz.passingScore);
+  // Convert stored UTC ISO string to local datetime-local input format
+  const toLocalInput = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [scheduledAt, setScheduledAt] = useState(toLocalInput(quiz.scheduledAt));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const isBiweekly = quiz.type === 'biweekly';
 
   const save = async () => {
     setSaving(true); setError('');
     try {
-      await api.updateQuiz(quiz.id, { title, passingScore: parseInt(passingScore) });
-      onSave({ ...quiz, title, passingScore: parseInt(passingScore) });
+      const payload = {
+        title,
+        passingScore: parseInt(passingScore),
+        ...(isBiweekly ? { scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null } : {}),
+      };
+      await api.updateQuiz(quiz.id, payload);
+      onSave({ ...quiz, ...payload });
     } catch (err) {
       setError(err.message);
     } finally {
       setSaving(false);
     }
+  };
+
+  const clearSchedule = async () => {
+    setSaving(true); setError('');
+    try {
+      await api.updateQuiz(quiz.id, { scheduledAt: null });
+      setScheduledAt('');
+      onSave({ ...quiz, scheduledAt: null });
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -93,6 +118,36 @@ function QuizSettingsForm({ quiz, onSave, onClose }) {
           onChange={e => setPassingScore(e.target.value)}
           className="w-full mt-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none" />
       </div>
+      {isBiweekly && (
+        <div>
+          <label className="text-gray-400 text-xs flex items-center gap-1">
+            🗓 Scheduled Open Date
+            <span className="text-gray-600 font-normal">(optional — quiz is locked until this date/time)</span>
+          </label>
+          <div className="flex gap-2 mt-1">
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={e => setScheduledAt(e.target.value)}
+              className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 [color-scheme:dark]"
+            />
+            {scheduledAt && (
+              <button type="button" onClick={clearSchedule} disabled={saving}
+                className="px-3 py-2 bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 rounded-lg text-xs transition-colors disabled:opacity-50">
+                Clear
+              </button>
+            )}
+          </div>
+          {scheduledAt && (
+            <p className="text-xs mt-1 text-gray-500">
+              Quiz will be locked until {new Date(scheduledAt).toLocaleString()}
+            </p>
+          )}
+          {!scheduledAt && quiz.scheduledAt && (
+            <p className="text-xs mt-1 text-emerald-500">Currently locked until {new Date(quiz.scheduledAt).toLocaleString()}</p>
+          )}
+        </div>
+      )}
       {error && <p className="text-red-400 text-xs">{error}</p>}
       <div className="flex gap-2">
         <button onClick={save} disabled={saving}
@@ -206,6 +261,16 @@ export default function Quizzes() {
                         <span className="text-gray-500 text-xs">·</span>
                         <span className="text-gray-500 text-xs">{quiz.passingScore}% to pass</span>
                         {quiz.moduleTitle && <span className="text-gray-600 text-xs">· {quiz.moduleTitle}</span>}
+                        {quiz.scheduledAt && new Date(quiz.scheduledAt) > new Date() && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium bg-orange-600/10 border-orange-600/20 text-orange-400 flex items-center gap-1">
+                            🔒 opens {new Date(quiz.scheduledAt).toLocaleDateString()}
+                          </span>
+                        )}
+                        {quiz.scheduledAt && new Date(quiz.scheduledAt) <= new Date() && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium bg-emerald-600/10 border-emerald-600/20 text-emerald-400">
+                            🔓 open
+                          </span>
+                        )}
                       </div>
                     </div>
                   </button>

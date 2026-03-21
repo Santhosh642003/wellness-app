@@ -9,6 +9,7 @@ import Modules from './pages/Modules.jsx';
 import Quizzes from './pages/Quizzes.jsx';
 import Rewards from './pages/Rewards.jsx';
 import Redemptions from './pages/Redemptions.jsx';
+import Notifications from './pages/Notifications.jsx';
 
 function Layout({ children }) {
   return (
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/quizzes" element={<Protected><Quizzes /></Protected>} />
       <Route path="/rewards" element={<Protected><Rewards /></Protected>} />
       <Route path="/redemptions" element={<Protected><Redemptions /></Protected>} />
+      <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

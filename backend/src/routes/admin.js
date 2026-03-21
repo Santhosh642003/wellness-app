@@ -226,11 +226,19 @@ router.post('/quizzes', async (req, res, next) => {
 
 router.patch('/quizzes/:id', async (req, res, next) => {
   try {
-    const d = z.object({ title: z.string().optional(), passingScore: z.number().optional() }).parse(req.body);
-    const fields = Object.keys(d);
+    const d = z.object({
+      title: z.string().optional(),
+      passingScore: z.number().optional(),
+      scheduledAt: z.string().nullable().optional(),
+    }).parse(req.body);
+    const fields = Object.keys(d).filter(k => d[k] !== undefined);
     if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
     const sets = fields.map((k, i) => `"${k}"=$${i + 1}`);
-    const { rows: [q] } = await pool.query(`UPDATE quizzes SET ${sets.join(',')},"updatedAt"=NOW() WHERE id=$${fields.length+1} RETURNING *`, [...Object.values(d), req.params.id]);
+    const vals = fields.map(k => d[k]);
+    const { rows: [q] } = await pool.query(
+      `UPDATE quizzes SET ${sets.join(',')},"updatedAt"=NOW() WHERE id=$${fields.length + 1} RETURNING *`,
+      [...vals, req.params.id]
+    );
     res.json(q);
   } catch (err) { next(err); }
 });
@@ -337,6 +345,58 @@ router.get('/redemptions', async (req, res, next) => {
        ORDER BY rr."redeemedAt" DESC`
     );
     res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// --- NOTIFICATIONS (admin CRUD) ---
+router.get('/notifications', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM notifications ORDER BY "createdAt" DESC`);
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+router.post('/notifications', async (req, res, next) => {
+  try {
+    const d = z.object({
+      title: z.string().min(1),
+      body: z.string().default(''),
+      imageUrl: z.string().nullable().optional(),
+      active: z.boolean().default(true),
+    }).parse(req.body);
+    const { rows: [n] } = await pool.query(
+      `INSERT INTO notifications (id, title, body, "imageUrl", active) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [randomUUID(), d.title, d.body, d.imageUrl || null, d.active]
+    );
+    res.status(201).json(n);
+  } catch (err) { next(err); }
+});
+
+router.patch('/notifications/:id', async (req, res, next) => {
+  try {
+    const d = z.object({
+      title: z.string().optional(),
+      body: z.string().optional(),
+      imageUrl: z.string().nullable().optional(),
+      active: z.boolean().optional(),
+    }).parse(req.body);
+    const fields = Object.keys(d).filter(k => d[k] !== undefined);
+    if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
+    const sets = fields.map((k, i) => `"${k}"=$${i + 1}`);
+    const vals = fields.map(k => d[k]);
+    const { rows: [n] } = await pool.query(
+      `UPDATE notifications SET ${sets.join(',')},"updatedAt"=NOW() WHERE id=$${fields.length + 1} RETURNING *`,
+      [...vals, req.params.id]
+    );
+    if (!n) return res.status(404).json({ error: 'Notification not found' });
+    res.json(n);
+  } catch (err) { next(err); }
+});
+
+router.delete('/notifications/:id', async (req, res, next) => {
+  try {
+    await pool.query('DELETE FROM notifications WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 

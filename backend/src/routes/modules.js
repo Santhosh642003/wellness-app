@@ -82,6 +82,11 @@ router.get('/quiz/biweekly', async (req, res, next) => {
     const { rows: [quiz] } = await pool.query(`SELECT * FROM quizzes WHERE type='biweekly' LIMIT 1`);
     if (!quiz) return res.status(404).json({ error: 'Biweekly quiz not found' });
 
+    // Check scheduled date — quiz is locked if scheduledAt is set and in the future
+    if (quiz.scheduledAt && new Date(quiz.scheduledAt) > new Date()) {
+      return res.json({ scheduledLock: true, scheduledAt: quiz.scheduledAt });
+    }
+
     // Check if user already attempted within the last 14 days
     const { rows: [recentAttempt] } = await pool.query(
       `SELECT * FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
