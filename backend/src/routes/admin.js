@@ -55,19 +55,28 @@ router.use(adminAuth);
 // GET /api/admin/stats
 router.get('/stats', async (req, res, next) => {
   try {
-    const [users, points, completions, redemptions, quizzes] = await Promise.all([
+    const [users, points, completions, redemptions, quizzes, modules, newUsers] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM users'),
-      pool.query('SELECT COALESCE(SUM(points),0) as total FROM user_progress'),
+      pool.query('SELECT COALESCE(SUM(points),0) as total, COALESCE(AVG(points),0) as avg FROM user_progress'),
       pool.query('SELECT COUNT(*) FROM user_module_progress WHERE completed=true'),
-      pool.query('SELECT COUNT(*) FROM reward_redemptions'),
-      pool.query('SELECT COUNT(*) FROM quiz_attempts WHERE passed=true'),
+      pool.query(`SELECT COUNT(*) as count, COALESCE(SUM("pointsSpent"),0) as pts FROM reward_redemptions`),
+      pool.query('SELECT COUNT(*) FILTER (WHERE passed=true) as passed, COUNT(*) as total FROM quiz_attempts'),
+      pool.query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE locked=false) as unlocked FROM modules'),
+      pool.query(`SELECT COUNT(*) FROM users WHERE "createdAt" > NOW() - INTERVAL '7 days'`),
     ]);
     res.json({
       totalUsers: parseInt(users.rows[0].count),
       totalPointsDistributed: parseInt(points.rows[0].total),
+      avgPointsPerUser: Math.round(parseFloat(points.rows[0].avg)),
       totalCompletions: parseInt(completions.rows[0].count),
       totalRedemptions: parseInt(redemptions.rows[0].count),
-      totalQuizzesPassed: parseInt(quizzes.rows[0].count),
+      totalPointsRedeemed: parseInt(redemptions.rows[0].pts),
+      totalQuizzesPassed: parseInt(quizzes.rows[0].passed),
+      totalQuizAttempts: parseInt(quizzes.rows[0].total),
+      quizPassRate: quizzes.rows[0].total > 0 ? Math.round((parseInt(quizzes.rows[0].passed) / parseInt(quizzes.rows[0].total)) * 100) : 0,
+      totalModules: parseInt(modules.rows[0].total),
+      unlockedModules: parseInt(modules.rows[0].unlocked),
+      newUsersThisWeek: parseInt(newUsers.rows[0].count),
     });
   } catch (err) { next(err); }
 });
@@ -328,6 +337,68 @@ router.get('/redemptions', async (req, res, next) => {
        ORDER BY rr."redeemedAt" DESC`
     );
     res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/admin/users/:id/points — award or deduct points
+router.patch('/users/:id/points', async (req, res, next) => {
+  try {
+    const { delta, reason } = z.object({
+      delta: z.number().int(),
+      reason: z.string().optional(),
+    }).parse(req.body);
+    // Ensure user_progress row exists
+    await pool.query(
+      `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,0)
+       ON CONFLICT ("userId") DO NOTHING`,
+      [randomUUID(), req.params.id]
+    );
+    const { rows: [p] } = await pool.query(
+      `UPDATE user_progress SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
+       WHERE "userId" = $2 RETURNING points`,
+      [delta, req.params.id]
+    );
+    if (!p) return res.status(404).json({ error: 'User not found' });
+    res.json({ points: p.points, delta, reason });
+  } catch (err) { next(err); }
+});
+
+// Enhanced stats with more detail
+router.get('/stats/detail', async (req, res, next) => {
+  try {
+    const [
+      users, points, completions, redemptions, quizzes,
+      modules, rewards, recentUsers, topUsers,
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM users'),
+      pool.query('SELECT COALESCE(SUM(points),0) as total, COALESCE(AVG(points),0) as avg FROM user_progress'),
+      pool.query('SELECT COUNT(*) FROM user_module_progress WHERE completed=true'),
+      pool.query('SELECT COUNT(*), COALESCE(SUM("pointsSpent"),0) as total_pts FROM reward_redemptions'),
+      pool.query('SELECT COUNT(*) FILTER (WHERE passed=true) as passed, COUNT(*) as total FROM quiz_attempts'),
+      pool.query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE locked=false) as unlocked FROM modules'),
+      pool.query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE available=true) as available FROM rewards'),
+      pool.query(`SELECT COUNT(*) FROM users WHERE "createdAt" > NOW() - INTERVAL '7 days'`),
+      pool.query(`SELECT u.name, u.email, COALESCE(p.points,0) as points
+                  FROM users u LEFT JOIN user_progress p ON p."userId"=u.id
+                  ORDER BY points DESC LIMIT 5`),
+    ]);
+    res.json({
+      totalUsers: parseInt(users.rows[0].count),
+      totalPointsDistributed: parseInt(points.rows[0].total),
+      avgPointsPerUser: Math.round(parseFloat(points.rows[0].avg)),
+      totalCompletions: parseInt(completions.rows[0].count),
+      totalRedemptions: parseInt(redemptions.rows[0].count),
+      totalPointsRedeemed: parseInt(redemptions.rows[0].total_pts),
+      totalQuizzesPassed: parseInt(quizzes.rows[0].passed),
+      totalQuizAttempts: parseInt(quizzes.rows[0].total),
+      quizPassRate: quizzes.rows[0].total > 0 ? Math.round((quizzes.rows[0].passed / quizzes.rows[0].total) * 100) : 0,
+      totalModules: parseInt(modules.rows[0].total),
+      unlockedModules: parseInt(modules.rows[0].unlocked),
+      totalRewards: parseInt(rewards.rows[0].total),
+      availableRewards: parseInt(rewards.rows[0].available),
+      newUsersThisWeek: parseInt(recentUsers.rows[0].count),
+      topUsers: topUsers.rows,
+    });
   } catch (err) { next(err); }
 });
 

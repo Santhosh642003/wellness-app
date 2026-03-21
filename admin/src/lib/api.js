@@ -43,6 +43,8 @@ export const api = {
   createReward: (body) => req('/rewards', { method: 'POST', body: JSON.stringify(body) }),
   updateReward: (id, body) => req(`/rewards/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteReward: (id) => req(`/rewards/${id}`, { method: 'DELETE' }),
+  // user points adjustment
+  adjustPoints: (userId, delta, reason) => req(`/users/${userId}/points`, { method: 'PATCH', body: JSON.stringify({ delta, reason }) }),
   // redemptions
   redemptions: () => req('/redemptions'),
 
