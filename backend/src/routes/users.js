@@ -169,20 +169,27 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
     );
 
     if (data.completed) {
-      await pool.query(
-        `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
-         ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
-        [randomUUID(), req.params.userId, module.pointsValue]
+      // Guard: only award points and unlock next module on first completion
+      const { rows: [alreadyDone] } = await pool.query(
+        'SELECT completed FROM user_module_progress WHERE "userId"=$1 AND "moduleId"=$2',
+        [req.params.userId, req.params.moduleId]
       );
-      // Seed progress row for the next module so the per-user lock query works
-      const { rows: [nextModule] } = await pool.query(
-        `SELECT * FROM modules WHERE "orderIndex"=$1`, [module.orderIndex + 1]
-      );
-      if (nextModule) {
+      if (!alreadyDone?.completed) {
         await pool.query(
-          `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-          [randomUUID(), req.params.userId, nextModule.id]
+          `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
+           ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
+          [randomUUID(), req.params.userId, module.pointsValue]
         );
+        // Seed progress row for the next module so the per-user lock query works
+        const { rows: [nextModule] } = await pool.query(
+          `SELECT * FROM modules WHERE "orderIndex"=$1`, [module.orderIndex + 1]
+        );
+        if (nextModule) {
+          await pool.query(
+            `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+            [randomUUID(), req.params.userId, nextModule.id]
+          );
+        }
       }
     }
 
@@ -228,18 +235,52 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
       [randomUUID(), req.params.userId, data.moduleId || null, data.quizType, data.score, data.totalPoints, passed, JSON.stringify(data.answers)]
     );
 
+    // Award quiz score points (always, regardless of module vs biweekly)
     if (passed && pointsEarned > 0) {
       await pool.query(
         `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
          ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
         [randomUUID(), req.params.userId, pointsEarned]
       );
-      if (data.moduleId) {
+    }
+
+    // For module quizzes: mark module completed and unlock the next one
+    if (passed && data.moduleId) {
+      const { rows: [mod] } = await pool.query('SELECT * FROM modules WHERE id=$1', [data.moduleId]);
+      const { rows: [existing] } = await pool.query(
+        'SELECT completed FROM user_module_progress WHERE "userId"=$1 AND "moduleId"=$2',
+        [req.params.userId, data.moduleId]
+      );
+
+      // Always mark quizPassed; mark completed and award module points only once
+      await pool.query(
+        `INSERT INTO user_module_progress (id, "userId", "moduleId", "quizPassed", completed, "completedAt", "watchedPercent")
+         VALUES ($1,$2,$3,true,true,NOW(),100)
+         ON CONFLICT ("userId","moduleId") DO UPDATE
+           SET "quizPassed"=true,
+               completed=true,
+               "completedAt"=COALESCE(user_module_progress."completedAt", NOW()),
+               "watchedPercent"=GREATEST(user_module_progress."watchedPercent", 100)`,
+        [randomUUID(), req.params.userId, data.moduleId]
+      );
+
+      if (!existing?.completed && mod) {
+        // Award module completion points
         await pool.query(
-          `INSERT INTO user_module_progress (id, "userId", "moduleId", "quizPassed") VALUES ($1,$2,$3,true)
-           ON CONFLICT ("userId","moduleId") DO UPDATE SET "quizPassed"=true`,
-          [randomUUID(), req.params.userId, data.moduleId]
+          `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
+           ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
+          [randomUUID(), req.params.userId, mod.pointsValue]
         );
+        // Create next module progress row so the lock query can see it as unlocked
+        const { rows: [nextMod] } = await pool.query(
+          `SELECT id FROM modules WHERE "orderIndex"=$1`, [mod.orderIndex + 1]
+        );
+        if (nextMod) {
+          await pool.query(
+            `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+            [randomUUID(), req.params.userId, nextMod.id]
+          );
+        }
       }
     }
 
