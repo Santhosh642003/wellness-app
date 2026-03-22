@@ -239,6 +239,7 @@ router.patch('/quizzes/:id', async (req, res, next) => {
       `UPDATE quizzes SET ${sets.join(',')},"updatedAt"=NOW() WHERE id=$${fields.length + 1} RETURNING *`,
       [...vals, req.params.id]
     );
+    if (!q) return res.status(404).json({ error: 'Quiz not found' });
     res.json(q);
   } catch (err) { next(err); }
 });
@@ -316,11 +317,13 @@ router.post('/rewards', async (req, res, next) => {
 
 router.patch('/rewards/:id', async (req, res, next) => {
   try {
-    const d = z.object({ title: z.string().optional(), description: z.string().optional(), pointsCost: z.number().optional(), category: z.string().optional(), stock: z.number().optional(), available: z.boolean().optional(), imageUrl: z.string().optional() }).parse(req.body);
-    const fields = Object.keys(d);
+    const d = z.object({ title: z.string().optional(), description: z.string().optional(), pointsCost: z.number().optional(), category: z.string().optional(), stock: z.number().optional(), available: z.boolean().optional(), imageUrl: z.string().nullable().optional() }).parse(req.body);
+    const fields = Object.keys(d).filter(k => d[k] !== undefined);
     if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
     const sets = fields.map((k, i) => `"${k}"=$${i + 1}`);
-    const { rows: [r] } = await pool.query(`UPDATE rewards SET ${sets.join(',')} WHERE id=$${fields.length+1} RETURNING *`, [...Object.values(d), req.params.id]);
+    const vals = fields.map(k => d[k]);
+    const { rows: [r] } = await pool.query(`UPDATE rewards SET ${sets.join(',')} WHERE id=$${fields.length+1} RETURNING *`, [...vals, req.params.id]);
+    if (!r) return res.status(404).json({ error: 'Reward not found' });
     res.json(r);
   } catch (err) { next(err); }
 });

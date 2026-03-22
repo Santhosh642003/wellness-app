@@ -27,6 +27,8 @@ export default function ModulePlayer() {
   const [mod, setMod] = useState(null);
   const [allModules, setAllModules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [points, setPoints] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
 
   // Video progress
   const [videoTime, setVideoTime] = useState(0);
@@ -48,10 +50,18 @@ export default function ModulePlayer() {
   // Load module data
   useEffect(() => {
     setLoading(true);
-    Promise.all([modulesApi.get(moduleId), modulesApi.list()])
-      .then(([m, all]) => {
+    Promise.all([
+      modulesApi.get(moduleId),
+      modulesApi.list(),
+      user?.id ? usersApi.get(user.id) : Promise.resolve(null),
+    ])
+      .then(([m, all, userData]) => {
         setMod(m);
         setAllModules(all);
+        if (userData?.progress) {
+          setPoints(userData.progress.points || 0);
+          setStreakDays(userData.progress.streakDays || 0);
+        }
         // Restore saved watch progress
         const saved = m?.userProgress?.watchedPercent || 0;
         setWatchedPercent(saved);
@@ -63,7 +73,7 @@ export default function ModulePlayer() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [moduleId]);
+  }, [moduleId, user?.id]);
 
   const content = useMemo(() => getContent(mod), [mod]);
   const currentIdx = allModules.findIndex((m) => m.id === moduleId);
@@ -197,7 +207,7 @@ export default function ModulePlayer() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
         <button

@@ -44,39 +44,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// GET /api/modules/:moduleId
-router.get('/:moduleId', async (req, res, next) => {
-  try {
-    const query = PER_USER_MODULES_QUERY.replace(
-      'ORDER BY m."orderIndex"',
-      'WHERE m.id = $2\n  ORDER BY m."orderIndex"'
-    );
-    const { rows } = await pool.query(query, [req.userId, req.params.moduleId]);
-    if (!rows[0]) return res.status(404).json({ error: 'Module not found' });
-    const { completed, watchedPercent, quizPassed, completedAt, ...module } = rows[0];
-    res.json({ ...module, userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt } : null });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/modules/:moduleId/quiz
-router.get('/:moduleId/quiz', async (req, res, next) => {
-  try {
-    const { rows: [quiz] } = await pool.query(
-      `SELECT * FROM quizzes WHERE "moduleId"=$1 AND type='module' LIMIT 1`,
-      [req.params.moduleId]
-    );
-    if (!quiz) return res.status(404).json({ error: 'No quiz found for this module' });
-    const { rows: questions } = await pool.query(
-      `SELECT * FROM quiz_questions WHERE "quizId"=$1 ORDER BY "orderIndex"`,
-      [quiz.id]
-    );
-    res.json({ ...quiz, questions });
-  } catch (err) { next(err); }
-});
-
-// GET /api/modules/quiz/biweekly
+// GET /api/modules/quiz/biweekly  ← MUST come before /:moduleId to avoid param capture
 router.get('/quiz/biweekly', async (req, res, next) => {
   try {
     const { rows: [quiz] } = await pool.query(`SELECT * FROM quizzes WHERE type='biweekly' LIMIT 1`);
@@ -114,6 +82,38 @@ router.get('/quiz/biweekly', async (req, res, next) => {
       [quiz.id]
     );
     res.json({ ...quiz, questions, alreadyAttempted: false });
+  } catch (err) { next(err); }
+});
+
+// GET /api/modules/:moduleId
+router.get('/:moduleId', async (req, res, next) => {
+  try {
+    const query = PER_USER_MODULES_QUERY.replace(
+      'ORDER BY m."orderIndex"',
+      'WHERE m.id = $2\n  ORDER BY m."orderIndex"'
+    );
+    const { rows } = await pool.query(query, [req.userId, req.params.moduleId]);
+    if (!rows[0]) return res.status(404).json({ error: 'Module not found' });
+    const { completed, watchedPercent, quizPassed, completedAt, ...module } = rows[0];
+    res.json({ ...module, userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt } : null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/modules/:moduleId/quiz
+router.get('/:moduleId/quiz', async (req, res, next) => {
+  try {
+    const { rows: [quiz] } = await pool.query(
+      `SELECT * FROM quizzes WHERE "moduleId"=$1 AND type='module' LIMIT 1`,
+      [req.params.moduleId]
+    );
+    if (!quiz) return res.status(404).json({ error: 'No quiz found for this module' });
+    const { rows: questions } = await pool.query(
+      `SELECT * FROM quiz_questions WHERE "quizId"=$1 ORDER BY "orderIndex"`,
+      [quiz.id]
+    );
+    res.json({ ...quiz, questions });
   } catch (err) { next(err); }
 });
 

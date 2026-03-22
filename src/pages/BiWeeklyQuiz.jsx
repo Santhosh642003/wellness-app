@@ -15,6 +15,13 @@ export default function BiWeeklyQuiz() {
   const [error, setError] = useState(null);
   const [points, setPoints] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
+  const [now, setNow] = useState(() => new Date());
+
+  // Keep "now" ticking so the countdown updates every minute
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("wellness_token");
@@ -91,7 +98,6 @@ export default function BiWeeklyQuiz() {
   // Quiz is scheduled but not yet available
   if (scheduledLock) {
     const unlockDate = new Date(scheduledLock.scheduledAt);
-    const now = new Date();
     const diffMs = unlockDate - now;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));

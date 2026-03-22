@@ -4,7 +4,7 @@ import DashboardNav from "../components/DashboardNav";
 import Toast from "../components/Toast";
 import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
-import { modules as modulesApi } from "../lib/api";
+import { modules as modulesApi, users as usersApi } from "../lib/api";
 
 const CATEGORY_COLORS = {
   Foundations: { bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
@@ -238,6 +238,8 @@ export default function Modules() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [modules, setModules] = useState([]);
+  const [points, setPoints] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
@@ -250,14 +252,21 @@ export default function Modules() {
 
   const loadModules = useCallback(async () => {
     try {
-      const mods = await modulesApi.list();
+      const [mods, userData] = await Promise.all([
+        modulesApi.list(),
+        user?.id ? usersApi.get(user.id) : Promise.resolve(null),
+      ]);
       setModules((mods || []).map(mapModule));
+      if (userData?.progress) {
+        setPoints(userData.progress.points || 0);
+        setStreakDays(userData.progress.streakDays || 0);
+      }
     } catch (err) {
       console.error("Failed to load modules", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => { loadModules(); }, [loadModules]);
 
@@ -295,7 +304,7 @@ export default function Modules() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
 
       <main className="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8 w-full">
 
