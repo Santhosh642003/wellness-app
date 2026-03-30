@@ -7,20 +7,30 @@ import { useAuth } from "../contexts/AuthContext";
 import { leaderboard as leaderboardApi, users as usersApi } from "../lib/api";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
+const PERIODS = [
+  { key: "all", label: "All-time" },
+  { key: "month", label: "This Month" },
+  { key: "week", label: "This Week" },
+];
 
 export default function Leaderboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState("all");
   const [points, setPoints] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
 
   useEffect(() => {
-    leaderboardApi.list()
+    setLoading(true);
+    leaderboardApi.list(period)
       .then(setEntries)
       .catch(console.error)
       .finally(() => setLoading(false));
+  }, [period]);
+
+  useEffect(() => {
     if (user?.id) {
       usersApi.get(user.id)
         .then((d) => { setPoints(d.progress?.points || 0); setStreakDays(d.progress?.streakDays || 0); })
@@ -36,7 +46,7 @@ export default function Leaderboard() {
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-6">
           <div className="h-10 w-10 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center">
             <Trophy size={20} className="text-yellow-500" />
           </div>
@@ -44,6 +54,23 @@ export default function Leaderboard() {
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Leaderboard</h1>
             <p className="text-sm text-slate-500 dark:text-gray-400">Top students by wellness points</p>
           </div>
+        </div>
+
+        {/* Period filter tabs */}
+        <div className="flex gap-2 mb-6">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all
+                ${period === p.key
+                  ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-600 dark:text-yellow-300"
+                  : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"
+                }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
 
         {/* My rank banner (if not in top 10) */}
@@ -93,7 +120,11 @@ export default function Leaderboard() {
           {loading ? (
             <div className="py-16 text-center text-slate-400 dark:text-gray-500 animate-pulse">Loading…</div>
           ) : entries.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 dark:text-gray-500">No entries yet. Be the first!</div>
+            <div className="py-16 text-center text-slate-400 dark:text-gray-500">
+              <div className="text-3xl mb-3">🏆</div>
+              <p>No activity for this period yet.</p>
+              <p className="text-sm mt-1">Complete modules and quizzes to appear here!</p>
+            </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-gray-800/60">
               {entries.map((e) => {

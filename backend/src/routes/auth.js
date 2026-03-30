@@ -47,7 +47,14 @@ const registerSchema = z.object({
   role: z.string().optional(),
   campus: z.string().optional(),
   otpCode: z.string().length(6, 'Verification code must be 6 digits'),
+  referralCode: z.string().max(12).optional(),
 });
+
+function generateReferralCode(name) {
+  const prefix = name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
+  const suffix = Math.random().toString(36).toUpperCase().slice(2, 7);
+  return `${prefix}${suffix}`;
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -138,15 +145,30 @@ router.post('/register', async (req, res, next) => {
     const hashed = await bcrypt.hash(data.password, 14); // bcrypt cost 14 for strong hashing
     const userId = randomUUID();
 
+    // Generate unique referral code for this user
+    let referralCode = generateReferralCode(data.name);
+    const { rows: codeCheck } = await pool.query('SELECT id FROM users WHERE "referralCode"=$1', [referralCode]);
+    if (codeCheck[0]) referralCode = generateReferralCode(data.name); // try once more
+
+    // Resolve referrer if referralCode provided
+    let referrerId = null;
+    if (data.referralCode) {
+      const { rows: [referrer] } = await pool.query(
+        'SELECT id FROM users WHERE "referralCode"=$1', [data.referralCode.toUpperCase()]
+      );
+      if (referrer) referrerId = referrer.id;
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(
-        `INSERT INTO users (id, email, name, password, initials, role, campus, major, "yearOfStudy", ethnicity, "emailVerified")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`,
+        `INSERT INTO users (id, email, name, password, initials, role, campus, major, "yearOfStudy", ethnicity, "emailVerified", "referralCode")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,$11)`,
         [userId, normalEmail, data.name.trim(), hashed, initials,
          data.role || 'Student', data.campus || 'NJIT Newark',
-         data.major || null, data.yearOfStudy || null, data.ethnicity || null]
+         data.major || null, data.yearOfStudy || null, data.ethnicity || null,
+         referralCode]
       );
       await client.query(`INSERT INTO user_progress (id, "userId") VALUES ($1,$2)`, [randomUUID(), userId]);
       const { rows: modules } = await client.query('SELECT id FROM modules');
@@ -154,6 +176,21 @@ router.post('/register', async (req, res, next) => {
         await client.query(
           `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
           [randomUUID(), userId, m.id]
+        );
+      }
+      // Award referral bonus points to referrer (50 pts) and new user (25 pts)
+      if (referrerId) {
+        await client.query(
+          `INSERT INTO referrals (id, "referrerId", "referredId", "pointsAwarded") VALUES ($1,$2,$3,50)`,
+          [randomUUID(), referrerId, userId]
+        );
+        await client.query(
+          `UPDATE user_progress SET points=points+50 WHERE "userId"=$1`,
+          [referrerId]
+        );
+        await client.query(
+          `UPDATE user_progress SET points=points+25 WHERE "userId"=$1`,
+          [userId]
         );
       }
       await client.query('COMMIT');
@@ -221,13 +258,15 @@ router.post('/google', async (req, res, next) => {
         : fullName.slice(0, 2).toUpperCase();
       const userId = randomUUID();
 
+      const googleReferralCode = generateReferralCode(fullName);
+
       const dbClient = await pool.connect();
       try {
         await dbClient.query('BEGIN');
         await dbClient.query(
-          `INSERT INTO users (id, email, name, password, initials, role, campus, "emailVerified")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,true)`,
-          [userId, email, fullName.trim(), '', initials, 'Student', 'NJIT Newark']
+          `INSERT INTO users (id, email, name, password, initials, role, campus, "emailVerified", "referralCode")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
+          [userId, email, fullName.trim(), '', initials, 'Student', 'NJIT Newark', googleReferralCode]
         );
         await dbClient.query(`INSERT INTO user_progress (id, "userId") VALUES ($1,$2)`, [randomUUID(), userId]);
         const { rows: modules } = await dbClient.query('SELECT id FROM modules');

@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import pool from '../lib/db.js';
 import { adminAuth } from '../middleware/adminAuth.js';
 import { uploadFile, deleteFile } from '../lib/storage.js';
+import { sendQuizLiveEmail, sendAnnouncementEmail } from '../lib/email.js';
 
 const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -230,16 +231,39 @@ router.patch('/quizzes/:id', async (req, res, next) => {
       title: z.string().optional(),
       passingScore: z.number().optional(),
       scheduledAt: z.string().nullable().optional(),
+      sendLiveEmail: z.boolean().optional(), // trigger "quiz live" email blast
     }).parse(req.body);
-    const fields = Object.keys(d).filter(k => d[k] !== undefined);
-    if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
-    const sets = fields.map((k, i) => `"${k}"=$${i + 1}`);
-    const vals = fields.map(k => d[k]);
-    const { rows: [q] } = await pool.query(
-      `UPDATE quizzes SET ${sets.join(',')},"updatedAt"=NOW() WHERE id=$${fields.length + 1} RETURNING *`,
-      [...vals, req.params.id]
-    );
-    if (!q) return res.status(404).json({ error: 'Quiz not found' });
+    const { sendLiveEmail, ...updateData } = d;
+    const fields = Object.keys(updateData).filter(k => updateData[k] !== undefined);
+    if (!fields.length && !sendLiveEmail) return res.status(400).json({ error: 'Nothing to update' });
+
+    let q;
+    if (fields.length) {
+      const sets = fields.map((k, i) => `"${k}"=$${i + 1}`);
+      const vals = fields.map(k => updateData[k]);
+      const { rows: [updated] } = await pool.query(
+        `UPDATE quizzes SET ${sets.join(',')},"updatedAt"=NOW() WHERE id=$${fields.length + 1} RETURNING *`,
+        [...vals, req.params.id]
+      );
+      if (!updated) return res.status(404).json({ error: 'Quiz not found' });
+      q = updated;
+    } else {
+      const { rows: [existing] } = await pool.query('SELECT * FROM quizzes WHERE id=$1', [req.params.id]);
+      if (!existing) return res.status(404).json({ error: 'Quiz not found' });
+      q = existing;
+    }
+
+    // Optionally send "quiz is live" email to all users
+    if (sendLiveEmail) {
+      const appUrl = process.env.APP_URL || 'http://localhost:5173';
+      const quizUrl = q.type === 'biweekly' ? `${appUrl}/quiz/biweekly` : `${appUrl}/quiz/module/${q.moduleId}`;
+      pool.query('SELECT email FROM users').then(({ rows: users }) => {
+        for (const user of users) {
+          sendQuizLiveEmail(user.email, q.title, quizUrl).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
     res.json(q);
   } catch (err) { next(err); }
 });
@@ -366,11 +390,22 @@ router.post('/notifications', async (req, res, next) => {
       body: z.string().default(''),
       imageUrl: z.string().nullable().optional(),
       active: z.boolean().default(true),
+      sendEmail: z.boolean().default(false),
     }).parse(req.body);
     const { rows: [n] } = await pool.query(
       `INSERT INTO notifications (id, title, body, "imageUrl", active) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
       [randomUUID(), d.title, d.body, d.imageUrl || null, d.active]
     );
+
+    // Optionally send announcement email to all users
+    if (d.sendEmail && d.active) {
+      pool.query('SELECT email FROM users').then(({ rows: users }) => {
+        for (const user of users) {
+          sendAnnouncementEmail(user.email, d.title, d.body).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
     res.status(201).json(n);
   } catch (err) { next(err); }
 });
@@ -423,6 +458,78 @@ router.patch('/users/:id/points', async (req, res, next) => {
     );
     if (!p) return res.status(404).json({ error: 'User not found' });
     res.json({ points: p.points, delta, reason });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/stats/analytics — time-series data for charts (last 30 days)
+router.get('/stats/analytics', async (req, res, next) => {
+  try {
+    const [registrations, completions, quizAttempts, dailyClaims] = await Promise.all([
+      pool.query(`
+        SELECT TO_CHAR(DATE_TRUNC('day',"createdAt"),'YYYY-MM-DD') AS date, COUNT(*) AS count
+        FROM users
+        WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE_TRUNC('day',"createdAt")
+        ORDER BY date`),
+      pool.query(`
+        SELECT TO_CHAR(DATE_TRUNC('day',"completedAt"),'YYYY-MM-DD') AS date, COUNT(*) AS count
+        FROM user_module_progress
+        WHERE completed=true AND "completedAt" >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE_TRUNC('day',"completedAt")
+        ORDER BY date`),
+      pool.query(`
+        SELECT TO_CHAR(DATE_TRUNC('day',"createdAt"),'YYYY-MM-DD') AS date,
+               COUNT(*) AS count,
+               COUNT(*) FILTER (WHERE passed=true) AS passed
+        FROM quiz_attempts
+        WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE_TRUNC('day',"createdAt")
+        ORDER BY date`),
+      pool.query(`
+        SELECT TO_CHAR(DATE_TRUNC('day',"lastClaimDate"),'YYYY-MM-DD') AS date, COUNT(*) AS count
+        FROM user_progress
+        WHERE "lastClaimDate" >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE_TRUNC('day',"lastClaimDate")
+        ORDER BY date`),
+    ]);
+
+    res.json({
+      registrations: registrations.rows.map(r => ({ date: r.date, count: parseInt(r.count) })),
+      completions: completions.rows.map(r => ({ date: r.date, count: parseInt(r.count) })),
+      quizAttempts: quizAttempts.rows.map(r => ({
+        date: r.date,
+        count: parseInt(r.count),
+        passed: parseInt(r.passed),
+      })),
+      dailyClaims: dailyClaims.rows.map(r => ({ date: r.date, count: parseInt(r.count) })),
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/users/bulk — bulk actions on users
+router.post('/users/bulk', async (req, res, next) => {
+  try {
+    const { userIds, action, points } = z.object({
+      userIds: z.array(z.string()).min(1).max(100),
+      action: z.enum(['award-points', 'revoke-points']),
+      points: z.number().int().positive().optional(),
+    }).parse(req.body);
+
+    if ((action === 'award-points' || action === 'revoke-points') && !points) {
+      return res.status(400).json({ error: 'points required for this action' });
+    }
+
+    const delta = action === 'award-points' ? points : -points;
+    const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',');
+
+    await pool.query(
+      `UPDATE user_progress
+       SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
+       WHERE "userId" IN (${placeholders})`,
+      [delta, ...userIds]
+    );
+
+    res.json({ success: true, affected: userIds.length, action, delta });
   } catch (err) { next(err); }
 });
 

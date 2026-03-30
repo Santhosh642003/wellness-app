@@ -53,6 +53,11 @@ export const api = {
   updateNotification: (id, body) => req(`/notifications/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteNotification: (id) => req(`/notifications/${id}`, { method: 'DELETE' }),
 
+  // analytics
+  analytics: () => req('/stats/analytics'),
+  // bulk user actions
+  bulkAction: (body) => req('/users/bulk', { method: 'POST', body: JSON.stringify(body) }),
+
   // image upload (returns { url })
   uploadImage: (file, onProgress) => {
     return new Promise((resolve, reject) => {

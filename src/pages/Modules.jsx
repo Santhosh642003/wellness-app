@@ -4,7 +4,7 @@ import DashboardNav from "../components/DashboardNav";
 import Toast from "../components/Toast";
 import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
-import { modules as modulesApi, users as usersApi } from "../lib/api";
+import { modules as modulesApi, users as usersApi, bookmarks as bookmarksApi } from "../lib/api";
 
 const CATEGORY_COLORS = {
   Foundations: { bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
@@ -101,7 +101,32 @@ function StepIndicator({ watchedPct, quizPassed, completed }) {
   );
 }
 
-function ModuleCard({ m, index, onClick }) {
+function BookmarkButton({ moduleId, bookmarked, onToggle }) {
+  const [busy, setBusy] = useState(false);
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    if (busy) return;
+    setBusy(true);
+    try { await onToggle(moduleId, bookmarked); } finally { setBusy(false); }
+  };
+  return (
+    <button
+      onClick={handleClick}
+      title={bookmarked ? "Remove bookmark" : "Bookmark this module"}
+      className={`absolute top-3 right-3 z-10 h-8 w-8 rounded-lg flex items-center justify-center border transition-all
+        ${bookmarked
+          ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-500"
+          : "bg-white/80 dark:bg-[#1a1a1a]/80 border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500 hover:text-yellow-500 hover:border-yellow-400/40"
+        }`}
+    >
+      <svg className="w-4 h-4" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+      </svg>
+    </button>
+  );
+}
+
+function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
   const color = getColor(m.category);
   const isActive = !m.locked && !m.completed;
   const pct = m.watchedPct;
@@ -111,6 +136,7 @@ function ModuleCard({ m, index, onClick }) {
       className={`group relative bg-white dark:bg-[#121212] border rounded-2xl overflow-hidden shadow-sm transition-all duration-200
         ${m.locked ? "border-slate-200 dark:border-gray-800 opacity-60" : m.completed ? "border-emerald-400/30" : "border-slate-200 dark:border-gray-800 hover:border-blue-400/40 hover:shadow-md"}`}
     >
+      {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
       {/* Top accent bar */}
       <div className={`h-1 w-full ${m.completed ? "bg-gradient-to-r from-emerald-400 to-teal-400" : m.locked ? "bg-slate-200 dark:bg-gray-800" : "bg-gradient-to-r from-blue-500 to-emerald-400"}`} />
 
@@ -243,6 +269,8 @@ export default function Modules() {
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
+  const [showBookmarked, setShowBookmarked] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -252,11 +280,13 @@ export default function Modules() {
 
   const loadModules = useCallback(async () => {
     try {
-      const [mods, userData] = await Promise.all([
+      const [mods, userData, bmarks] = await Promise.all([
         modulesApi.list(),
         user?.id ? usersApi.get(user.id) : Promise.resolve(null),
+        user?.id ? bookmarksApi.list(user.id).catch(() => []) : Promise.resolve([]),
       ]);
       setModules((mods || []).map(mapModule));
+      setBookmarkedIds(new Set((bmarks || []).map((b) => b.moduleId)));
       if (userData?.progress) {
         setPoints(userData.progress.points || 0);
         setStreakDays(userData.progress.streakDays || 0);
@@ -268,6 +298,22 @@ export default function Modules() {
     }
   }, [user?.id]);
 
+  const handleBookmarkToggle = useCallback(async (moduleId, currentlyBookmarked) => {
+    try {
+      if (currentlyBookmarked) {
+        await bookmarksApi.remove(user.id, moduleId);
+        setBookmarkedIds((prev) => { const s = new Set(prev); s.delete(moduleId); return s; });
+        setToast("Bookmark removed");
+      } else {
+        await bookmarksApi.add(user.id, moduleId);
+        setBookmarkedIds((prev) => new Set([...prev, moduleId]));
+        setToast("Module bookmarked");
+      }
+    } catch (err) {
+      setToast("Failed to update bookmark");
+    }
+  }, [user?.id]);
+
   useEffect(() => { loadModules(); }, [loadModules]);
 
   const categories = useMemo(() => {
@@ -276,9 +322,11 @@ export default function Modules() {
   }, [modules]);
 
   const filtered = useMemo(() => {
-    if (activeCategory === "All") return modules;
-    return modules.filter((m) => m.category === activeCategory);
-  }, [modules, activeCategory]);
+    let list = modules;
+    if (showBookmarked) list = list.filter((m) => bookmarkedIds.has(m.id));
+    if (activeCategory !== "All") list = list.filter((m) => m.category === activeCategory);
+    return list;
+  }, [modules, activeCategory, showBookmarked, bookmarkedIds]);
 
   const stats = useMemo(() => {
     const total = modules.length;
@@ -363,46 +411,61 @@ export default function Modules() {
           </div>
         </div>
 
-        {/* Category filter tabs */}
-        {categories.length > 2 && (
-          <div className="flex gap-2 flex-wrap">
-            {categories.map((cat) => {
-              const color = cat === "All" ? null : getColor(cat);
-              const count = cat === "All" ? modules.length : modules.filter((m) => m.category === cat).length;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all
-                    ${activeCategory === cat
-                      ? cat === "All"
-                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white"
-                        : `${color.bg} ${color.border} ${color.text} shadow-sm`
-                      : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"
-                    }`}
-                >
-                  {cat} <span className="opacity-60">({count})</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* Bookmark filter + category filter tabs */}
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* Bookmarked toggle */}
+          <button
+            onClick={() => setShowBookmarked((v) => !v)}
+            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all flex items-center gap-1.5
+              ${showBookmarked
+                ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-600 dark:text-yellow-300"
+                : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-yellow-400/30"
+              }`}
+          >
+            <svg className="w-3 h-3" fill={showBookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            Bookmarked <span className="opacity-60">({bookmarkedIds.size})</span>
+          </button>
+
+          {categories.length > 2 && categories.map((cat) => {
+            const color = cat === "All" ? null : getColor(cat);
+            const count = cat === "All" ? modules.length : modules.filter((m) => m.category === cat).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all
+                  ${activeCategory === cat
+                    ? cat === "All"
+                      ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white"
+                      : `${color.bg} ${color.border} ${color.text} shadow-sm`
+                    : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"
+                  }`}
+              >
+                {cat} <span className="opacity-60">({count})</span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* Module grid */}
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-slate-400 dark:text-gray-500">
-            <div className="text-4xl mb-3">📚</div>
-            <p className="font-medium">No modules yet</p>
-            <p className="text-sm mt-1">Check back soon — new modules are coming!</p>
+            <div className="text-4xl mb-3">{showBookmarked ? "🔖" : "📚"}</div>
+            <p className="font-medium">{showBookmarked ? "No bookmarks yet" : "No modules yet"}</p>
+            <p className="text-sm mt-1">{showBookmarked ? "Click the bookmark icon on any module to save it here" : "Check back soon — new modules are coming!"}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {filtered.map((m, i) => (
+            {filtered.map((m) => (
               <ModuleCard
                 key={m.id}
                 m={m}
                 index={modules.indexOf(m)}
                 onClick={(mod) => navigate(`/modules/${mod.id}`)}
+                bookmarked={bookmarkedIds.has(m.id)}
+                onBookmarkToggle={handleBookmarkToggle}
               />
             ))}
           </div>

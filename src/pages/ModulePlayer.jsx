@@ -4,7 +4,7 @@ import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import VideoPlayer from "../components/VideoPlayer";
 import { useAuth } from "../contexts/AuthContext";
-import { modules as modulesApi, users as usersApi, transcribe } from "../lib/api";
+import { modules as modulesApi, users as usersApi, transcribe, comments as commentsApi } from "../lib/api";
 
 function getContent(mod) {
   return {
@@ -46,6 +46,12 @@ export default function ModulePlayer() {
   const [aiRecording, setAiRecording] = useState(false);
   const [aiError, setAiError] = useState("");
   const recorderRef = useRef(null);
+
+  // Discussion state
+  const [discussionComments, setDiscussionComments] = useState([]);
+  const [commentInput, setCommentInput] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentPosting, setCommentPosting] = useState(false);
 
   // Load module data
   useEffect(() => {
@@ -188,6 +194,40 @@ export default function ModulePlayer() {
   useEffect(() => () => stopAiRecording(), [stopAiRecording]);
 
   const goToQuiz = () => navigate(`/quiz/module/${moduleId}`);
+
+  // Load comments
+  useEffect(() => {
+    if (!moduleId) return;
+    setCommentLoading(true);
+    commentsApi.list(moduleId)
+      .then((data) => setDiscussionComments(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setCommentLoading(false));
+  }, [moduleId]);
+
+  const postComment = async () => {
+    const body = commentInput.trim();
+    if (!body || commentPosting) return;
+    setCommentPosting(true);
+    try {
+      const newComment = await commentsApi.add(moduleId, body);
+      setDiscussionComments((prev) => [...prev, newComment]);
+      setCommentInput("");
+    } catch (err) {
+      console.error("Failed to post comment", err);
+    } finally {
+      setCommentPosting(false);
+    }
+  };
+
+  const deleteComment = async (commentId) => {
+    try {
+      await commentsApi.delete(moduleId, commentId);
+      setDiscussionComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (err) {
+      console.error("Failed to delete comment", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -511,6 +551,72 @@ export default function ModulePlayer() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   Watch at least 80% of the video to unlock the quiz.
+                </div>
+              )}
+            </div>
+
+            {/* ── Discussion ─────────────────────────────────────────────── */}
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Discussion</h2>
+              <p className="text-sm text-slate-500 dark:text-gray-400 mb-5">Share your thoughts about this module</p>
+
+              {/* Comment input */}
+              <div className="flex gap-3 mb-5">
+                <div className="h-8 w-8 rounded-full bg-blue-500/10 border border-blue-400/20 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                  {user?.initials || "?"}
+                </div>
+                <div className="flex-1 flex gap-2">
+                  <input
+                    value={commentInput}
+                    onChange={(e) => setCommentInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postComment(); } }}
+                    placeholder="Add a comment…"
+                    maxLength={1000}
+                    className="flex-1 rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-slate-400 dark:placeholder:text-gray-600"
+                  />
+                  <button
+                    onClick={postComment}
+                    disabled={!commentInput.trim() || commentPosting}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 disabled:opacity-40 transition"
+                  >
+                    {commentPosting ? "…" : "Post"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Comments list */}
+              {commentLoading ? (
+                <div className="py-6 text-center text-slate-400 dark:text-gray-600 text-sm animate-pulse">Loading discussion…</div>
+              ) : discussionComments.length === 0 ? (
+                <div className="py-6 text-center text-slate-400 dark:text-gray-600 text-sm">No comments yet. Be the first to start a discussion!</div>
+              ) : (
+                <div className="space-y-4">
+                  {discussionComments.map((c) => (
+                    <div key={c.id} className="flex gap-3">
+                      <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-gray-300 shrink-0">
+                        {c.userInitials || "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-slate-900 dark:text-white">{c.userName || "User"}</span>
+                            <span className="text-[10px] text-slate-400 dark:text-gray-600">
+                              {new Date(c.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {c.isOwn && (
+                            <button
+                              onClick={() => deleteComment(c.id)}
+                              className="text-[10px] text-slate-400 dark:text-gray-600 hover:text-red-500 transition shrink-0"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-gray-400 mt-0.5 leading-relaxed">{c.body}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

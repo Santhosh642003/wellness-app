@@ -290,6 +290,45 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
   }
 });
 
+// GET /api/users/:userId/bookmarks
+router.get('/:userId/bookmarks', requireSelf, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT b.id, b."moduleId", b."createdAt",
+              m.title, m.slug, m.category, m."orderIndex", m."pointsValue", m."videoUrl",
+              m.description, m.duration
+       FROM bookmarks b
+       JOIN modules m ON m.id = b."moduleId"
+       WHERE b."userId" = $1
+       ORDER BY b."createdAt" DESC`,
+      [req.params.userId]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// POST /api/users/:userId/bookmarks/:moduleId
+router.post('/:userId/bookmarks/:moduleId', requireSelf, async (req, res, next) => {
+  try {
+    await pool.query(
+      `INSERT INTO bookmarks (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+      [randomUUID(), req.params.userId, req.params.moduleId]
+    );
+    res.status(201).json({ bookmarked: true, moduleId: req.params.moduleId });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/users/:userId/bookmarks/:moduleId
+router.delete('/:userId/bookmarks/:moduleId', requireSelf, async (req, res, next) => {
+  try {
+    await pool.query(
+      `DELETE FROM bookmarks WHERE "userId"=$1 AND "moduleId"=$2`,
+      [req.params.userId, req.params.moduleId]
+    );
+    res.json({ bookmarked: false, moduleId: req.params.moduleId });
+  } catch (err) { next(err); }
+});
+
 // GET /api/users/:userId/activity
 // Returns active dates (YYYY-MM-DD) for the last 90 days derived from
 // quiz attempts, module completions, and daily claims.

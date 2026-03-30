@@ -397,6 +397,53 @@ export default function Profile() {
                 View rewards store
               </button>
             </div>
+
+            {/* Referral Code */}
+            {profileData?.referralCode && (
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Refer a Friend</h2>
+                <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+                  Share your code! You'll earn <strong className="text-emerald-500">+50 pts</strong> and your friend gets <strong className="text-blue-500">+25 pts</strong> on signup.
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 rounded-xl px-4 py-2.5 font-mono text-sm font-bold text-slate-900 dark:text-white tracking-wider">
+                    {profileData.referralCode}
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(profileData.referralCode).catch(() => {});
+                      setToast("Referral code copied!");
+                    }}
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-100 dark:bg-[#141414] text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
+                    title="Copy code"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Certificate */}
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Certificate</h2>
+              <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+                {completedCount === totalModules && totalModules > 0
+                  ? "You've completed all modules! View your certificate."
+                  : `Complete all ${totalModules} modules to earn your certificate.`}
+              </p>
+              <button
+                onClick={() => navigate("/certificate")}
+                className={`w-full px-4 py-2 rounded-xl text-sm font-semibold transition
+                  ${completedCount === totalModules && totalModules > 0
+                    ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-white hover:opacity-90"
+                    : "bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]"
+                  }`}
+              >
+                {completedCount === totalModules && totalModules > 0 ? "View Certificate ✨" : "View Progress Certificate"}
+              </button>
+            </div>
           </aside>
         </div>
       </main>

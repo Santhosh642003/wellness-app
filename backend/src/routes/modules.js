@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import pool from '../lib/db.js';
 import { authenticate } from '../middleware/auth.js';
 
@@ -102,6 +104,7 @@ router.get('/:moduleId', async (req, res, next) => {
 });
 
 // GET /api/modules/:moduleId/quiz
+// Returns quiz with retake cooldown enforcement (24-hour cooldown for module quizzes)
 router.get('/:moduleId/quiz', async (req, res, next) => {
   try {
     const { rows: [quiz] } = await pool.query(
@@ -109,11 +112,87 @@ router.get('/:moduleId/quiz', async (req, res, next) => {
       [req.params.moduleId]
     );
     if (!quiz) return res.status(404).json({ error: 'No quiz found for this module' });
+
+    // Check 24-hour retake cooldown (skip if user already passed)
+    const { rows: [lastAttempt] } = await pool.query(
+      `SELECT * FROM quiz_attempts
+       WHERE "userId"=$1 AND "moduleId"=$2 AND "quizType"='module'
+       ORDER BY "createdAt" DESC LIMIT 1`,
+      [req.userId, req.params.moduleId]
+    );
+
+    if (lastAttempt && !lastAttempt.passed) {
+      const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours
+      const nextAvailable = new Date(lastAttempt.createdAt.getTime() + cooldownMs);
+      if (nextAvailable > new Date()) {
+        return res.json({
+          ...quiz,
+          questions: [],
+          alreadyAttempted: true,
+          passed: false,
+          score: lastAttempt.score,
+          totalPoints: lastAttempt.totalPoints,
+          nextAvailable: nextAvailable.toISOString(),
+        });
+      }
+    }
+
     const { rows: questions } = await pool.query(
       `SELECT * FROM quiz_questions WHERE "quizId"=$1 ORDER BY "orderIndex"`,
       [quiz.id]
     );
-    res.json({ ...quiz, questions });
+    res.json({ ...quiz, questions, alreadyAttempted: !!lastAttempt, passed: lastAttempt?.passed ?? false });
+  } catch (err) { next(err); }
+});
+
+// GET /api/modules/:moduleId/comments
+router.get('/:moduleId/comments', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.body, c."createdAt", c."updatedAt",
+              u.name AS "userName", u.initials AS "userInitials", u.role AS "userRole",
+              c."userId" = $2 AS "isOwn"
+       FROM comments c
+       JOIN users u ON u.id = c."userId"
+       WHERE c."moduleId" = $1
+       ORDER BY c."createdAt" ASC`,
+      [req.params.moduleId, req.userId]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// POST /api/modules/:moduleId/comments
+router.post('/:moduleId/comments', async (req, res, next) => {
+  try {
+    const { body } = z.object({ body: z.string().min(1).max(1000) }).parse(req.body);
+    const { rows: [comment] } = await pool.query(
+      `INSERT INTO comments (id, "userId", "moduleId", body)
+       VALUES ($1,$2,$3,$4) RETURNING *`,
+      [randomUUID(), req.userId, req.params.moduleId, body.trim()]
+    );
+    const { rows: [user] } = await pool.query('SELECT name, initials, role FROM users WHERE id=$1', [req.userId]);
+    res.status(201).json({
+      ...comment,
+      userName: user.name,
+      userInitials: user.initials,
+      userRole: user.role,
+      isOwn: true,
+    });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/modules/:moduleId/comments/:commentId
+router.delete('/:moduleId/comments/:commentId', async (req, res, next) => {
+  try {
+    const { rows: [comment] } = await pool.query(
+      'SELECT "userId" FROM comments WHERE id=$1 AND "moduleId"=$2',
+      [req.params.commentId, req.params.moduleId]
+    );
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+    if (comment.userId !== req.userId) return res.status(403).json({ error: 'Not authorized' });
+    await pool.query('DELETE FROM comments WHERE id=$1', [req.params.commentId]);
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 

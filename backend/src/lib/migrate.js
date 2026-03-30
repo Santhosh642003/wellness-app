@@ -163,6 +163,36 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 `;
 
+const COMMUNITY_AND_REFERRALS = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "referralCode" TEXT UNIQUE;
+
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "moduleId" TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("userId", "moduleId")
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "moduleId" TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS comments_module_idx ON comments("moduleId");
+
+CREATE TABLE IF NOT EXISTS referrals (
+  id TEXT PRIMARY KEY,
+  "referrerId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "referredId" TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  "pointsAwarded" INTEGER NOT NULL DEFAULT 50,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
@@ -170,6 +200,7 @@ export async function migrate() {
     await pool.query(OTP_TABLE);
     await pool.query(RESET_TABLE);
     await pool.query(SCHEDULING_AND_NOTIFICATIONS);
+    await pool.query(COMMUNITY_AND_REFERRALS);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

@@ -92,10 +92,24 @@ export const rewards = {
 
 // Leaderboard
 export const leaderboard = {
-  list: () => request('/leaderboard'),
+  list: (period = 'all') => request(`/leaderboard?period=${period}`),
 };
 
 // Notifications
 export const notifications = {
   list: () => request('/notifications'),
+};
+
+// Bookmarks
+export const bookmarks = {
+  list: (userId) => request(`/users/${userId}/bookmarks`),
+  add: (userId, moduleId) => request(`/users/${userId}/bookmarks/${moduleId}`, { method: 'POST' }),
+  remove: (userId, moduleId) => request(`/users/${userId}/bookmarks/${moduleId}`, { method: 'DELETE' }),
+};
+
+// Comments
+export const comments = {
+  list: (moduleId) => request(`/modules/${moduleId}/comments`),
+  add: (moduleId, body) => request(`/modules/${moduleId}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
+  delete: (moduleId, commentId) => request(`/modules/${moduleId}/comments/${commentId}`, { method: 'DELETE' }),
 };

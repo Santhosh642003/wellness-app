@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, BookOpen, Gift, User, Sun, Moon, Trophy } from "lucide-react";
+import { Home, BookOpen, Gift, User, Sun, Moon, Trophy, Bell, X } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
+import { notifications as notificationsApi } from "../lib/api";
 
 function NavItem({ to, children }) {
   return (
@@ -20,9 +22,40 @@ function NavItem({ to, children }) {
   );
 }
 
+const STORAGE_KEY = "wellness_notif_seen_count";
+
 export default function DashboardNav({ points = 0, streakDays = 0, initials = "?" }) {
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const [notifs, setNotifs] = useState([]);
+  const [showBell, setShowBell] = useState(false);
+  const bellRef = useRef(null);
+
+  // Track unread count via localStorage
+  const seenCount = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10);
+  const unread = Math.max(0, notifs.length - seenCount);
+
+  useEffect(() => {
+    notificationsApi.list()
+      .then((data) => setNotifs(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showBell) return;
+    const handler = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setShowBell(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showBell]);
+
+  const openBell = () => {
+    setShowBell((v) => !v);
+    // Mark all as seen
+    localStorage.setItem(STORAGE_KEY, String(notifs.length));
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 dark:bg-[#0b0b0b]/80 backdrop-blur border-b border-slate-200 dark:border-gray-900">
@@ -45,7 +78,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
           <NavItem to="/profile"><User size={16} />Profile</NavItem>
         </nav>
 
-        {/* Right: stats + theme + avatar */}
+        {/* Right: stats + notifications + theme + avatar */}
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2">
             <div className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 text-sm">
@@ -56,6 +89,49 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
               <span className="text-slate-500 dark:text-gray-400">Streak:</span>{" "}
               <span className="font-semibold text-slate-900 dark:text-white">{streakDays}d</span>
             </div>
+          </div>
+
+          {/* Notification bell */}
+          <div className="relative" ref={bellRef}>
+            <button
+              onClick={openBell}
+              title="Notifications"
+              className="relative h-10 w-10 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
+            >
+              <Bell size={16} />
+              {unread > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </button>
+
+            {/* Notification dropdown */}
+            {showBell && (
+              <div className="absolute right-0 top-12 w-80 bg-white dark:bg-[#141414] border border-slate-200 dark:border-gray-800 rounded-2xl shadow-xl z-50 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-gray-800">
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</span>
+                  <button onClick={() => setShowBell(false)} className="text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 transition">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-gray-800">
+                  {notifs.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 dark:text-gray-500 text-sm">No notifications yet</div>
+                  ) : (
+                    notifs.map((n) => (
+                      <div key={n.id} className="px-4 py-3">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{n.title}</div>
+                        {n.body && <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5 leading-relaxed">{n.body}</div>}
+                        <div className="text-[10px] text-slate-400 dark:text-gray-600 mt-1">
+                          {new Date(n.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Theme toggle */}
