@@ -119,7 +119,6 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => { if (videoRef.current) { setDuration(videoRef.current.duration); onLoadedMetadata?.(); } }}
         onEnded={() => { setPlaying(false); setShowControls(true); onEnded?.(); }}
-        onClick={(e) => e.stopPropagation()}
       />
 
       {/* Big play button overlay (when paused) */}
@@ -135,7 +134,7 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
 
       {/* In-player subtitle overlay */}
       {caption && (
-        <div className={`absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 ${showControls ? "bottom-20" : "bottom-6"}`}>
+        <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 transition-all duration-200 ${showControls ? "bottom-20" : "bottom-5"}`}>
           <div className="max-w-[80%] text-center">
             <span className="inline-block bg-black/75 text-white text-sm sm:text-base font-medium leading-snug rounded px-3 py-1 shadow-lg" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
               {caption}
