@@ -169,6 +169,7 @@ const videoItemSchema = z.object({
   title: z.string(),
   url: z.string(),
   duration: z.string().optional(),
+  transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
 });
 const documentItemSchema = z.object({
   id: z.string().optional(),
