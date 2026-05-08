@@ -13,15 +13,15 @@ const CATEGORY_COLORS = {
   Bonus: { bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
   General: { bg: "bg-teal-500/10", border: "border-teal-500/20", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500" },
 };
-
 const DEFAULT_COLOR = { bg: "bg-slate-100 dark:bg-white/5", border: "border-slate-200 dark:border-gray-700", text: "text-slate-500 dark:text-gray-400", dot: "bg-slate-400" };
-
-function getColor(category) {
-  return CATEGORY_COLORS[category] || DEFAULT_COLOR;
-}
+function getColor(category) { return CATEGORY_COLORS[category] || DEFAULT_COLOR; }
 
 function mapModule(m) {
-  const videos = Array.isArray(m.videos) && m.videos.length > 0 ? m.videos : m.videoUrl ? [{ url: m.videoUrl }] : [];
+  const videos = Array.isArray(m.videos) && m.videos.length > 0
+    ? m.videos
+    : m.videoUrl
+    ? [{ id: "v0", url: m.videoUrl, title: m.title || "Video", duration: m.duration || "" }]
+    : [];
   return {
     id: m.id,
     slug: m.slug,
@@ -36,7 +36,9 @@ function mapModule(m) {
     category: m.category || "General",
     orderIndex: m.orderIndex ?? 0,
     keyPoints: Array.isArray(m.keyPoints) ? m.keyPoints : [],
+    videos,
     videoCount: videos.length,
+    videoProgress: m.userProgress?.videoProgress || {},
     documentCount: Array.isArray(m.documents) ? m.documents.length : 0,
   };
 }
@@ -128,15 +130,71 @@ function BookmarkButton({ moduleId, bookmarked, onToggle }) {
   );
 }
 
-function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
+function ChapterRow({ video, index, progress, isModuleCompleted, onClick }) {
+  const pct = progress;
+  const done = pct >= 80 || isModuleCompleted;
+  const started = pct > 0 && !done;
+  return (
+    <button
+      onClick={() => onClick(index)}
+      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all group
+        ${done
+          ? "border-emerald-200 dark:border-emerald-500/25 bg-emerald-50/50 dark:bg-emerald-500/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+          : started
+          ? "border-blue-200 dark:border-blue-500/25 bg-blue-50/30 dark:bg-blue-500/5 hover:bg-blue-50/60 dark:hover:bg-blue-500/10"
+          : "border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] hover:border-blue-300/50 dark:hover:border-blue-700/40"
+        }`}
+    >
+      <div className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center text-[11px] font-bold
+        ${done ? "bg-emerald-500 text-white" : started ? "bg-blue-500 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-400"}`}>
+        {done ? (
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+        ) : index + 1}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-slate-800 dark:text-gray-200 truncate leading-tight">
+          {video.title || `Chapter ${index + 1}`}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5">
+          {video.duration && <span className="text-[10px] text-slate-400 dark:text-gray-600">{video.duration}</span>}
+          {started && <span className="text-[10px] text-blue-500 dark:text-blue-400">{pct}% watched</span>}
+        </div>
+        {started && (
+          <div className="mt-1.5 h-1 w-full bg-slate-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          </div>
+        )}
+      </div>
+
+      <div className={`shrink-0 text-[11px] font-semibold transition
+        ${done ? "text-emerald-600 dark:text-emerald-400"
+          : started ? "text-blue-600 dark:text-blue-400"
+          : "text-slate-400 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400"}`}>
+        {done ? "Done" : started ? "Continue" : "Watch →"}
+      </div>
+    </button>
+  );
+}
+
+function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle }) {
+  const [expanded, setExpanded] = useState(false);
   const color = getColor(m.category);
-  const isActive = !m.locked && !m.completed;
   const pct = m.watchedPct;
+  const isMultiVideo = m.videoCount > 1;
 
   return (
     <div
       className={`group relative bg-white dark:bg-[#121212] border rounded-2xl overflow-hidden shadow-sm transition-all duration-200
-        ${m.locked ? "border-slate-200 dark:border-gray-800 opacity-60" : m.completed ? "border-emerald-400/30" : "border-slate-200 dark:border-gray-800 hover:border-blue-400/40 hover:shadow-md"}`}
+        ${m.locked
+          ? "border-slate-200 dark:border-gray-800 opacity-60"
+          : m.completed
+          ? "border-emerald-400/30"
+          : expanded
+          ? "border-blue-400/40 shadow-md"
+          : "border-slate-200 dark:border-gray-800 hover:border-blue-400/40 hover:shadow-md"}`}
     >
       {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
       {/* Top accent bar */}
@@ -146,9 +204,10 @@ function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
         {/* Header row */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Step number */}
             <div className={`shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold
-              ${m.completed ? "bg-emerald-400/10 border border-emerald-400/20 text-emerald-500" : m.locked ? "bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500" : "bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400"}`}>
+              ${m.completed ? "bg-emerald-400/10 border border-emerald-400/20 text-emerald-500"
+                : m.locked ? "bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500"
+                : "bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400"}`}>
               {m.completed ? (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -157,16 +216,13 @@ function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
                 </svg>
-              ) : (
-                index + 1
-              )}
+              ) : index + 1}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-tight">{m.title}</h3>
               </div>
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                {/* Category badge */}
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${color.bg} ${color.border} ${color.text}`}>
                   {m.category}
                 </span>
@@ -175,20 +231,22 @@ function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
             </div>
           </div>
 
-          {/* Points badge */}
           <div className="shrink-0 text-right">
             <div className="text-xs px-2.5 py-1 rounded-lg bg-yellow-400/10 border border-yellow-400/20 text-yellow-600 dark:text-yellow-300 font-bold">
               +{m.points} pts
             </div>
             <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-1">{m.mins} min</div>
+            {isMultiVideo && (
+              <div className="text-[10px] text-blue-500 dark:text-blue-400 mt-0.5 font-medium">{m.videoCount} chapters</div>
+            )}
           </div>
         </div>
 
         {/* Description */}
         <p className="text-slate-500 dark:text-gray-400 text-xs leading-relaxed line-clamp-2 mb-4">{m.desc}</p>
 
-        {/* Key points preview */}
-        {m.keyPoints.length > 0 && !m.locked && (
+        {/* Key points (only for single-video, non-locked) */}
+        {m.keyPoints.length > 0 && !m.locked && !isMultiVideo && (
           <div className="mb-4 space-y-1">
             {m.keyPoints.slice(0, 3).map((kp, i) => (
               <div key={i} className="flex items-start gap-2 text-[11px] text-slate-500 dark:text-gray-400">
@@ -202,13 +260,12 @@ function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
           </div>
         )}
 
-        {/* Progress section */}
+        {/* Progress */}
         {!m.locked && (
           <div className="mb-4 space-y-2">
-            {/* Watch progress */}
             <div>
               <div className="flex justify-between text-[10px] text-slate-400 dark:text-gray-500 mb-1">
-                <span>Video progress</span>
+                <span>{isMultiVideo ? "Overall progress" : "Video progress"}</span>
                 <span className={pct >= 80 ? "text-emerald-500 font-semibold" : ""}>{pct}%</span>
               </div>
               <div className="h-1.5 w-full bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden">
@@ -218,53 +275,89 @@ function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
                 />
               </div>
             </div>
-
-            {/* 3-step mini tracker */}
             <StepIndicator watchedPct={pct} quizPassed={m.quizPassed} completed={m.completed} />
           </div>
         )}
 
-        {/* Video + doc indicators */}
-        {m.videoCount > 0 && !m.locked && (
-          <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-gray-500 mb-4 flex-wrap">
-            <div className="flex items-center gap-1">
-              <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-              </svg>
-              <span className="font-medium text-slate-600 dark:text-gray-400">{m.videoCount} video{m.videoCount !== 1 ? "s" : ""}</span>
-            </div>
-            {m.documentCount > 0 && (
-              <div className="flex items-center gap-1">
-                <span>📎</span>
-                <span>{m.documentCount} resource{m.documentCount !== 1 ? "s" : ""}</span>
-              </div>
-            )}
-            {pct > 0 && pct < 100 && <span className="text-orange-400">• {pct}% watched</span>}
+        {/* Document indicator */}
+        {m.documentCount > 0 && !m.locked && (
+          <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-gray-500 mb-4">
+            <span>📎</span>
+            <span>{m.documentCount} resource{m.documentCount !== 1 ? "s" : ""}</span>
           </div>
         )}
 
-        {/* CTA button */}
-        <button
-          disabled={m.locked}
-          onClick={() => !m.locked && onClick(m)}
-          className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
-            ${m.locked
-              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+        {/* CTA — multi-video: accordion chapters | single: navigate directly */}
+        {isMultiVideo && !m.locked ? (
+          <div>
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-between
+                ${m.completed
+                  ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
+                  : expanded
+                  ? "bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400"
+                  : pct > 0
+                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm"
+                  : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"
+                }`}
+            >
+              <span>
+                {m.completed
+                  ? "Review Chapters"
+                  : pct > 0
+                  ? `▶ Continue — ${pct}% done`
+                  : `View ${m.videoCount} Chapters`}
+              </span>
+              <svg
+                className={`w-4 h-4 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {expanded && (
+              <div className="mt-3 space-y-2">
+                <div className="text-[10px] font-semibold text-slate-400 dark:text-gray-600 uppercase tracking-wider px-1 mb-2">
+                  Chapters
+                </div>
+                {m.videos.map((video, idx) => (
+                  <ChapterRow
+                    key={video.id || idx}
+                    video={video}
+                    index={idx}
+                    progress={m.videoProgress[String(idx)] ?? 0}
+                    isModuleCompleted={m.completed}
+                    onClick={(i) => onNavigate(m.id, i)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            disabled={m.locked}
+            onClick={() => !m.locked && onNavigate(m.id, 0)}
+            className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+              ${m.locked
+                ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+                : m.completed
+                ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
+                : pct > 0
+                ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm"
+                : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"
+              }`}
+          >
+            {m.locked
+              ? "🔒 Locked"
               : m.completed
-              ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
+              ? "Review Module"
               : pct > 0
-              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm"
-              : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"
-            }`}
-        >
-          {m.locked
-            ? "🔒 Locked"
-            : m.completed
-            ? "Review Module"
-            : pct > 0
-            ? `▶ Continue — ${pct}% watched`
-            : "Start Module →"}
-        </button>
+              ? `▶ Continue — ${pct}% watched`
+              : "Start Module →"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -319,10 +412,15 @@ export default function Modules() {
         setBookmarkedIds((prev) => new Set([...prev, moduleId]));
         setToast("Module bookmarked");
       }
-    } catch (err) {
+    } catch {
       setToast("Failed to update bookmark");
     }
   }, [user?.id]);
+
+  // Navigate to a specific chapter (videoIdx) within a module
+  const handleNavigate = useCallback((moduleId, chapterIdx = 0) => {
+    navigate(`/modules/${moduleId}${chapterIdx > 0 ? `?chapter=${chapterIdx}` : ""}`);
+  }, [navigate]);
 
   useEffect(() => { loadModules(); }, [loadModules]);
 
@@ -376,7 +474,7 @@ export default function Modules() {
           </div>
           {stats.nextUp && (
             <button
-              onClick={() => navigate(`/modules/${stats.nextUp.id}`)}
+              onClick={() => handleNavigate(stats.nextUp.id, 0)}
               className="shrink-0 text-sm px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-emerald-400 text-white font-semibold hover:opacity-90 transition"
             >
               Continue Learning →
@@ -423,7 +521,6 @@ export default function Modules() {
 
         {/* Bookmark filter + category filter tabs */}
         <div className="flex gap-2 flex-wrap items-center">
-          {/* Bookmarked toggle */}
           <button
             onClick={() => setShowBookmarked((v) => !v)}
             className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all flex items-center gap-1.5
@@ -473,7 +570,7 @@ export default function Modules() {
                 key={m.id}
                 m={m}
                 index={modules.indexOf(m)}
-                onClick={(mod) => navigate(`/modules/${mod.id}`)}
+                onNavigate={handleNavigate}
                 bookmarked={bookmarkedIds.has(m.id)}
                 onBookmarkToggle={handleBookmarkToggle}
               />

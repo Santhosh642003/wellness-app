@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import VideoPlayer from "../components/VideoPlayer";
@@ -35,6 +35,7 @@ function getContent(mod) {
 
 export default function ModulePlayer() {
   const { moduleId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -89,7 +90,14 @@ export default function ModulePlayer() {
         // Restore saved per-video progress
         const savedVP = m?.userProgress?.videoProgress || {};
         setVideoProgress(savedVP);
-        const savedPct = savedVP["0"] ?? m?.userProgress?.watchedPercent ?? 0;
+
+        // Start at the chapter requested via ?chapter=N, default 0
+        const chapterParam = parseInt(searchParams.get("chapter") || "0");
+        const numVideos = (Array.isArray(m?.videos) && m.videos.length > 0 ? m.videos.length : m?.videoUrl ? 1 : 1);
+        const safeIdx = Math.max(0, Math.min(chapterParam, numVideos - 1));
+        setCurrentVideoIdx(safeIdx);
+
+        const savedPct = savedVP[String(safeIdx)] ?? (safeIdx === 0 ? m?.userProgress?.watchedPercent ?? 0 : 0);
         setWatchedPercent(savedPct);
         lastSavedPct.current = savedPct;
       })
@@ -335,7 +343,7 @@ export default function ModulePlayer() {
         {/* Steps indicator */}
         <div className="flex items-center gap-4 mb-8 flex-wrap">
           {[
-            { n: 1, label: "Watch Video", done: watchedPercent >= 80 || alreadyCompleted },
+            { n: 1, label: content.videos.length > 1 ? `Watch All ${content.videos.length} Chapters` : "Watch Video", done: watchedPercent >= 80 || alreadyCompleted },
             { n: 2, label: "Take Quiz", done: quizPassed || alreadyCompleted },
             { n: 3, label: "Complete", done: alreadyCompleted },
           ].map((step, i, arr) => (
@@ -382,7 +390,7 @@ export default function ModulePlayer() {
                           ${done ? "bg-emerald-500 text-white" : active ? "bg-blue-500 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-400"}`}>
                           {done ? "✓" : i + 1}
                         </div>
-                        <span className="max-w-[140px] truncate">{v.title || `Video ${i + 1}`}</span>
+                        <span className="max-w-[140px] truncate">{v.title || `Chapter ${i + 1}`}</span>
                         {v.duration && <span className="text-[10px] text-slate-400 dark:text-gray-600">{v.duration}</span>}
                         {pct > 0 && !done && (
                           <span className="text-[10px] text-orange-500 dark:text-orange-400">{pct}%</span>
@@ -779,7 +787,7 @@ export default function ModulePlayer() {
                           onClick={() => switchVideo(i)}
                           className={`truncate max-w-[130px] text-left font-medium transition ${i === currentVideoIdx ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300"}`}
                         >
-                          {content.videos.length > 1 ? `${i + 1}. ${v.title || `Video ${i+1}`}` : "Video watched"}
+                          {content.videos.length > 1 ? `${i + 1}. ${v.title || `Chapter ${i + 1}`}` : "Video watched"}
                         </button>
                         <span className={`font-semibold shrink-0 ml-2 ${done ? "text-emerald-600 dark:text-emerald-400" : "text-slate-600 dark:text-gray-400"}`}>
                           {done ? "✓" : `${pct}%`}
