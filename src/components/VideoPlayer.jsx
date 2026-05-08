@@ -7,7 +7,7 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, caption = null, className = "" }) {
+export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, caption = null, captionsOn = false, hasTranscript = false, onToggleCaptions, className = "" }) {
   const internalRef = useRef(null);
   const videoRef = externalRef || internalRef;
   const containerRef = useRef(null);
@@ -223,6 +223,21 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
                 ))}
               </div>
             </div>
+
+            {/* CC */}
+            <button
+              onClick={onToggleCaptions}
+              disabled={!hasTranscript}
+              title={!hasTranscript ? "No transcript available" : captionsOn ? "Turn off captions" : "Turn on captions"}
+              className={`text-xs font-bold px-1.5 py-0.5 rounded border transition shrink-0
+                ${captionsOn
+                  ? "bg-white text-black border-white"
+                  : hasTranscript
+                    ? "text-white/80 border-white/30 hover:border-white hover:text-white"
+                    : "text-white/20 border-white/10 cursor-not-allowed"}`}
+            >
+              CC
+            </button>
 
             {/* Fullscreen */}
             <button onClick={toggleFullscreen} className="text-white hover:text-emerald-400 transition shrink-0">
