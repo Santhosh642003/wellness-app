@@ -4,7 +4,7 @@ import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import VideoPlayer from "../components/VideoPlayer";
 import { useAuth } from "../contexts/AuthContext";
-import { modules as modulesApi, users as usersApi, transcribe, comments as commentsApi } from "../lib/api";
+import { modules as modulesApi, users as usersApi, comments as commentsApi } from "../lib/api";
 
 const FILE_ICONS = {
   pdf: "📄", docx: "📝", doc: "📝", pptx: "📊", ppt: "📊",
@@ -29,7 +29,6 @@ function getContent(mod) {
     videos: rawVideos,
     documents: Array.isArray(mod?.documents) ? mod.documents : [],
     keyPoints: mod?.keyPoints ?? [],
-    transcript: mod?.transcript ?? [],
   };
 }
 
@@ -58,13 +57,6 @@ export default function ModulePlayer() {
 
   // Caption state
   const [captionsOn, setCaptionsOn] = useState(false);
-
-  // AI transcription state
-  const [aiMode, setAiMode] = useState(false);
-  const [aiTranscript, setAiTranscript] = useState([]);
-  const [aiRecording, setAiRecording] = useState(false);
-  const [aiError, setAiError] = useState("");
-  const recorderRef = useRef(null);
 
   // Discussion state
   const [discussionComments, setDiscussionComments] = useState([]);
@@ -206,52 +198,22 @@ export default function ModulePlayer() {
     setVideoTime(0);
   }, [videoProgress, watchedPercent, saveProgress]);
 
+  // Per-video transcript (updates when current chapter changes)
+  const currentTranscript = useMemo(
+    () => Array.isArray(content.videos[currentVideoIdx]?.transcript) ? content.videos[currentVideoIdx].transcript : [],
+    [content.videos, currentVideoIdx]
+  );
+
   // Preset captions
   const activeCaptionIdx = useMemo(() => {
-    if (!content.transcript?.length) return -1;
+    if (!currentTranscript.length) return -1;
     let idx = -1;
-    for (let i = 0; i < content.transcript.length; i++) {
-      if (content.transcript[i].time <= videoTime) idx = i;
+    for (let i = 0; i < currentTranscript.length; i++) {
+      if (currentTranscript[i].time <= videoTime) idx = i;
     }
     return idx;
-  }, [videoTime, content.transcript]);
-  const activeCaption = activeCaptionIdx >= 0 ? content.transcript[activeCaptionIdx] : null;
-
-  // AI transcription
-  const loadAiMode = () => { setAiMode(true); setAiError(""); setAiTranscript([]); };
-
-  const startAiRecording = useCallback(async () => {
-    if (!videoRef.current) return;
-    setAiError("");
-    let stream;
-    try { stream = videoRef.current.captureStream(); }
-    catch { setAiError("Your browser does not support video stream capture (use Chrome/Edge)."); return; }
-    const audioTracks = stream.getAudioTracks();
-    if (!audioTracks.length) { setAiError("No audio track found in this video."); return; }
-    const audioStream = new MediaStream(audioTracks);
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
-    const recorder = new MediaRecorder(audioStream, { mimeType });
-    recorder.ondataavailable = async (e) => {
-      if (e.data.size < 2000) return;
-      try {
-        const result = await transcribe(new Blob([e.data], { type: mimeType }));
-        if (result.text?.trim()) setAiTranscript((prev) => [...prev, { text: result.text.trim() }]);
-      } catch (err) {
-        if (!err.message?.includes("short") && !err.message?.includes("format"))
-          setAiError("Transcription failed — check your GROQ_API_KEY is set.");
-      }
-    };
-    recorder.start(8000);
-    setAiRecording(true);
-    recorderRef.current = recorder;
-  }, []);
-
-  const stopAiRecording = useCallback(() => {
-    if (recorderRef.current?.state !== "inactive") recorderRef.current?.stop();
-    setAiRecording(false);
-  }, []);
-
-  useEffect(() => () => stopAiRecording(), [stopAiRecording]);
+  }, [videoTime, currentTranscript]);
+  const activeCaption = activeCaptionIdx >= 0 ? currentTranscript[activeCaptionIdx] : null;
 
   const goToQuiz = () => navigate(`/quiz/module/${moduleId}`);
 
@@ -447,65 +409,26 @@ export default function ModulePlayer() {
 
                 {/* Caption controls */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  {content.transcript?.length > 0 && (
+                  {currentTranscript.length > 0 && (
                     <button
-                      onClick={() => { setCaptionsOn((v) => !v); setAiMode(false); stopAiRecording(); }}
+                      onClick={() => setCaptionsOn((v) => !v)}
                       className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all
-                        ${captionsOn && !aiMode
+                        ${captionsOn
                           ? "bg-blue-500/10 border-blue-400/30 text-blue-500 dark:text-blue-300"
                           : "bg-slate-100 dark:bg-[#1a1a1a] border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200"}`}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                       </svg>
-                      {captionsOn && !aiMode ? "Captions ON" : "Captions"}
+                      {captionsOn ? "Captions ON" : "Captions"}
                     </button>
-                  )}
-
-                  {!aiMode ? (
-                    <button
-                      onClick={loadAiMode}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30 text-violet-600 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-all"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                      AI Transcribe
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      {!aiRecording && (
-                        <button
-                          onClick={startAiRecording}
-                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all"
-                        >
-                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                          Start Transcribing
-                        </button>
-                      )}
-                      {aiRecording && (
-                        <button
-                          onClick={stopAiRecording}
-                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-500/20 transition-all"
-                        >
-                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                          Stop
-                        </button>
-                      )}
-                      <button
-                        onClick={() => { setAiMode(false); stopAiRecording(); setAiTranscript([]); setAiError(""); }}
-                        className="text-xs text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 px-2"
-                      >
-                        ✕ Close
-                      </button>
-                    </div>
                   )}
                 </div>
               </div>
             </div>
 
             {/* ── Preset Captions ─────────────────────────────────────────── */}
-            {captionsOn && !aiMode && (
+            {captionsOn && (
               <div className="bg-blue-50 dark:bg-[#0d1117] border border-blue-200 dark:border-blue-500/20 rounded-2xl p-5 min-h-[80px] flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="flex h-2 w-2 relative">
@@ -518,51 +441,6 @@ export default function ModulePlayer() {
                   ? <p className="text-slate-900 dark:text-white text-base leading-relaxed font-medium">{activeCaption.text}</p>
                   : <p className="text-slate-400 dark:text-gray-600 text-sm italic">Play the video to see captions…</p>
                 }
-              </div>
-            )}
-
-            {/* ── AI Transcription Panel ──────────────────────────────────── */}
-            {aiMode && (
-              <div className="bg-violet-50 dark:bg-[#0e0b1a] border border-violet-200 dark:border-violet-500/20 rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="flex h-2 w-2 relative">
-                    {aiRecording
-                      ? <><span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-violet-500" /><span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" /></>
-                      : <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400" />
-                    }
-                  </span>
-                  <span className="text-xs font-medium text-violet-500 dark:text-violet-400 uppercase tracking-wider">
-                    AI Transcription {aiRecording ? "— Recording" : "— Ready"}
-                  </span>
-                </div>
-                {aiError && <p className="text-sm text-red-500 dark:text-red-400 mb-2">{aiError}</p>}
-                {!aiRecording && !aiTranscript.length && (
-                  <p className="text-slate-400 dark:text-gray-500 text-sm italic">
-                    Press <strong>Start Transcribing</strong> then play the video — Whisper transcribes every 8 s.
-                  </p>
-                )}
-                {aiTranscript.length > 0 && (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {aiTranscript.map((entry, i) => (
-                      <p key={i} className={`text-sm leading-relaxed rounded-lg px-3 py-2 ${i === aiTranscript.length - 1 ? "bg-violet-100 dark:bg-violet-500/15 text-slate-900 dark:text-white font-medium" : "text-slate-600 dark:text-gray-400"}`}>
-                        {entry.text}
-                      </p>
-                    ))}
-                  </div>
-                )}
-                {aiRecording && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-violet-500 dark:text-violet-400">
-                    <div className="flex gap-0.5">
-                      {[0, 1, 2, 3, 4].map((i) => (
-                        <div key={i} className="w-1 bg-violet-400 rounded-full animate-bounce" style={{ height: `${8 + (i % 3) * 4}px`, animationDelay: `${i * 0.1}s` }} />
-                      ))}
-                    </div>
-                    Listening… next transcription in ~8 s
-                  </div>
-                )}
-                <p className="text-[10px] text-slate-400 dark:text-gray-600 mt-3">
-                  Powered by Groq Whisper · fast cloud transcription
-                </p>
               </div>
             )}
 
@@ -614,14 +492,16 @@ export default function ModulePlayer() {
             )}
 
             {/* ── Transcript ──────────────────────────────────────────────── */}
-            {content.transcript?.length > 0 && (
+            {currentTranscript.length > 0 && (
               <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Full Transcript</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                  {content.videos.length > 1 ? `Transcript — ${currentVideoTitle}` : "Full Transcript"}
+                </h2>
                 <div className="space-y-3 text-sm leading-relaxed max-h-80 overflow-y-auto pr-2">
-                  {content.transcript.map((line, idx) => {
+                  {currentTranscript.map((line, idx) => {
                     const mins = Math.floor(line.time / 60);
                     const secs = String(line.time % 60).padStart(2, "0");
-                    const isActive = idx === activeCaptionIdx && captionsOn && !aiMode;
+                    const isActive = idx === activeCaptionIdx && captionsOn;
                     return (
                       <div key={idx} className={`flex gap-3 p-2 rounded-xl transition-colors ${isActive ? "bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20" : ""}`}>
                         <span className="text-slate-400 dark:text-gray-600 font-mono text-xs mt-0.5 shrink-0 w-12">[{mins}:{secs}]</span>
@@ -829,13 +709,6 @@ export default function ModulePlayer() {
               </div>
             )}
 
-            {/* AI Transcription info */}
-            <div className="bg-violet-50 dark:bg-violet-500/5 border border-violet-200 dark:border-violet-500/15 rounded-2xl p-5">
-              <div className="text-xs font-semibold text-violet-600 dark:text-violet-300 mb-1">✨ AI Live Transcription</div>
-              <div className="text-xs text-slate-500 dark:text-gray-500 leading-relaxed">
-                Click <strong>AI Transcribe</strong> to transcribe video audio every 8 s using Groq Whisper — instant, cloud-powered.
-              </div>
-            </div>
           </aside>
         </div>
       </main>
