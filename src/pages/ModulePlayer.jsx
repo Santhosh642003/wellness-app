@@ -379,6 +379,7 @@ export default function ModulePlayer() {
                   onTimeUpdate={handleTimeUpdate}
                   onEnded={handleVideoEnded}
                   onLoadedMetadata={handleMetadataLoaded}
+                  caption={captionsOn && activeCaption ? activeCaption.text : null}
                   className="w-full h-full"
                 />
               </div>

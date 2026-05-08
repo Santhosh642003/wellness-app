@@ -7,7 +7,7 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, className = "" }) {
+export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, caption = null, className = "" }) {
   const internalRef = useRef(null);
   const videoRef = externalRef || internalRef;
   const containerRef = useRef(null);
@@ -129,6 +129,17 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
             <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
+          </div>
+        </div>
+      )}
+
+      {/* In-player subtitle overlay */}
+      {caption && (
+        <div className={`absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 ${showControls ? "bottom-20" : "bottom-6"}`}>
+          <div className="max-w-[80%] text-center">
+            <span className="inline-block bg-black/75 text-white text-sm sm:text-base font-medium leading-snug rounded px-3 py-1 shadow-lg" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+              {caption}
+            </span>
           </div>
         </div>
       )}
