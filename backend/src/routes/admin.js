@@ -35,6 +35,11 @@ const uploadImage = multer({
   },
 });
 
+const uploadDocument = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+});
+
 const router = Router();
 
 // POST /api/admin/auth/login
@@ -137,12 +142,40 @@ router.post('/images/upload', uploadImage.single('image'), async (req, res, next
   }
 });
 
+// POST /api/admin/documents/upload
+router.post('/documents/upload', uploadDocument.single('document'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const sizeKB = req.file.size / 1024;
+    const size = sizeKB >= 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${Math.round(sizeKB)} KB`;
+    const ext = req.file.originalname.split('.').pop()?.toLowerCase() || 'file';
+    res.json({ url, size, fileType: ext, originalName: req.file.originalname });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- MODULES CRUD ---
 router.get('/modules', async (req, res, next) => {
   try {
     const { rows } = await pool.query('SELECT * FROM modules ORDER BY "orderIndex"');
     res.json(rows);
   } catch (err) { next(err); }
+});
+
+const videoItemSchema = z.object({
+  id: z.string().optional(),
+  title: z.string(),
+  url: z.string(),
+  duration: z.string().optional(),
+});
+const documentItemSchema = z.object({
+  id: z.string().optional(),
+  title: z.string(),
+  url: z.string(),
+  fileType: z.string().optional(),
+  size: z.string().optional(),
 });
 
 router.post('/modules', async (req, res, next) => {
@@ -153,13 +186,23 @@ router.post('/modules', async (req, res, next) => {
       locked: z.boolean().optional(), videoUrl: z.string().optional(),
       keyPoints: z.array(z.string()).optional(),
       transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
+      videos: z.array(videoItemSchema).optional(),
+      documents: z.array(documentItemSchema).optional(),
     }).parse(req.body);
+
+    // Assign stable IDs to video/doc items that don't have one
+    const videos = (d.videos || []).map((v) => ({ ...v, id: v.id || randomUUID() }));
+    const documents = (d.documents || []).map((doc) => ({ ...doc, id: doc.id || randomUUID() }));
+    // Derive videoUrl from first video for backward-compat
+    const videoUrl = d.videoUrl || videos[0]?.url || '';
+
     const { rows: [m] } = await pool.query(
-      `INSERT INTO modules (id, slug, title, description, duration, category, "orderIndex", "pointsValue", locked, "videoUrl", "keyPoints", transcript)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      `INSERT INTO modules (id, slug, title, description, duration, category, "orderIndex", "pointsValue", locked, "videoUrl", "keyPoints", transcript, videos, documents)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [randomUUID(), d.slug, d.title, d.description, d.duration, d.category, d.orderIndex,
-       d.pointsValue??100, d.locked??true, d.videoUrl??'',
-       JSON.stringify(d.keyPoints||[]), JSON.stringify(d.transcript||[])]
+       d.pointsValue??100, d.locked??true, videoUrl,
+       JSON.stringify(d.keyPoints||[]), JSON.stringify(d.transcript||[]),
+       JSON.stringify(videos), JSON.stringify(documents)]
     );
     res.status(201).json(m);
   } catch (err) { next(err); }
@@ -174,12 +217,22 @@ router.patch('/modules/:id', async (req, res, next) => {
       locked: z.boolean().optional(), videoUrl: z.string().optional(),
       keyPoints: z.array(z.string()).optional(),
       transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
+      videos: z.array(videoItemSchema).optional(),
+      documents: z.array(documentItemSchema).optional(),
     }).parse(req.body);
 
-    // Serialize JSON fields before building SET clause
     const d = { ...raw };
     if (d.keyPoints !== undefined) d.keyPoints = JSON.stringify(d.keyPoints);
     if (d.transcript !== undefined) d.transcript = JSON.stringify(d.transcript);
+    if (d.videos !== undefined) {
+      const videos = d.videos.map((v) => ({ ...v, id: v.id || randomUUID() }));
+      d.videos = JSON.stringify(videos);
+      // Sync videoUrl to first video for backward-compat
+      if (!d.videoUrl && videos.length > 0) d.videoUrl = videos[0].url;
+    }
+    if (d.documents !== undefined) {
+      d.documents = JSON.stringify(d.documents.map((doc) => ({ ...doc, id: doc.id || randomUUID() })));
+    }
 
     const fields = Object.keys(d);
     if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });

@@ -193,6 +193,12 @@ CREATE TABLE IF NOT EXISTS referrals (
 );
 `;
 
+const MULTI_VIDEO_AND_DOCS = `
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS videos JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE user_module_progress ADD COLUMN IF NOT EXISTS "videoProgress" JSONB DEFAULT '{}'::jsonb;
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
@@ -201,6 +207,7 @@ export async function migrate() {
     await pool.query(RESET_TABLE);
     await pool.query(SCHEDULING_AND_NOTIFICATIONS);
     await pool.query(COMMUNITY_AND_REFERRALS);
+    await pool.query(MULTI_VIDEO_AND_DOCS);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

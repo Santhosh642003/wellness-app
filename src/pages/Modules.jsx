@@ -21,6 +21,7 @@ function getColor(category) {
 }
 
 function mapModule(m) {
+  const videos = Array.isArray(m.videos) && m.videos.length > 0 ? m.videos : m.videoUrl ? [{ url: m.videoUrl }] : [];
   return {
     id: m.id,
     slug: m.slug,
@@ -35,7 +36,8 @@ function mapModule(m) {
     category: m.category || "General",
     orderIndex: m.orderIndex ?? 0,
     keyPoints: Array.isArray(m.keyPoints) ? m.keyPoints : [],
-    videoUrl: m.videoUrl || "",
+    videoCount: videos.length,
+    documentCount: Array.isArray(m.documents) ? m.documents.length : 0,
   };
 }
 
@@ -222,14 +224,22 @@ function ModuleCard({ m, index, onClick, bookmarked, onBookmarkToggle }) {
           </div>
         )}
 
-        {/* Video indicator */}
-        {m.videoUrl && !m.locked && (
-          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-gray-500 mb-4">
-            <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-            </svg>
-            <span>Video available</span>
-            {pct > 0 && pct < 100 && <span className="text-orange-400">• Resume at {pct}%</span>}
+        {/* Video + doc indicators */}
+        {m.videoCount > 0 && !m.locked && (
+          <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-gray-500 mb-4 flex-wrap">
+            <div className="flex items-center gap-1">
+              <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+              </svg>
+              <span className="font-medium text-slate-600 dark:text-gray-400">{m.videoCount} video{m.videoCount !== 1 ? "s" : ""}</span>
+            </div>
+            {m.documentCount > 0 && (
+              <div className="flex items-center gap-1">
+                <span>📎</span>
+                <span>{m.documentCount} resource{m.documentCount !== 1 ? "s" : ""}</span>
+              </div>
+            )}
+            {pct > 0 && pct < 100 && <span className="text-orange-400">• {pct}% watched</span>}
           </div>
         )}
 

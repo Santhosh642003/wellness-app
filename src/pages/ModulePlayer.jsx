@@ -6,14 +6,28 @@ import VideoPlayer from "../components/VideoPlayer";
 import { useAuth } from "../contexts/AuthContext";
 import { modules as modulesApi, users as usersApi, transcribe, comments as commentsApi } from "../lib/api";
 
+const FILE_ICONS = {
+  pdf: "📄", docx: "📝", doc: "📝", pptx: "📊", ppt: "📊",
+  xlsx: "📊", xls: "📊", mp4: "🎬", zip: "📦", default: "📎",
+};
+function fileIcon(type) { return FILE_ICONS[type?.toLowerCase()] || FILE_ICONS.default; }
+
 function getContent(mod) {
+  // Build canonical videos list: prefer mod.videos array, fall back to single videoUrl
+  const rawVideos = Array.isArray(mod?.videos) && mod.videos.length > 0
+    ? mod.videos
+    : mod?.videoUrl
+      ? [{ id: "v0", title: mod.title || "Video", url: mod.videoUrl, duration: mod.duration || "" }]
+      : [];
+
   return {
     title: mod?.title ?? "",
     subtitle: mod?.description ?? "",
     category: mod?.category ?? "",
     duration: mod?.duration ?? "",
     points: mod?.pointsValue ?? 0,
-    videoUrl: mod?.videoUrl || "/videos/demo.mp4",
+    videos: rawVideos,
+    documents: Array.isArray(mod?.documents) ? mod.documents : [],
     keyPoints: mod?.keyPoints ?? [],
     transcript: mod?.transcript ?? [],
   };
@@ -30,7 +44,11 @@ export default function ModulePlayer() {
   const [points, setPoints] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
 
-  // Video progress
+  // Multi-video state
+  const [currentVideoIdx, setCurrentVideoIdx] = useState(0);
+  const [videoProgress, setVideoProgress] = useState({}); // { "0": pct, "1": pct, ... }
+
+  // Video progress (for current video)
   const [videoTime, setVideoTime] = useState(0);
   const [watchedPercent, setWatchedPercent] = useState(0);
   const videoRef = useRef(null);
@@ -68,39 +86,45 @@ export default function ModulePlayer() {
           setPoints(userData.progress.points || 0);
           setStreakDays(userData.progress.streakDays || 0);
         }
-        // Restore saved watch progress
-        const saved = m?.userProgress?.watchedPercent || 0;
-        setWatchedPercent(saved);
-        lastSavedPct.current = saved;
-        // Seek video to saved position once metadata loads (handled via ref callback)
-        if (saved > 0 && saved < 95 && videoRef.current?.duration) {
-          videoRef.current.currentTime = (saved / 100) * videoRef.current.duration;
-        }
+        // Restore saved per-video progress
+        const savedVP = m?.userProgress?.videoProgress || {};
+        setVideoProgress(savedVP);
+        const savedPct = savedVP["0"] ?? m?.userProgress?.watchedPercent ?? 0;
+        setWatchedPercent(savedPct);
+        lastSavedPct.current = savedPct;
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [moduleId, user?.id]);
 
   const content = useMemo(() => getContent(mod), [mod]);
+  const currentVideoUrl = content.videos[currentVideoIdx]?.url || "";
+  const currentVideoTitle = content.videos[currentVideoIdx]?.title || "";
+
   const currentIdx = allModules.findIndex((m) => m.id === moduleId);
   const nextModule = allModules[currentIdx + 1] || null;
   const completedCount = allModules.filter((m) => m.userProgress?.completed).length;
   const alreadyCompleted = mod?.userProgress?.completed ?? false;
   const quizPassed = mod?.userProgress?.quizPassed ?? false;
-  const quizUnlocked = watchedPercent >= 80 || quizPassed || alreadyCompleted;
+
+  // All videos must be >= 80% watched to unlock quiz
+  const allVideosWatched = content.videos.length === 0 || content.videos.every((_, i) => (videoProgress[String(i)] ?? 0) >= 80);
+  const quizUnlocked = alreadyCompleted || quizPassed || (content.videos.length > 0 ? allVideosWatched : watchedPercent >= 80);
 
   // Save progress to the server (debounced)
-  const saveProgress = useCallback(async (pct) => {
+  const saveProgress = useCallback(async (pct, vpOverride) => {
     if (!user?.id || !moduleId) return;
     try {
+      const vp = vpOverride ?? videoProgress;
       await usersApi.updateModuleProgress(user.id, moduleId, {
         watchedPercent: Math.round(pct),
+        videoProgress: content.videos.length > 1 ? vp : undefined,
       });
       lastSavedPct.current = pct;
     } catch (err) {
       console.error("Failed to save progress", err);
     }
-  }, [user?.id, moduleId]);
+  }, [user?.id, moduleId, videoProgress, content.videos.length]);
 
   // Save every 30 seconds if progress advanced
   useEffect(() => {
@@ -121,30 +145,58 @@ export default function ModulePlayer() {
     };
   }, [watchedPercent, saveProgress]);
 
-  // Track video time and compute watched %
+  // Track video time and compute watched % for the current video
   const handleTimeUpdate = useCallback((currentTime) => {
     setVideoTime(Math.floor(currentTime));
     const dur = videoRef.current?.duration;
     if (dur > 0) {
       const pct = Math.min(100, (currentTime / dur) * 100);
       setWatchedPercent((prev) => Math.max(prev, pct));
+      setVideoProgress((prev) => {
+        const key = String(currentVideoIdx);
+        if (pct <= (prev[key] ?? 0)) return prev;
+        return { ...prev, [key]: Math.round(pct) };
+      });
     }
-  }, []);
+  }, [currentVideoIdx]);
 
-  // On video ended: save 100%
+  // On video ended: mark current video 100%
   const handleVideoEnded = useCallback(() => {
     setWatchedPercent(100);
-    saveProgress(100);
-  }, [saveProgress]);
+    setVideoProgress((prev) => {
+      const updated = { ...prev, [String(currentVideoIdx)]: 100 };
+      const percs = Object.values(updated);
+      const avg = Math.round(percs.reduce((a, b) => a + b, 0) / Math.max(percs.length, 1));
+      saveProgress(avg, updated);
+      // Auto-advance to next video
+      if (currentVideoIdx < content.videos.length - 1) {
+        setTimeout(() => setCurrentVideoIdx((i) => i + 1), 1200);
+      }
+      return updated;
+    });
+  }, [saveProgress, currentVideoIdx, content.videos.length]);
 
   // Seek to saved position when video metadata loads
   const handleMetadataLoaded = useCallback(() => {
     const dur = videoRef.current?.duration;
-    const saved = lastSavedPct.current;
-    if (dur > 0 && saved > 0 && saved < 95) {
-      videoRef.current.currentTime = (saved / 100) * dur;
+    const savedPct = videoProgress[String(currentVideoIdx)] ?? 0;
+    if (dur > 0 && savedPct > 0 && savedPct < 95) {
+      videoRef.current.currentTime = (savedPct / 100) * dur;
     }
-  }, []);
+  }, [currentVideoIdx, videoProgress]);
+
+  // When user switches videos, update current video's watched % display
+  const switchVideo = useCallback((idx) => {
+    // Save current video progress first
+    const percs = Object.values(videoProgress);
+    const avg = percs.length ? Math.round(percs.reduce((a, b) => a + b, 0) / percs.length) : 0;
+    if (watchedPercent > lastSavedPct.current + 1) saveProgress(avg);
+    setCurrentVideoIdx(idx);
+    const savedPct = videoProgress[String(idx)] ?? 0;
+    setWatchedPercent(savedPct);
+    lastSavedPct.current = savedPct;
+    setVideoTime(0);
+  }, [videoProgress, watchedPercent, saveProgress]);
 
   // Preset captions
   const activeCaptionIdx = useMemo(() => {
@@ -309,10 +361,50 @@ export default function ModulePlayer() {
 
             {/* ── Video Player ─────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+              {/* Video playlist tabs (if multiple videos) */}
+              {content.videos.length > 1 && (
+                <div className="flex overflow-x-auto border-b border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0d0d0d]">
+                  {content.videos.map((v, i) => {
+                    const pct = videoProgress[String(i)] ?? 0;
+                    const done = pct >= 80;
+                    const active = i === currentVideoIdx;
+                    return (
+                      <button
+                        key={v.id || i}
+                        onClick={() => switchVideo(i)}
+                        className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all shrink-0
+                          ${active
+                            ? "border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-[#121212]"
+                            : "border-transparent text-slate-500 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"
+                          }`}
+                      >
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
+                          ${done ? "bg-emerald-500 text-white" : active ? "bg-blue-500 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-400"}`}>
+                          {done ? "✓" : i + 1}
+                        </div>
+                        <span className="max-w-[140px] truncate">{v.title || `Video ${i + 1}`}</span>
+                        {v.duration && <span className="text-[10px] text-slate-400 dark:text-gray-600">{v.duration}</span>}
+                        {pct > 0 && !done && (
+                          <span className="text-[10px] text-orange-500 dark:text-orange-400">{pct}%</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Currently playing video label */}
+              {content.videos.length > 1 && (
+                <div className="px-5 py-2.5 bg-slate-50 dark:bg-[#0f0f0f] border-b border-slate-100 dark:border-gray-800/60 flex items-center gap-2">
+                  <span className="text-xs text-slate-400 dark:text-gray-600">Now playing:</span>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-gray-300">{currentVideoTitle}</span>
+                </div>
+              )}
+
               <div className="aspect-video bg-black">
                 <VideoPlayer
-                  key={moduleId}
-                  src={content.videoUrl}
+                  key={`${moduleId}-${currentVideoIdx}`}
+                  src={currentVideoUrl}
                   videoRef={videoRef}
                   onTimeUpdate={handleTimeUpdate}
                   onEnded={handleVideoEnded}
@@ -338,7 +430,9 @@ export default function ModulePlayer() {
                   </div>
                   {!quizUnlocked && (
                     <span className="text-xs text-amber-600 dark:text-amber-400">
-                      Watch 80% to unlock quiz
+                      {content.videos.length > 1
+                        ? `Watch all ${content.videos.length} videos (≥80% each) to unlock quiz`
+                        : "Watch 80% to unlock quiz"}
                     </span>
                   )}
                 </div>
@@ -476,6 +570,38 @@ export default function ModulePlayer() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* ── Documents ──────────────────────────────────────────────── */}
+            {content.documents.length > 0 && (
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+                <h2 className="text-sm font-semibold text-slate-500 dark:text-gray-300 uppercase tracking-wider mb-4">Module Resources</h2>
+                <div className="space-y-2">
+                  {content.documents.map((doc) => (
+                    <a
+                      key={doc.id}
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] hover:border-blue-400/40 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 group transition-all"
+                    >
+                      <span className="text-xl shrink-0">{fileIcon(doc.fileType)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition truncate">
+                          {doc.title}
+                        </div>
+                        <div className="text-xs text-slate-400 dark:text-gray-600 flex items-center gap-2">
+                          {doc.fileType && <span className="uppercase">{doc.fileType}</span>}
+                          {doc.size && <><span>·</span><span>{doc.size}</span></>}
+                        </div>
+                      </div>
+                      <svg className="w-4 h-4 text-slate-400 dark:text-gray-600 group-hover:text-blue-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -642,15 +768,32 @@ export default function ModulePlayer() {
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5">
               <div className="text-sm font-semibold text-slate-900 dark:text-white mb-3">This Module</div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-gray-500">Video watched</span>
-                  <span className={`font-semibold ${watchedPercent >= 80 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-gray-300"}`}>
-                    {Math.round(watchedPercent)}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
+                {/* Per-video progress */}
+                {content.videos.map((v, i) => {
+                  const pct = videoProgress[String(i)] ?? 0;
+                  const done = pct >= 80;
+                  return (
+                    <div key={v.id || i} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <button
+                          onClick={() => switchVideo(i)}
+                          className={`truncate max-w-[130px] text-left font-medium transition ${i === currentVideoIdx ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300"}`}
+                        >
+                          {content.videos.length > 1 ? `${i + 1}. ${v.title || `Video ${i+1}`}` : "Video watched"}
+                        </button>
+                        <span className={`font-semibold shrink-0 ml-2 ${done ? "text-emerald-600 dark:text-emerald-400" : "text-slate-600 dark:text-gray-400"}`}>
+                          {done ? "✓" : `${pct}%`}
+                        </span>
+                      </div>
+                      <div className="h-1 w-full bg-slate-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${done ? "bg-emerald-400" : "bg-blue-400"}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="pt-1 border-t border-slate-100 dark:border-gray-800/60 flex items-center justify-between text-xs">
                   <span className="text-slate-500 dark:text-gray-500">Quiz</span>
-                  <span className={`font-semibold ${quizPassed ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-gray-600"}`}>
+                  <span className={`font-semibold ${quizPassed ? "text-emerald-600 dark:text-emerald-400" : quizUnlocked ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-gray-600"}`}>
                     {quizPassed ? "Passed ✓" : quizUnlocked ? "Unlocked" : "Locked"}
                   </span>
                 </div>

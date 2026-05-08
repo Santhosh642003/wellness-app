@@ -139,6 +139,7 @@ router.get('/:userId/module-progress', requireSelf, async (req, res, next) => {
 // PATCH /api/users/:userId/module-progress/:moduleId
 const moduleProgressSchema = z.object({
   watchedPercent: z.number().min(0).max(100).optional(),
+  videoProgress: z.record(z.string(), z.number().min(0).max(100)).optional(),
   completed: z.boolean().optional(),
 });
 
@@ -151,7 +152,17 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
     const sets = [];
     const vals = [];
     let i = 1;
-    if (data.watchedPercent !== undefined) { sets.push(`"watchedPercent"=$${i++}`); vals.push(data.watchedPercent); }
+
+    // If per-video progress is provided, compute overall watchedPercent from it
+    let resolvedWatchedPercent = data.watchedPercent;
+    if (data.videoProgress && Object.keys(data.videoProgress).length > 0) {
+      const percs = Object.values(data.videoProgress);
+      resolvedWatchedPercent = Math.round(percs.reduce((a, b) => a + b, 0) / percs.length);
+      sets.push(`"videoProgress"=$${i++}`);
+      vals.push(JSON.stringify(data.videoProgress));
+    }
+
+    if (resolvedWatchedPercent !== undefined) { sets.push(`"watchedPercent"=$${i++}`); vals.push(resolvedWatchedPercent); }
     if (data.completed !== undefined) {
       sets.push(`completed=$${i++}`);
       vals.push(data.completed);
