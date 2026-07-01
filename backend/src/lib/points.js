@@ -20,9 +20,9 @@ export async function awardPoints(client, { userId, source, points, refId = null
       `SELECT "semesterLabel" FROM reward_pool WHERE "closedAt" IS NULL LIMIT 1`
     );
     if (!openPool) {
-      const err = new Error('No active semester — an admin must open a semester before points can be earned');
+      const err = new Error('No active reward semester — points and redemptions are paused');
       err.code = 'NO_ACTIVE_SEMESTER';
-      err.status = 503;
+      err.status = 409;
       throw err;
     }
     semesterLabel = openPool.semesterLabel;

@@ -69,9 +69,6 @@ router.post('/:eventId/checkin', async (req, res, next) => {
       res.status(201).json({ checkedIn: true, pointsEarned: awarded, eventTitle: event.title });
     } catch (err) {
       await client.query('ROLLBACK');
-      if (err.code === 'NO_ACTIVE_SEMESTER') {
-        return res.status(503).json({ error: err.message });
-      }
       throw err;
     } finally {
       client.release();

@@ -44,6 +44,7 @@ function StatCard({ icon: Icon, label, value, sub, color, loading }) {
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [poolOpen, setPoolOpen] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -52,8 +53,13 @@ export default function Dashboard() {
     Promise.all([
       api.stats(),
       api.analytics().catch(() => null),
+      api.rewardPool().catch(() => null),
     ])
-      .then(([s, a]) => { setStats(s); setAnalytics(a); })
+      .then(([s, a, pools]) => {
+        setStats(s);
+        setAnalytics(a);
+        setPoolOpen(Array.isArray(pools) ? pools.some((p) => !p.closedAt) : null);
+      })
       .catch(() => setError('Failed to load stats. Check backend connection.'))
       .finally(() => setLoading(false));
   }, []);
@@ -82,6 +88,24 @@ export default function Dashboard() {
       {error && (
         <div className="text-red-400 text-sm mb-6 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">
           {error}
+        </div>
+      )}
+
+      {poolOpen === false && (
+        <div className="flex items-start gap-3 mb-6 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-4">
+          <Trophy size={18} className="text-amber-400 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-amber-300 font-semibold text-sm">No active reward semester</p>
+            <p className="text-amber-400/80 text-xs mt-0.5">
+              Students cannot earn points or redeem rewards until a semester is opened.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/reward-pool')}
+            className="shrink-0 text-xs font-medium text-amber-300 border border-amber-400/40 rounded-lg px-3 py-1.5 hover:bg-amber-400/10 transition-colors"
+          >
+            Open semester →
+          </button>
         </div>
       )}
 
