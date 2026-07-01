@@ -499,20 +499,39 @@ router.patch('/users/:id/points', async (req, res, next) => {
       delta: z.number().int(),
       reason: z.string().optional(),
     }).parse(req.body);
-    // Ensure user_progress row exists
-    await pool.query(
-      `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,0)
-       ON CONFLICT ("userId") DO NOTHING`,
-      [randomUUID(), req.params.id]
-    );
-    const { rows: [p] } = await pool.query(
-      `UPDATE user_progress SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
-       WHERE "userId" = $2 RETURNING points`,
-      [delta, req.params.id]
-    );
-    if (!p) return res.status(404).json({ error: 'User not found' });
-    res.json({ points: p.points, delta, reason });
-  } catch (err) { next(err); }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,0)
+         ON CONFLICT ("userId") DO NOTHING`,
+        [randomUUID(), req.params.id]
+      );
+      const { rows: [p] } = await client.query(
+        `UPDATE user_progress SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
+         WHERE "userId" = $2 RETURNING points`,
+        [delta, req.params.id]
+      );
+      if (!p) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'User not found' });
+      }
+      await client.query(
+        `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'admin_adjustment',$3,$4)`,
+        [randomUUID(), req.params.id, delta, reason || null]
+      );
+      await client.query('COMMIT');
+      res.json({ points: p.points, delta, reason });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // GET /api/admin/stats/analytics — time-series data for charts (last 30 days)
@@ -563,10 +582,11 @@ router.get('/stats/analytics', async (req, res, next) => {
 // POST /api/admin/users/bulk — bulk actions on users
 router.post('/users/bulk', async (req, res, next) => {
   try {
-    const { userIds, action, points } = z.object({
+    const { userIds, action, points, reason } = z.object({
       userIds: z.array(z.string()).min(1).max(100),
       action: z.enum(['award-points', 'revoke-points']),
       points: z.number().int().positive().optional(),
+      reason: z.string().optional(),
     }).parse(req.body);
 
     if ((action === 'award-points' || action === 'revoke-points') && !points) {
@@ -574,17 +594,42 @@ router.post('/users/bulk', async (req, res, next) => {
     }
 
     const delta = action === 'award-points' ? points : -points;
-    const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',');
 
-    await pool.query(
-      `UPDATE user_progress
-       SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
-       WHERE "userId" IN (${placeholders})`,
-      [delta, ...userIds]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    res.json({ success: true, affected: userIds.length, action, delta });
-  } catch (err) { next(err); }
+      const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',');
+      await client.query(
+        `UPDATE user_progress SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
+         WHERE "userId" IN (${placeholders})`,
+        [delta, ...userIds]
+      );
+
+      // Insert one point_ledger row per user
+      if (userIds.length > 0) {
+        const ledgerValues = userIds.map((_, i) => {
+          const b = i * 4;
+          return `($${b + 1}, $${b + 2}, 'admin_adjustment', $${b + 3}, $${b + 4})`;
+        }).join(',');
+        const ledgerParams = userIds.flatMap((uid) => [randomUUID(), uid, delta, reason || null]);
+        await client.query(
+          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ${ledgerValues}`,
+          ledgerParams
+        );
+      }
+
+      await client.query('COMMIT');
+      res.json({ success: true, affected: userIds.length, action, delta });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Enhanced stats with more detail

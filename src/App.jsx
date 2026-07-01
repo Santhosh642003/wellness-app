@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -17,8 +17,9 @@ import { useAuth } from "./contexts/AuthContext.jsx";
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
+  const location = useLocation();
   if (loading) return null;
-  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  if (!isLoggedIn) return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   return children;
 }
 

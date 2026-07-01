@@ -87,12 +87,15 @@ router.patch('/:userId/profile', requireSelf, async (req, res, next) => {
 // POST /api/users/:userId/daily-claim
 router.post('/:userId/daily-claim', requireSelf, async (req, res, next) => {
   try {
-    const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [req.params.userId]);
+    const { rows: [progress] } = await pool.query(
+      'SELECT * FROM user_progress WHERE "userId"=$1', [req.params.userId]
+    );
     if (!progress) return res.status(404).json({ error: 'User progress not found' });
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+    let newStreak = 1;
     if (progress.lastClaimDate) {
       const lastClaim = new Date(progress.lastClaimDate);
       const lastDay = new Date(lastClaim.getFullYear(), lastClaim.getMonth(), lastClaim.getDate());
@@ -101,19 +104,29 @@ router.post('/:userId/daily-claim', requireSelf, async (req, res, next) => {
       }
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      const streakContinues = lastDay.getTime() === yesterday.getTime();
-      const { rows: [updated] } = await pool.query(
-        `UPDATE user_progress SET points=points+25, "streakDays"=$1, "lastClaimDate"=$2 WHERE "userId"=$3 RETURNING *`,
-        [streakContinues ? progress.streakDays + 1 : 1, now, req.params.userId]
-      );
-      return res.json({ claimed: true, pointsEarned: 25, streakDays: updated.streakDays, totalPoints: updated.points });
+      newStreak = lastDay.getTime() === yesterday.getTime() ? progress.streakDays + 1 : 1;
     }
 
-    const { rows: [updated] } = await pool.query(
-      `UPDATE user_progress SET points=points+25, "streakDays"=1, "lastClaimDate"=$1 WHERE "userId"=$2 RETURNING *`,
-      [now, req.params.userId]
-    );
-    res.json({ claimed: true, pointsEarned: 25, streakDays: updated.streakDays, totalPoints: updated.points });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows: [updated] } = await client.query(
+        `UPDATE user_progress SET points=points+25, "streakDays"=$1, "lastClaimDate"=$2, "updatedAt"=NOW()
+         WHERE "userId"=$3 RETURNING *`,
+        [newStreak, now, req.params.userId]
+      );
+      await client.query(
+        `INSERT INTO point_ledger (id, "userId", source, points) VALUES ($1,$2,'daily_login',25)`,
+        [randomUUID(), req.params.userId]
+      );
+      await client.query('COMMIT');
+      res.json({ claimed: true, pointsEarned: 25, streakDays: updated.streakDays, totalPoints: updated.points });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }
@@ -146,65 +159,102 @@ const moduleProgressSchema = z.object({
 router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res, next) => {
   try {
     const data = moduleProgressSchema.parse(req.body);
-    const { rows: [module] } = await pool.query('SELECT * FROM modules WHERE id=$1', [req.params.moduleId]);
-    if (!module) return res.status(404).json({ error: 'Module not found' });
 
-    const sets = [];
-    const vals = [];
-    let i = 1;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // If per-video progress is provided, compute overall watchedPercent from it
-    let resolvedWatchedPercent = data.watchedPercent;
-    if (data.videoProgress && Object.keys(data.videoProgress).length > 0) {
-      const percs = Object.values(data.videoProgress);
-      resolvedWatchedPercent = Math.round(percs.reduce((a, b) => a + b, 0) / percs.length);
-      sets.push(`"videoProgress"=$${i++}`);
-      vals.push(JSON.stringify(data.videoProgress));
-    }
+      const { rows: [module] } = await client.query(
+        'SELECT * FROM modules WHERE id=$1', [req.params.moduleId]
+      );
+      if (!module) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Module not found' });
+      }
 
-    if (resolvedWatchedPercent !== undefined) { sets.push(`"watchedPercent"=$${i++}`); vals.push(resolvedWatchedPercent); }
-    if (data.completed !== undefined) {
-      sets.push(`completed=$${i++}`);
-      vals.push(data.completed);
-      if (data.completed) { sets.push(`"completedAt"=$${i++}`); vals.push(new Date()); }
-    }
-    sets.push(`"updatedAt"=$${i++}`);
-    vals.push(new Date());
-
-    const { rows: [progress] } = await pool.query(
-      `INSERT INTO user_module_progress (id, "userId", "moduleId", ${sets.map((s, idx) => s.split('=')[0]).join(',')})
-       VALUES ($${i++},$${i++},$${i++},${vals.map((_, idx) => `$${idx + 1}`).join(',')})
-       ON CONFLICT ("userId","moduleId") DO UPDATE SET ${sets.join(',')}
-       RETURNING *`,
-      [...vals, randomUUID(), req.params.userId, req.params.moduleId]
-    );
-
-    if (data.completed) {
-      // Guard: only award points and unlock next module on first completion
-      const { rows: [alreadyDone] } = await pool.query(
+      // Read current completion state BEFORE the upsert so the guard is accurate
+      const { rows: [existing] } = await client.query(
         'SELECT completed FROM user_module_progress WHERE "userId"=$1 AND "moduleId"=$2',
         [req.params.userId, req.params.moduleId]
       );
-      if (!alreadyDone?.completed) {
-        await pool.query(
-          `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
-           ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
-          [randomUUID(), req.params.userId, module.pointsValue]
+      const wasCompleted = existing?.completed ?? false;
+
+      // Build INSERT columns and ON CONFLICT UPDATE clauses separately
+      const insertCols = [];
+      const insertVals = [];
+      const updateClauses = [];
+
+      let resolvedWatchedPercent = data.watchedPercent;
+      if (data.videoProgress && Object.keys(data.videoProgress).length > 0) {
+        const percs = Object.values(data.videoProgress);
+        resolvedWatchedPercent = Math.round(percs.reduce((a, b) => a + b, 0) / percs.length);
+        insertCols.push('"videoProgress"');
+        insertVals.push(JSON.stringify(data.videoProgress));
+        updateClauses.push(`"videoProgress"=EXCLUDED."videoProgress"`);
+      }
+
+      if (resolvedWatchedPercent !== undefined) {
+        insertCols.push('"watchedPercent"');
+        insertVals.push(resolvedWatchedPercent);
+        // Use GREATEST so progress never decreases on re-saves or reconnects
+        updateClauses.push(`"watchedPercent"=GREATEST(user_module_progress."watchedPercent", EXCLUDED."watchedPercent")`);
+      }
+
+      if (data.completed !== undefined) {
+        insertCols.push('completed');
+        insertVals.push(data.completed);
+        updateClauses.push(`completed=EXCLUDED.completed`);
+        if (data.completed) {
+          insertCols.push('"completedAt"');
+          insertVals.push(new Date());
+          updateClauses.push(`"completedAt"=COALESCE(user_module_progress."completedAt", EXCLUDED."completedAt")`);
+        }
+      }
+
+      insertCols.push('"updatedAt"');
+      insertVals.push(new Date());
+      updateClauses.push(`"updatedAt"=EXCLUDED."updatedAt"`);
+
+      const n = insertVals.length;
+      const valPlaceholders = insertVals.map((_, i) => `$${i + 1}`).join(',');
+
+      const { rows: [progress] } = await client.query(
+        `INSERT INTO user_module_progress (id, "userId", "moduleId", ${insertCols.join(',')})
+         VALUES ($${n + 1},$${n + 2},$${n + 3},${valPlaceholders})
+         ON CONFLICT ("userId","moduleId") DO UPDATE SET ${updateClauses.join(',')}
+         RETURNING *`,
+        [...insertVals, randomUUID(), req.params.userId, req.params.moduleId]
+      );
+
+      // Award points only on first completion; wasCompleted was read before the upsert
+      if (data.completed && !wasCompleted) {
+        await client.query(
+          `UPDATE user_progress SET points=points+$1, "updatedAt"=NOW() WHERE "userId"=$2`,
+          [module.pointsValue, req.params.userId]
         );
-        // Seed progress row for the next module so the per-user lock query works
-        const { rows: [nextModule] } = await pool.query(
+        await client.query(
+          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'module_completion',$3,$4)`,
+          [randomUUID(), req.params.userId, module.pointsValue, req.params.moduleId]
+        );
+        const { rows: [nextModule] } = await client.query(
           `SELECT * FROM modules WHERE "orderIndex"=$1`, [module.orderIndex + 1]
         );
         if (nextModule) {
-          await pool.query(
+          await client.query(
             `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
             [randomUUID(), req.params.userId, nextModule.id]
           );
         }
       }
-    }
 
-    res.json(progress);
+      await client.query('COMMIT');
+      res.json(progress);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }
@@ -223,79 +273,93 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
   try {
     const data = quizSchema.parse(req.body);
 
-    // Enforce 14-day cooldown for bi-weekly quiz
-    if (data.quizType === 'biweekly') {
-      const { rows: [recent] } = await pool.query(
-        `SELECT "createdAt" FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
-         AND "createdAt" > NOW() - INTERVAL '14 days' ORDER BY "createdAt" DESC LIMIT 1`,
-        [req.params.userId]
-      );
-      if (recent) {
-        const nextAvailable = new Date(recent.createdAt);
-        nextAvailable.setDate(nextAvailable.getDate() + 14);
-        return res.status(409).json({ error: 'Already completed this period', nextAvailable: nextAvailable.toISOString() });
-      }
-    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const passed = data.score / data.totalPoints >= 0.7;
-    const pointsEarned = passed ? Math.round(data.score * 0.5) : 0;
-
-    const { rows: [attempt] } = await pool.query(
-      `INSERT INTO quiz_attempts (id, "userId", "moduleId", "quizType", score, "totalPoints", passed, answers)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [randomUUID(), req.params.userId, data.moduleId || null, data.quizType, data.score, data.totalPoints, passed, JSON.stringify(data.answers)]
-    );
-
-    // Award quiz score points (always, regardless of module vs biweekly)
-    if (passed && pointsEarned > 0) {
-      await pool.query(
-        `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
-         ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
-        [randomUUID(), req.params.userId, pointsEarned]
-      );
-    }
-
-    // For module quizzes: mark module completed and unlock the next one
-    if (passed && data.moduleId) {
-      const { rows: [mod] } = await pool.query('SELECT * FROM modules WHERE id=$1', [data.moduleId]);
-      const { rows: [existing] } = await pool.query(
-        'SELECT completed FROM user_module_progress WHERE "userId"=$1 AND "moduleId"=$2',
-        [req.params.userId, data.moduleId]
-      );
-
-      // Always mark quizPassed; mark completed and award module points only once
-      await pool.query(
-        `INSERT INTO user_module_progress (id, "userId", "moduleId", "quizPassed", completed, "completedAt", "watchedPercent")
-         VALUES ($1,$2,$3,true,true,NOW(),100)
-         ON CONFLICT ("userId","moduleId") DO UPDATE
-           SET "quizPassed"=true,
-               completed=true,
-               "completedAt"=COALESCE(user_module_progress."completedAt", NOW()),
-               "watchedPercent"=GREATEST(user_module_progress."watchedPercent", 100)`,
-        [randomUUID(), req.params.userId, data.moduleId]
-      );
-
-      if (!existing?.completed && mod) {
-        // Award module completion points
-        await pool.query(
-          `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,$3)
-           ON CONFLICT ("userId") DO UPDATE SET points=user_progress.points+$3`,
-          [randomUUID(), req.params.userId, mod.pointsValue]
+      // Enforce 14-day cooldown for bi-weekly quiz
+      if (data.quizType === 'biweekly') {
+        const { rows: [recent] } = await client.query(
+          `SELECT "createdAt" FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
+           AND "createdAt" > NOW() - INTERVAL '14 days' ORDER BY "createdAt" DESC LIMIT 1`,
+          [req.params.userId]
         );
-        // Create next module progress row so the lock query can see it as unlocked
-        const { rows: [nextMod] } = await pool.query(
-          `SELECT id FROM modules WHERE "orderIndex"=$1`, [mod.orderIndex + 1]
-        );
-        if (nextMod) {
-          await pool.query(
-            `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-            [randomUUID(), req.params.userId, nextMod.id]
-          );
+        if (recent) {
+          await client.query('ROLLBACK');
+          const nextAvailable = new Date(recent.createdAt);
+          nextAvailable.setDate(nextAvailable.getDate() + 14);
+          return res.status(409).json({ error: 'Already completed this period', nextAvailable: nextAvailable.toISOString() });
         }
       }
-    }
 
-    res.status(201).json({ ...attempt, pointsEarned });
+      const passed = data.score / data.totalPoints >= 0.7;
+      const pointsEarned = passed ? Math.round(data.score * 0.5) : 0;
+
+      const { rows: [attempt] } = await client.query(
+        `INSERT INTO quiz_attempts (id, "userId", "moduleId", "quizType", score, "totalPoints", passed, answers)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [randomUUID(), req.params.userId, data.moduleId || null, data.quizType,
+         data.score, data.totalPoints, passed, JSON.stringify(data.answers)]
+      );
+
+      if (passed && pointsEarned > 0) {
+        await client.query(
+          `UPDATE user_progress SET points=points+$1, "updatedAt"=NOW() WHERE "userId"=$2`,
+          [pointsEarned, req.params.userId]
+        );
+        await client.query(
+          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'quiz_pass',$3,$4)`,
+          [randomUUID(), req.params.userId, pointsEarned, attempt.id]
+        );
+      }
+
+      if (passed && data.moduleId) {
+        const { rows: [mod] } = await client.query('SELECT * FROM modules WHERE id=$1', [data.moduleId]);
+        const { rows: [existingProg] } = await client.query(
+          'SELECT completed FROM user_module_progress WHERE "userId"=$1 AND "moduleId"=$2',
+          [req.params.userId, data.moduleId]
+        );
+
+        await client.query(
+          `INSERT INTO user_module_progress (id, "userId", "moduleId", "quizPassed", completed, "completedAt", "watchedPercent")
+           VALUES ($1,$2,$3,true,true,NOW(),100)
+           ON CONFLICT ("userId","moduleId") DO UPDATE
+             SET "quizPassed"=true,
+                 completed=true,
+                 "completedAt"=COALESCE(user_module_progress."completedAt", NOW()),
+                 "watchedPercent"=GREATEST(user_module_progress."watchedPercent", 100)`,
+          [randomUUID(), req.params.userId, data.moduleId]
+        );
+
+        if (!existingProg?.completed && mod) {
+          await client.query(
+            `UPDATE user_progress SET points=points+$1, "updatedAt"=NOW() WHERE "userId"=$2`,
+            [mod.pointsValue, req.params.userId]
+          );
+          await client.query(
+            `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'module_completion',$3,$4)`,
+            [randomUUID(), req.params.userId, mod.pointsValue, data.moduleId]
+          );
+          const { rows: [nextMod] } = await client.query(
+            `SELECT id FROM modules WHERE "orderIndex"=$1`, [mod.orderIndex + 1]
+          );
+          if (nextMod) {
+            await client.query(
+              `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+              [randomUUID(), req.params.userId, nextMod.id]
+            );
+          }
+        }
+      }
+
+      await client.query('COMMIT');
+      res.status(201).json({ ...attempt, pointsEarned });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }
@@ -341,29 +405,23 @@ router.delete('/:userId/bookmarks/:moduleId', requireSelf, async (req, res, next
 });
 
 // GET /api/users/:userId/activity
-// Returns active dates (YYYY-MM-DD) for the last 90 days derived from
-// quiz attempts, module completions, and daily claims.
 router.get('/:userId/activity', requireSelf, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `SELECT DISTINCT TO_CHAR(day::date, 'YYYY-MM-DD') AS date
        FROM (
-         SELECT "createdAt" AS day
-         FROM quiz_attempts
+         SELECT "createdAt" AS day FROM quiz_attempts
          WHERE "userId" = $1 AND "createdAt" >= NOW() - INTERVAL '90 days'
          UNION ALL
-         SELECT "completedAt" AS day
-         FROM user_module_progress
+         SELECT "completedAt" AS day FROM user_module_progress
          WHERE "userId" = $1 AND "completedAt" IS NOT NULL
            AND "completedAt" >= NOW() - INTERVAL '90 days'
          UNION ALL
-         SELECT "updatedAt" AS day
-         FROM user_module_progress
+         SELECT "updatedAt" AS day FROM user_module_progress
          WHERE "userId" = $1 AND "watchedPercent" > 0
            AND "updatedAt" >= NOW() - INTERVAL '90 days'
          UNION ALL
-         SELECT "lastClaimDate" AS day
-         FROM user_progress
+         SELECT "lastClaimDate" AS day FROM user_progress
          WHERE "userId" = $1 AND "lastClaimDate" IS NOT NULL
        ) sub
        WHERE day IS NOT NULL

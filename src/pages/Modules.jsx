@@ -179,7 +179,7 @@ function ChapterRow({ video, index, progress, isModuleCompleted, onClick }) {
   );
 }
 
-function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle }) {
+function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevModuleTitle = null }) {
   const [expanded, setExpanded] = useState(false);
   const color = getColor(m.category);
   const pct = m.watchedPct;
@@ -350,7 +350,7 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle }) {
               }`}
           >
             {m.locked
-              ? "🔒 Locked"
+              ? prevModuleTitle ? `🔒 Complete "${prevModuleTitle}" first` : "🔒 Locked"
               : m.completed
               ? "Review Module"
               : pct > 0
@@ -565,16 +565,22 @@ export default function Modules() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {filtered.map((m) => (
-              <ModuleCard
-                key={m.id}
-                m={m}
-                index={modules.indexOf(m)}
-                onNavigate={handleNavigate}
-                bookmarked={bookmarkedIds.has(m.id)}
-                onBookmarkToggle={handleBookmarkToggle}
-              />
-            ))}
+            {filtered.map((m) => {
+              const prevMod = m.locked
+                ? modules.find((mod) => mod.orderIndex === m.orderIndex - 1)
+                : null;
+              return (
+                <ModuleCard
+                  key={m.id}
+                  m={m}
+                  index={modules.indexOf(m)}
+                  onNavigate={handleNavigate}
+                  bookmarked={bookmarkedIds.has(m.id)}
+                  onBookmarkToggle={handleBookmarkToggle}
+                  prevModuleTitle={prevMod?.title ?? null}
+                />
+              );
+            })}
           </div>
         )}
       </main>

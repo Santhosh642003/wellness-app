@@ -50,21 +50,6 @@ export const auth = {
   resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 };
 
-// Transcription
-export const transcribe = async (audioBlob) => {
-  const token = getToken();
-  const formData = new FormData();
-  formData.append('audio', audioBlob, 'audio.webm');
-  const res = await fetch(`${BASE_URL}/transcribe`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  return data;
-};
-
 // Users
 export const users = {
   get: (userId) => request(`/users/${userId}`),

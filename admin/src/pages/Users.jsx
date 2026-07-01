@@ -22,6 +22,8 @@ export default function Users() {
   const [bulkAction, setBulkAction] = useState('award-points');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkMsg, setBulkMsg] = useState('');
+  const [bulkConfirm, setBulkConfirm] = useState(null); // { pts, delta, action, count, reason }
+  const [bulkReason, setBulkReason] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,24 +73,36 @@ export default function Users() {
     }
   };
 
-  const executeBulk = async () => {
+  const prepareBulk = () => {
     if (!selected.size || !bulkPoints) return;
     const pts = parseInt(bulkPoints);
     if (!pts || pts <= 0) return;
+    const delta = bulkAction === 'award-points' ? pts : -pts;
+    setBulkConfirm({ pts, delta, action: bulkAction, count: selected.size });
+  };
+
+  const executeBulk = async () => {
+    if (!bulkConfirm) return;
     setBulkLoading(true);
     setBulkMsg('');
     try {
-      const res = await api.bulkAction({ userIds: [...selected], action: bulkAction, points: pts });
-      setBulkMsg(`✓ ${res.action === 'award-points' ? '+' : '-'}${pts} pts applied to ${res.affected} user${res.affected !== 1 ? 's' : ''}`);
-      // Refresh users
+      const res = await api.bulkAction({
+        userIds: [...selected],
+        action: bulkConfirm.action,
+        points: bulkConfirm.pts,
+        reason: bulkReason || undefined,
+      });
+      setBulkMsg(`✓ ${res.action === 'award-points' ? '+' : '-'}${bulkConfirm.pts} pts applied to ${res.affected} user${res.affected !== 1 ? 's' : ''}`);
       const updated = await api.users();
       setUsers(updated);
       setSelected(new Set());
       setBulkPoints('');
+      setBulkReason('');
     } catch (err) {
       setBulkMsg(`Error: ${err.message}`);
     } finally {
       setBulkLoading(false);
+      setBulkConfirm(null);
     }
   };
 
@@ -155,7 +169,7 @@ export default function Users() {
               className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500"
             />
             <button
-              onClick={executeBulk}
+              onClick={prepareBulk}
               disabled={bulkLoading || !bulkPoints}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
             >
@@ -250,6 +264,46 @@ export default function Users() {
           </tbody>
         </table>
       </div>
+
+      {/* Bulk action confirmation modal */}
+      {bulkConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-white font-semibold mb-2">Confirm Bulk Action</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              {bulkConfirm.action === 'award-points' ? 'Award' : 'Deduct'}{' '}
+              <span className="text-emerald-400 font-bold">{bulkConfirm.pts} pts</span>{' '}
+              {bulkConfirm.action === 'award-points' ? 'to' : 'from'}{' '}
+              <span className="text-white font-bold">{bulkConfirm.count} user{bulkConfirm.count !== 1 ? 's' : ''}</span>
+              {' '}(total delta: {bulkConfirm.delta > 0 ? '+' : ''}{bulkConfirm.delta * bulkConfirm.count} pts).
+            </p>
+            <div className="mb-4">
+              <label className="text-gray-400 text-xs block mb-1">Reason (optional, stored for audit)</label>
+              <input
+                value={bulkReason}
+                onChange={e => setBulkReason(e.target.value)}
+                placeholder="e.g. Attendance bonus"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={executeBulk}
+                disabled={bulkLoading}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+              >
+                {bulkLoading ? 'Applying…' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => { setBulkConfirm(null); setBulkReason(''); }}
+                className="flex-1 bg-gray-800 border border-gray-700 text-gray-300 hover:text-white py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { auth as authApi } from "../lib/api.js";
@@ -57,6 +57,8 @@ const LABEL_CLS = "block text-sm font-semibold text-slate-700 dark:text-gray-200
 export default function Login() {
   const { login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/dashboard";
 
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [step, setStep] = useState(1); // register steps: 1=personal, 2=credentials, 3=otp
@@ -107,7 +109,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(loginEmail.trim().toLowerCase(), loginPassword);
-      navigate("/dashboard");
+      navigate(redirectTo);
     } catch (err) {
       setError(err.message || "Invalid email or password.");
     } finally {
@@ -155,7 +157,7 @@ export default function Login() {
         campus, major: major || undefined, yearOfStudy: yearOfStudy || undefined,
         ethnicity: ethnicity || undefined, otpCode,
       });
-      navigate("/dashboard");
+      navigate(redirectTo);
     } catch (err) {
       setError(err.message || "Registration failed. Please check your code and try again.");
     } finally {
@@ -208,7 +210,7 @@ export default function Login() {
                   <GoogleLogin
                     onSuccess={async ({ credential }) => {
                       setLoading(true); setError("");
-                      try { await loginWithGoogle(credential); navigate("/dashboard"); }
+                      try { await loginWithGoogle(credential); navigate(redirectTo); }
                       catch (err) { setError(err.message || "Google sign-in failed. Ensure you use an @njit.edu account."); }
                       finally { setLoading(false); }
                     }}
@@ -380,7 +382,7 @@ export default function Login() {
                   <GoogleLogin
                     onSuccess={async ({ credential }) => {
                       setLoading(true); setError("");
-                      try { await loginWithGoogle(credential); navigate("/dashboard"); }
+                      try { await loginWithGoogle(credential); navigate(redirectTo); }
                       catch (err) { setError(err.message || "Google sign-in failed. Ensure you use an @njit.edu account."); }
                       finally { setLoading(false); }
                     }}

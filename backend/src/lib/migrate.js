@@ -199,6 +199,21 @@ ALTER TABLE modules ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT '[]'::jsonb
 ALTER TABLE user_module_progress ADD COLUMN IF NOT EXISTS "videoProgress" JSONB DEFAULT '{}'::jsonb;
 `;
 
+const IDEMPOTENCY_AND_LEDGER = `
+ALTER TABLE reward_redemptions ADD COLUMN IF NOT EXISTS "idempotencyKey" TEXT UNIQUE;
+
+CREATE TABLE IF NOT EXISTS point_ledger (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  points INTEGER NOT NULL,
+  "refId" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS point_ledger_user_idx ON point_ledger("userId");
+CREATE INDEX IF NOT EXISTS point_ledger_created_idx ON point_ledger("createdAt");
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
@@ -208,6 +223,7 @@ export async function migrate() {
     await pool.query(SCHEDULING_AND_NOTIFICATIONS);
     await pool.query(COMMUNITY_AND_REFERRALS);
     await pool.query(MULTI_VIDEO_AND_DOCS);
+    await pool.query(IDEMPOTENCY_AND_LEDGER);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

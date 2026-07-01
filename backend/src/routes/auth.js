@@ -146,9 +146,13 @@ router.post('/register', async (req, res, next) => {
     const userId = randomUUID();
 
     // Generate unique referral code for this user
-    let referralCode = generateReferralCode(data.name);
-    const { rows: codeCheck } = await pool.query('SELECT id FROM users WHERE "referralCode"=$1', [referralCode]);
-    if (codeCheck[0]) referralCode = generateReferralCode(data.name); // try once more
+    let referralCode;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      referralCode = generateReferralCode(data.name);
+      const { rows: check } = await pool.query('SELECT id FROM users WHERE "referralCode"=$1', [referralCode]);
+      if (!check[0]) break;
+      if (attempt === 4) return res.status(500).json({ error: 'Could not generate unique referral code, please try again' });
+    }
 
     // Resolve referrer if referralCode provided
     let referrerId = null;
@@ -185,12 +189,20 @@ router.post('/register', async (req, res, next) => {
           [randomUUID(), referrerId, userId]
         );
         await client.query(
-          `UPDATE user_progress SET points=points+50 WHERE "userId"=$1`,
+          `UPDATE user_progress SET points=points+50, "updatedAt"=NOW() WHERE "userId"=$1`,
           [referrerId]
         );
         await client.query(
-          `UPDATE user_progress SET points=points+25 WHERE "userId"=$1`,
+          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'referral_referrer',50,$3)`,
+          [randomUUID(), referrerId, userId]
+        );
+        await client.query(
+          `UPDATE user_progress SET points=points+25, "updatedAt"=NOW() WHERE "userId"=$1`,
           [userId]
+        );
+        await client.query(
+          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'referral_referred',25,$3)`,
+          [randomUUID(), userId, referrerId]
         );
       }
       await client.query('COMMIT');
