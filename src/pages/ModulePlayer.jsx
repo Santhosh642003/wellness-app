@@ -55,6 +55,8 @@ export default function ModulePlayer() {
   const lastSavedPct = useRef(0);
   const saveTimer = useRef(null);
 
+  const [lastSaved, setLastSaved] = useState(null);
+
   // Caption state
   const [captionsOn, setCaptionsOn] = useState(false);
 
@@ -121,6 +123,7 @@ export default function ModulePlayer() {
         videoProgress: content.videos.length > 1 ? vp : undefined,
       });
       lastSavedPct.current = pct;
+      setLastSaved(new Date());
     } catch (err) {
       console.error("Failed to save progress", err);
     }
@@ -217,6 +220,11 @@ export default function ModulePlayer() {
 
   const goToQuiz = () => navigate(`/quiz/module/${moduleId}`);
 
+  // Chapters still under the 80% watch threshold (used for the quiz lock message)
+  const incompleteChapters = content.videos
+    .map((v, i) => ({ v, i, pct: videoProgress[String(i)] ?? 0 }))
+    .filter(({ pct }) => pct < 80);
+
   // Load comments
   useEffect(() => {
     if (!moduleId) return;
@@ -305,7 +313,7 @@ export default function ModulePlayer() {
         {/* Steps indicator */}
         <div className="flex items-center gap-4 mb-8 flex-wrap">
           {[
-            { n: 1, label: content.videos.length > 1 ? `Watch All ${content.videos.length} Chapters` : "Watch Video", done: watchedPercent >= 80 || alreadyCompleted },
+            { n: 1, label: content.videos.length > 1 ? `Watch All ${content.videos.length} Chapters` : "Watch Video", done: allVideosWatched || alreadyCompleted },
             { n: 2, label: "Take Quiz", done: quizPassed || alreadyCompleted },
             { n: 3, label: "Complete", done: alreadyCompleted },
           ].map((step, i, arr) => (
@@ -342,6 +350,7 @@ export default function ModulePlayer() {
                       <button
                         key={v.id || i}
                         onClick={() => switchVideo(i)}
+                        title={done ? "80%+ watched — counts toward unlocking the quiz" : undefined}
                         className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all shrink-0
                           ${active
                             ? "border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-[#121212]"
@@ -392,6 +401,7 @@ export default function ModulePlayer() {
                 {/* Watch progress */}
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 dark:text-gray-500 whitespace-nowrap">Progress saved</span>
                     <div className="w-24 h-1.5 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all"
@@ -399,19 +409,25 @@ export default function ModulePlayer() {
                       />
                     </div>
                     <span className="text-xs text-slate-500 dark:text-gray-400 font-mono whitespace-nowrap">
-                      {Math.round(watchedPercent)}% watched
+                      {Math.round(watchedPercent)}%
                     </span>
                   </div>
                   {!quizUnlocked && (
                     <span className="text-xs text-amber-600 dark:text-amber-400">
-                      {content.videos.length > 1
-                        ? `Watch all ${content.videos.length} videos (≥80% each) to unlock quiz`
+                      {content.videos.length > 1 && incompleteChapters.length > 0
+                        ? incompleteChapters.length === 1
+                          ? `Watch Chapter ${incompleteChapters[0].i + 1} to unlock quiz`
+                          : `Watch Chapters ${incompleteChapters.map((c) => c.i + 1).join(" & ")} to unlock quiz`
                         : "Watch 80% to unlock quiz"}
                     </span>
                   )}
                 </div>
 
-                <div />
+                {lastSaved && (
+                  <span className="text-[10px] text-slate-400 dark:text-gray-500 whitespace-nowrap shrink-0">
+                    ✓ Saved {lastSaved.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -552,7 +568,11 @@ export default function ModulePlayer() {
                   <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-                  Watch at least 80% of the video to unlock the quiz.
+                  {content.videos.length > 1 && incompleteChapters.length > 0
+                    ? incompleteChapters.length === 1
+                      ? `Watch Chapter ${incompleteChapters[0].i + 1}: "${incompleteChapters[0].v.title || `Chapter ${incompleteChapters[0].i + 1}`}" to unlock the quiz.`
+                      : `Watch ${incompleteChapters.map((c) => `Chapter ${c.i + 1}: "${c.v.title || `Chapter ${c.i + 1}`}"`).join(" and ")} to unlock the quiz.`
+                    : "Watch at least 80% of the video to unlock the quiz."}
                 </div>
               )}
             </div>

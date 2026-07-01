@@ -117,7 +117,7 @@ function BookmarkButton({ moduleId, bookmarked, onToggle }) {
     <button
       onClick={handleClick}
       title={bookmarked ? "Remove bookmark" : "Bookmark this module"}
-      className={`absolute top-3 right-3 z-10 h-8 w-8 rounded-lg flex items-center justify-center border transition-all
+      className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center border transition-all
         ${bookmarked
           ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-500"
           : "bg-white/80 dark:bg-[#1a1a1a]/80 border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500 hover:text-yellow-500 hover:border-yellow-400/40"
@@ -196,7 +196,6 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
           ? "border-blue-400/40 shadow-md"
           : "border-slate-200 dark:border-gray-800 hover:border-blue-400/40 hover:shadow-md"}`}
     >
-      {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
       {/* Top accent bar */}
       <div className={`h-1 w-full ${m.completed ? "bg-gradient-to-r from-emerald-400 to-teal-400" : m.locked ? "bg-slate-200 dark:bg-gray-800" : "bg-gradient-to-r from-blue-500 to-emerald-400"}`} />
 
@@ -231,13 +230,16 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
             </div>
           </div>
 
-          <div className="shrink-0 text-right">
-            <div className="text-xs px-2.5 py-1 rounded-lg bg-yellow-400/10 border border-yellow-400/20 text-yellow-600 dark:text-yellow-300 font-bold">
-              +{m.points} pts
+          <div className="shrink-0 flex flex-col items-end gap-0.5">
+            <div className="flex items-start gap-1.5">
+              <div className="text-xs px-2.5 py-1 rounded-lg bg-yellow-400/10 border border-yellow-400/20 text-yellow-600 dark:text-yellow-300 font-bold">
+                +{m.points} pts
+              </div>
+              {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
             </div>
-            <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-1">{m.mins} min</div>
+            <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">{m.mins} min</div>
             {isMultiVideo && (
-              <div className="text-[10px] text-blue-500 dark:text-blue-400 mt-0.5 font-medium">{m.videoCount} chapters</div>
+              <div className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">{m.videoCount} chapters</div>
             )}
           </div>
         </div>
@@ -488,7 +490,7 @@ export default function Modules() {
             { label: "Completed", value: stats.completed, total: stats.total, icon: "✅", color: "text-emerald-600 dark:text-emerald-400" },
             { label: "In Progress", value: stats.inProgress, total: null, icon: "▶", color: "text-blue-600 dark:text-blue-400" },
             { label: "Locked", value: stats.locked, total: null, icon: "🔒", color: "text-slate-500 dark:text-gray-400" },
-            { label: "Points Earned", value: stats.totalPoints, total: null, icon: "⭐", color: "text-yellow-600 dark:text-yellow-300" },
+            { label: "Points Earned", value: points, total: null, icon: "⭐", color: "text-yellow-600 dark:text-yellow-300" },
           ].map((s) => (
             <div key={s.label} className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm">
               <div className="text-lg mb-1">{s.icon}</div>
