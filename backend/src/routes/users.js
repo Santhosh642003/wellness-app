@@ -359,13 +359,18 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
       );
 
       if (passed && pointsEarned > 0) {
-        await awardPoints(client, {
-          userId: req.params.userId,
-          source: data.quizType === 'biweekly' ? 'biweekly_quiz_pass' : 'quiz_pass',
-          points: pointsEarned,
-          refId: attempt.id,
-          ...(data.quizType === 'biweekly' ? { capPoints: 1600, capScope: 'semester' } : {}),
-        });
+        try {
+          await awardPoints(client, {
+            userId: req.params.userId,
+            source: data.quizType === 'biweekly' ? 'biweekly_quiz_pass' : 'quiz_pass',
+            points: pointsEarned,
+            refId: attempt.id,
+            ...(data.quizType === 'biweekly' ? { capPoints: 1600, capScope: 'semester' } : {}),
+          });
+        } catch (err) {
+          if (err.code !== 'NO_ACTIVE_SEMESTER') throw err;
+          // biweekly points skipped — quiz attempt still commits below
+        }
       }
 
       if (passed && data.moduleId) {
