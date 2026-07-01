@@ -7,6 +7,7 @@ import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import pool from '../lib/db.js';
 import { adminAuth } from '../middleware/adminAuth.js';
+import { awardPoints } from '../lib/points.js';
 import { uploadFile, deleteFile } from '../lib/storage.js';
 import { sendQuizLiveEmail, sendAnnouncementEmail } from '../lib/email.js';
 
@@ -492,7 +493,6 @@ router.delete('/notifications/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// PATCH /api/admin/users/:id/points — award or deduct points
 router.patch('/users/:id/points', async (req, res, next) => {
   try {
     const { delta, reason } = z.object({
@@ -504,23 +504,16 @@ router.patch('/users/:id/points', async (req, res, next) => {
     try {
       await client.query('BEGIN');
       await client.query(
-        `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,0)
-         ON CONFLICT ("userId") DO NOTHING`,
+        `INSERT INTO user_progress (id, "userId", points) VALUES ($1,$2,0) ON CONFLICT ("userId") DO NOTHING`,
         [randomUUID(), req.params.id]
       );
-      const { rows: [p] } = await client.query(
-        `UPDATE user_progress SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
-         WHERE "userId" = $2 RETURNING points`,
-        [delta, req.params.id]
-      );
-      if (!p) {
+      const { rows: [userCheck] } = await client.query('SELECT id FROM users WHERE id=$1', [req.params.id]);
+      if (!userCheck) {
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'User not found' });
       }
-      await client.query(
-        `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'admin_adjustment',$3,$4)`,
-        [randomUUID(), req.params.id, delta, reason || null]
-      );
+      await awardPoints(client, { userId: req.params.id, source: 'admin_adjustment', points: delta, refId: reason || null });
+      const { rows: [p] } = await client.query('SELECT points FROM user_progress WHERE "userId"=$1', [req.params.id]);
       await client.query('COMMIT');
       res.json({ points: p.points, delta, reason });
     } catch (err) {
@@ -579,7 +572,6 @@ router.get('/stats/analytics', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/admin/users/bulk — bulk actions on users
 router.post('/users/bulk', async (req, res, next) => {
   try {
     const { userIds, action, points, reason } = z.object({
@@ -601,20 +593,18 @@ router.post('/users/bulk', async (req, res, next) => {
 
       const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',');
       await client.query(
-        `UPDATE user_progress SET points = GREATEST(0, points + $1), "updatedAt" = NOW()
-         WHERE "userId" IN (${placeholders})`,
+        `UPDATE user_progress SET points = GREATEST(0, points + $1), "updatedAt" = NOW() WHERE "userId" IN (${placeholders})`,
         [delta, ...userIds]
       );
 
-      // Insert one point_ledger row per user
       if (userIds.length > 0) {
         const ledgerValues = userIds.map((_, i) => {
           const b = i * 4;
-          return `($${b + 1}, $${b + 2}, 'admin_adjustment', $${b + 3}, $${b + 4})`;
+          return `($${b + 1}, $${b + 2}, 'admin_adjustment', $${b + 3}, $${b + 4}, NULL)`;
         }).join(',');
         const ledgerParams = userIds.flatMap((uid) => [randomUUID(), uid, delta, reason || null]);
         await client.query(
-          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ${ledgerValues}`,
+          `INSERT INTO point_ledger (id, "userId", source, points, "refId", "semesterLabel") VALUES ${ledgerValues}`,
           ledgerParams
         );
       }
@@ -668,6 +658,143 @@ router.get('/stats/detail', async (req, res, next) => {
       newUsersThisWeek: parseInt(recentUsers.rows[0].count),
       topUsers: topUsers.rows,
     });
+  } catch (err) { next(err); }
+});
+
+// --- REWARD POOL ---
+router.get('/reward-pool', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM reward_pool ORDER BY "createdAt" DESC`);
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+router.post('/reward-pool', async (req, res, next) => {
+  try {
+    const { semesterLabel, budgetCents } = z.object({
+      semesterLabel: z.string().min(1),
+      budgetCents: z.number().int().positive(),
+    }).parse(req.body);
+
+    const { rows: [existing] } = await pool.query(
+      `SELECT "semesterLabel" FROM reward_pool WHERE "closedAt" IS NULL LIMIT 1`
+    );
+    if (existing) {
+      return res.status(409).json({
+        error: `Semester "${existing.semesterLabel}" is still open. Close it before opening a new one.`,
+      });
+    }
+
+    const { rows: [rp] } = await pool.query(
+      `INSERT INTO reward_pool (id, "semesterLabel", "budgetCents") VALUES ($1,$2,$3) RETURNING *`,
+      [randomUUID(), semesterLabel, budgetCents]
+    );
+    res.status(201).json(rp);
+  } catch (err) { next(err); }
+});
+
+router.patch('/reward-pool/:id', async (req, res, next) => {
+  try {
+    const d = z.object({
+      budgetCents: z.number().int().positive().optional(),
+      close: z.boolean().optional(),
+    }).parse(req.body);
+
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    if (d.budgetCents !== undefined) { sets.push(`"budgetCents"=$${i++}`); vals.push(d.budgetCents); }
+    if (d.close) { sets.push(`"closedAt"=$${i++}`); vals.push(new Date()); }
+    if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+    vals.push(req.params.id);
+    const { rows: [rp] } = await pool.query(
+      `UPDATE reward_pool SET ${sets.join(',')} WHERE id=$${i} RETURNING *`, vals
+    );
+    if (!rp) return res.status(404).json({ error: 'Pool not found' });
+    res.json(rp);
+  } catch (err) { next(err); }
+});
+
+// --- EVENTS CRUD ---
+router.get('/events', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM events ORDER BY "startsAt" DESC`);
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+router.post('/events', async (req, res, next) => {
+  try {
+    const d = z.object({
+      title: z.string().min(1),
+      description: z.string().optional(),
+      checkInCode: z.string().min(1),
+      startsAt: z.string(),
+      endsAt: z.string(),
+    }).parse(req.body);
+    const { rows: [ev] } = await pool.query(
+      `INSERT INTO events (id, title, description, "checkInCode", "startsAt", "endsAt") VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [randomUUID(), d.title, d.description || null, d.checkInCode, new Date(d.startsAt), new Date(d.endsAt)]
+    );
+    res.status(201).json(ev);
+  } catch (err) { next(err); }
+});
+
+router.patch('/events/:id', async (req, res, next) => {
+  try {
+    const d = z.object({
+      title: z.string().optional(),
+      description: z.string().nullable().optional(),
+      checkInCode: z.string().optional(),
+      startsAt: z.string().optional(),
+      endsAt: z.string().optional(),
+    }).parse(req.body);
+
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    if (d.title !== undefined) { sets.push(`title=$${i++}`); vals.push(d.title); }
+    if (d.description !== undefined) { sets.push(`description=$${i++}`); vals.push(d.description); }
+    if (d.checkInCode !== undefined) { sets.push(`"checkInCode"=$${i++}`); vals.push(d.checkInCode); }
+    if (d.startsAt !== undefined) { sets.push(`"startsAt"=$${i++}`); vals.push(new Date(d.startsAt)); }
+    if (d.endsAt !== undefined) { sets.push(`"endsAt"=$${i++}`); vals.push(new Date(d.endsAt)); }
+    if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+    vals.push(req.params.id);
+    const { rows: [ev] } = await pool.query(
+      `UPDATE events SET ${sets.join(',')} WHERE id=$${i} RETURNING *`, vals
+    );
+    if (!ev) return res.status(404).json({ error: 'Event not found' });
+    res.json(ev);
+  } catch (err) { next(err); }
+});
+
+router.delete('/events/:id', async (req, res, next) => {
+  try {
+    await pool.query('DELETE FROM events WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/events/:id/rotate-code — regenerate the check-in code
+router.post('/events/:id/rotate-code', async (req, res, next) => {
+  try {
+    const newCode = Math.random().toString(36).toUpperCase().slice(2, 8);
+    const { rows: [ev] } = await pool.query(
+      `UPDATE events SET "checkInCode"=$1 WHERE id=$2 RETURNING *`,
+      [newCode, req.params.id]
+    );
+    if (!ev) return res.status(404).json({ error: 'Event not found' });
+    res.json(ev);
+  } catch (err) { next(err); }
+});
+
+router.get('/events/:id/checkins', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT ec.*, u.name, u.email FROM event_checkins ec JOIN users u ON u.id=ec."userId" WHERE ec."eventId"=$1 ORDER BY ec."checkedInAt"`,
+      [req.params.id]
+    );
+    res.json(rows);
   } catch (err) { next(err); }
 });
 

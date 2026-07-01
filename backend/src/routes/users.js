@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import pool from '../lib/db.js';
 import { authenticate, requireSelf } from '../middleware/auth.js';
+import { awardPoints } from '../lib/points.js';
 
 const router = Router();
 router.use(authenticate);
@@ -84,43 +85,99 @@ router.patch('/:userId/profile', requireSelf, async (req, res, next) => {
   }
 });
 
+async function checkAndPayReferral(client, referredUserId) {
+  const { rows: [{ count }] } = await client.query(
+    `SELECT COUNT(*) FROM user_module_progress WHERE "userId"=$1 AND completed=true`,
+    [referredUserId]
+  );
+  if (parseInt(count) < 3) return;
+
+  const { rows: [referral] } = await client.query(
+    `SELECT * FROM referrals WHERE "referredId"=$1 AND "paidAt" IS NULL`,
+    [referredUserId]
+  );
+  if (!referral) return;
+
+  try {
+    await awardPoints(client, {
+      userId: referral.referrerId,
+      source: 'referral_referrer',
+      points: 100,
+      refId: referredUserId,
+      capPoints: 500,
+      capScope: 'semester',
+    });
+    await client.query(
+      `UPDATE referrals SET "paidAt"=NOW(), "pointsAwarded"=100, "modulesAtPayout"=$1 WHERE id=$2`,
+      [parseInt(count), referral.id]
+    );
+  } catch (err) {
+    if (err.code === 'NO_ACTIVE_SEMESTER') return; // retry on next completion
+    throw err;
+  }
+}
+
 // POST /api/users/:userId/daily-claim
 router.post('/:userId/daily-claim', requireSelf, async (req, res, next) => {
   try {
-    const { rows: [progress] } = await pool.query(
-      'SELECT * FROM user_progress WHERE "userId"=$1', [req.params.userId]
-    );
-    if (!progress) return res.status(404).json({ error: 'User progress not found' });
-
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    let newStreak = 1;
-    if (progress.lastClaimDate) {
-      const lastClaim = new Date(progress.lastClaimDate);
-      const lastDay = new Date(lastClaim.getFullYear(), lastClaim.getMonth(), lastClaim.getDate());
-      if (lastDay.getTime() === today.getTime()) {
-        return res.status(409).json({ error: 'Already claimed today' });
-      }
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      newStreak = lastDay.getTime() === yesterday.getTime() ? progress.streakDays + 1 : 1;
-    }
-
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const { rows: [updated] } = await client.query(
-        `UPDATE user_progress SET points=points+25, "streakDays"=$1, "lastClaimDate"=$2, "updatedAt"=NOW()
-         WHERE "userId"=$3 RETURNING *`,
+
+      // Lock progress row to prevent concurrent double-claim
+      const { rows: [progress] } = await client.query(
+        'SELECT * FROM user_progress WHERE "userId"=$1 FOR UPDATE',
+        [req.params.userId]
+      );
+      if (!progress) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'User progress not found' });
+      }
+
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let newStreak = 1;
+
+      if (progress.lastClaimDate) {
+        const lastClaim = new Date(progress.lastClaimDate);
+        const lastDay = new Date(lastClaim.getFullYear(), lastClaim.getMonth(), lastClaim.getDate());
+        if (lastDay.getTime() === today.getTime()) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ error: 'Already claimed today' });
+        }
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        newStreak = lastDay.getTime() === yesterday.getTime() ? progress.streakDays + 1 : 1;
+      }
+
+      // Update streak/lastClaimDate unconditionally
+      await client.query(
+        `UPDATE user_progress SET "streakDays"=$1, "lastClaimDate"=$2, "updatedAt"=NOW() WHERE "userId"=$3`,
         [newStreak, now, req.params.userId]
       );
-      await client.query(
-        `INSERT INTO point_ledger (id, "userId", source, points) VALUES ($1,$2,'daily_login',25)`,
-        [randomUUID(), req.params.userId]
+
+      // Award points — swallow NO_ACTIVE_SEMESTER (streak still saved)
+      let awarded = 0;
+      try {
+        const result = await awardPoints(client, {
+          userId: req.params.userId,
+          source: 'daily_login',
+          points: 10,
+          capPoints: 300,
+          capScope: 'semester',
+        });
+        awarded = result.awarded;
+      } catch (err) {
+        if (err.code !== 'NO_ACTIVE_SEMESTER') throw err;
+      }
+
+      const { rows: [updated] } = await client.query(
+        'SELECT points FROM user_progress WHERE "userId"=$1',
+        [req.params.userId]
       );
+
       await client.query('COMMIT');
-      res.json({ claimed: true, pointsEarned: 25, streakDays: updated.streakDays, totalPoints: updated.points });
+      res.json({ claimed: true, pointsEarned: awarded, streakDays: newStreak, totalPoints: updated.points });
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -228,14 +285,13 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
 
       // Award points only on first completion; wasCompleted was read before the upsert
       if (data.completed && !wasCompleted) {
-        await client.query(
-          `UPDATE user_progress SET points=points+$1, "updatedAt"=NOW() WHERE "userId"=$2`,
-          [module.pointsValue, req.params.userId]
-        );
-        await client.query(
-          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'module_completion',$3,$4)`,
-          [randomUUID(), req.params.userId, module.pointsValue, req.params.moduleId]
-        );
+        await awardPoints(client, {
+          userId: req.params.userId,
+          source: 'module_completion',
+          points: module.pointsValue,
+          refId: req.params.moduleId,
+        });
+        await checkAndPayReferral(client, req.params.userId);
         const { rows: [nextModule] } = await client.query(
           `SELECT * FROM modules WHERE "orderIndex"=$1`, [module.orderIndex + 1]
         );
@@ -293,7 +349,7 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
       }
 
       const passed = data.score / data.totalPoints >= 0.7;
-      const pointsEarned = passed ? Math.round(data.score * 0.5) : 0;
+      const pointsEarned = passed ? (data.quizType === 'biweekly' ? 200 : Math.round(data.score * 0.5)) : 0;
 
       const { rows: [attempt] } = await client.query(
         `INSERT INTO quiz_attempts (id, "userId", "moduleId", "quizType", score, "totalPoints", passed, answers)
@@ -303,14 +359,13 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
       );
 
       if (passed && pointsEarned > 0) {
-        await client.query(
-          `UPDATE user_progress SET points=points+$1, "updatedAt"=NOW() WHERE "userId"=$2`,
-          [pointsEarned, req.params.userId]
-        );
-        await client.query(
-          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'quiz_pass',$3,$4)`,
-          [randomUUID(), req.params.userId, pointsEarned, attempt.id]
-        );
+        await awardPoints(client, {
+          userId: req.params.userId,
+          source: data.quizType === 'biweekly' ? 'biweekly_quiz_pass' : 'quiz_pass',
+          points: pointsEarned,
+          refId: attempt.id,
+          ...(data.quizType === 'biweekly' ? { capPoints: 1600, capScope: 'semester' } : {}),
+        });
       }
 
       if (passed && data.moduleId) {
@@ -332,14 +387,13 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
         );
 
         if (!existingProg?.completed && mod) {
-          await client.query(
-            `UPDATE user_progress SET points=points+$1, "updatedAt"=NOW() WHERE "userId"=$2`,
-            [mod.pointsValue, req.params.userId]
-          );
-          await client.query(
-            `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'module_completion',$3,$4)`,
-            [randomUUID(), req.params.userId, mod.pointsValue, data.moduleId]
-          );
+          await awardPoints(client, {
+            userId: req.params.userId,
+            source: 'module_completion',
+            points: mod.pointsValue,
+            refId: data.moduleId,
+          });
+          await checkAndPayReferral(client, req.params.userId);
           const { rows: [nextMod] } = await client.query(
             `SELECT id FROM modules WHERE "orderIndex"=$1`, [mod.orderIndex + 1]
           );
@@ -360,6 +414,55 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
     } finally {
       client.release();
     }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/users/:userId/points-summary
+router.get('/:userId/points-summary', requireSelf, async (req, res, next) => {
+  try {
+    const userId = req.params.userId;
+
+    const { rows: [openPool] } = await pool.query(
+      `SELECT "semesterLabel" FROM reward_pool WHERE "closedAt" IS NULL LIMIT 1`
+    );
+    const semesterLabel = openPool?.semesterLabel || null;
+
+    const semesterSources = [
+      { source: 'daily_login', cap: 300, label: 'Daily Login' },
+      { source: 'biweekly_quiz_pass', cap: 1600, label: 'Bi-Weekly Quiz' },
+      { source: 'event_checkin', cap: 1500, label: 'Event Check-ins' },
+      { source: 'referral_referrer', cap: 500, label: 'Referrals' },
+    ];
+    const lifetimeSources = [
+      { source: 'joining_bonus', cap: 200, label: 'Joining Bonus' },
+    ];
+
+    const sources = [];
+
+    for (const s of semesterSources) {
+      let earned = 0;
+      if (semesterLabel) {
+        const { rows: [row] } = await pool.query(
+          `SELECT COALESCE(SUM(points), 0) AS total FROM point_ledger WHERE "userId"=$1 AND source=$2 AND "semesterLabel"=$3`,
+          [userId, s.source, semesterLabel]
+        );
+        earned = parseInt(row.total);
+      }
+      sources.push({ ...s, scope: 'semester', earned, headroom: Math.max(0, s.cap - earned) });
+    }
+
+    for (const s of lifetimeSources) {
+      const { rows: [row] } = await pool.query(
+        `SELECT COALESCE(SUM(points), 0) AS total FROM point_ledger WHERE "userId"=$1 AND source=$2`,
+        [userId, s.source]
+      );
+      const earned = parseInt(row.total);
+      sources.push({ ...s, scope: 'lifetime', earned, headroom: Math.max(0, s.cap - earned) });
+    }
+
+    res.json({ semesterLabel, sources });
   } catch (err) {
     next(err);
   }
@@ -429,6 +532,31 @@ router.get('/:userId/activity', requireSelf, async (req, res, next) => {
       [req.params.userId]
     );
     res.json(rows.map((r) => r.date));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/users/:userId/referrals
+router.get('/:userId/referrals', requireSelf, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.id, r."referredId", r."pointsAwarded", r."paidAt", r."modulesAtPayout", r."createdAt",
+              u.name AS "referredName",
+              COUNT(ump.id) FILTER (WHERE ump.completed=true) AS "modulesCompleted"
+       FROM referrals r
+       JOIN users u ON u.id = r."referredId"
+       LEFT JOIN user_module_progress ump ON ump."userId" = r."referredId"
+       WHERE r."referrerId" = $1
+       GROUP BY r.id, r."referredId", r."pointsAwarded", r."paidAt", r."modulesAtPayout", r."createdAt", u.name
+       ORDER BY r."createdAt" DESC`,
+      [req.params.userId]
+    );
+    res.json(rows.map((r) => ({
+      ...r,
+      modulesCompleted: parseInt(r.modulesCompleted),
+      status: r.paidAt ? 'paid' : parseInt(r.modulesCompleted) >= 3 ? 'processing' : 'pending',
+    })));
   } catch (err) {
     next(err);
   }

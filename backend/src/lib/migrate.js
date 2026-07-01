@@ -214,6 +214,43 @@ CREATE INDEX IF NOT EXISTS point_ledger_user_idx ON point_ledger("userId");
 CREATE INDEX IF NOT EXISTS point_ledger_created_idx ON point_ledger("createdAt");
 `;
 
+const BATCH2_SCHEMA = `
+CREATE TABLE IF NOT EXISTS reward_pool (
+  id TEXT PRIMARY KEY,
+  "semesterLabel" TEXT UNIQUE NOT NULL,
+  "budgetCents" INTEGER NOT NULL,
+  "spentCents" INTEGER NOT NULL DEFAULT 0,
+  "closedAt" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS one_open_pool ON reward_pool ((1)) WHERE "closedAt" IS NULL;
+
+ALTER TABLE point_ledger ADD COLUMN IF NOT EXISTS "semesterLabel" TEXT;
+ALTER TABLE reward_redemptions ADD COLUMN IF NOT EXISTS "poolId" TEXT REFERENCES reward_pool(id);
+
+CREATE TABLE IF NOT EXISTS events (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  "checkInCode" TEXT NOT NULL,
+  "startsAt" TIMESTAMPTZ NOT NULL,
+  "endsAt" TIMESTAMPTZ NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS event_checkins (
+  id TEXT PRIMARY KEY,
+  "eventId" TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "checkedInAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("eventId", "userId")
+);
+CREATE INDEX IF NOT EXISTS event_checkins_user_idx ON event_checkins("userId");
+
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMPTZ;
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS "modulesAtPayout" INTEGER;
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
@@ -224,6 +261,7 @@ export async function migrate() {
     await pool.query(COMMUNITY_AND_REFERRALS);
     await pool.query(MULTI_VIDEO_AND_DOCS);
     await pool.query(IDEMPOTENCY_AND_LEDGER);
+    await pool.query(BATCH2_SCHEMA);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

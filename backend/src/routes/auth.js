@@ -7,6 +7,7 @@ import { OAuth2Client } from 'google-auth-library';
 import pool from '../lib/db.js';
 import { authenticate } from '../middleware/auth.js';
 import { sendOtpEmail, sendPasswordResetEmail } from '../lib/email.js';
+import { awardPoints } from '../lib/points.js';
 
 const router = Router();
 
@@ -182,28 +183,19 @@ router.post('/register', async (req, res, next) => {
           [randomUUID(), userId, m.id]
         );
       }
-      // Award referral bonus points to referrer (50 pts) and new user (25 pts)
+      // 200-pt joining bonus — lifetime cap of 200 makes it naturally once-ever
+      try {
+        await awardPoints(client, { userId, source: 'joining_bonus', points: 200, capPoints: 200, capScope: 'lifetime' });
+      } catch (_) { /* lifetime awards don't throw NO_ACTIVE_SEMESTER */ }
+      // Create referral record (referrer payout is deferred until invitee completes 3 modules)
+      // Invitee gets 25 pts immediately on signup as a welcome bonus
       if (referrerId) {
         await client.query(
-          `INSERT INTO referrals (id, "referrerId", "referredId", "pointsAwarded") VALUES ($1,$2,$3,50)`,
+          `INSERT INTO referrals (id, "referrerId", "referredId", "pointsAwarded") VALUES ($1,$2,$3,0)`,
           [randomUUID(), referrerId, userId]
         );
-        await client.query(
-          `UPDATE user_progress SET points=points+50, "updatedAt"=NOW() WHERE "userId"=$1`,
-          [referrerId]
-        );
-        await client.query(
-          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'referral_referrer',50,$3)`,
-          [randomUUID(), referrerId, userId]
-        );
-        await client.query(
-          `UPDATE user_progress SET points=points+25, "updatedAt"=NOW() WHERE "userId"=$1`,
-          [userId]
-        );
-        await client.query(
-          `INSERT INTO point_ledger (id, "userId", source, points, "refId") VALUES ($1,$2,'referral_referred',25,$3)`,
-          [randomUUID(), userId, referrerId]
-        );
+        // Invitee welcome bonus — no cap (naturally once-ever via UNIQUE referredId constraint)
+        await awardPoints(client, { userId, source: 'referral_referred', points: 25, refId: referrerId });
       }
       await client.query('COMMIT');
     } catch (err) {
@@ -288,6 +280,10 @@ router.post('/google', async (req, res, next) => {
             [randomUUID(), userId, m.id]
           );
         }
+        // 200-pt joining bonus for new Google users
+        try {
+          await awardPoints(dbClient, { userId, source: 'joining_bonus', points: 200, capPoints: 200, capScope: 'lifetime' });
+        } catch (_) { /* lifetime awards don't throw NO_ACTIVE_SEMESTER */ }
         await dbClient.query('COMMIT');
       } catch (err) {
         await dbClient.query('ROLLBACK');

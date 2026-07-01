@@ -53,6 +53,18 @@ export const api = {
   updateNotification: (id, body) => req(`/notifications/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteNotification: (id) => req(`/notifications/${id}`, { method: 'DELETE' }),
 
+  // reward pool
+  rewardPool: () => req('/reward-pool'),
+  createRewardPool: (body) => req('/reward-pool', { method: 'POST', body: JSON.stringify(body) }),
+  updateRewardPool: (id, body) => req(`/reward-pool/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  // events
+  events: () => req('/events'),
+  createEvent: (body) => req('/events', { method: 'POST', body: JSON.stringify(body) }),
+  updateEvent: (id, body) => req(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEvent: (id) => req(`/events/${id}`, { method: 'DELETE' }),
+  rotateEventCode: (id) => req(`/events/${id}/rotate-code`, { method: 'POST' }),
+  eventCheckins: (id) => req(`/events/${id}/checkins`),
+
   // analytics
   analytics: () => req('/stats/analytics'),
   // bulk user actions

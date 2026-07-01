@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DashboardNav from "../components/DashboardNav";
 import Toast from "../components/Toast";
 import Footer from "../components/Footer";
@@ -47,6 +47,8 @@ export default function Rewards() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedReward, setSelectedReward] = useState(null);
   const [redeeming, setRedeeming] = useState(false);
+  const [poolStatus, setPoolStatus] = useState(null);
+  const [semesterSpent, setSemesterSpent] = useState(0);
 
   useEffect(() => {
     if (!toast) return;
@@ -57,13 +59,15 @@ export default function Rewards() {
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const [userData, rwds] = await Promise.all([
+      const [userData, rwds, ps] = await Promise.all([
         usersApi.get(user.id),
         rewardsApi.list(),
+        rewardsApi.poolStatus().catch(() => null),
       ]);
       setPoints(userData.progress?.points || 0);
       setStreakDays(userData.progress?.streakDays || 0);
       setRewardsList(rwds || []);
+      setPoolStatus(ps);
     } catch (err) {
       console.error("Failed to load rewards", err);
     } finally {
@@ -89,7 +93,8 @@ export default function Rewards() {
     if (points < selectedReward.pointsCost) { setToast("❌ Not enough points"); return; }
     setRedeeming(true);
     try {
-      await rewardsApi.redeem(user.id, selectedReward.id);
+      const idempotencyKey = crypto.randomUUID();
+      await rewardsApi.redeem(user.id, selectedReward.id, idempotencyKey);
       setPoints((p) => p - selectedReward.pointsCost);
       setToast(`✅ Redeemed ${selectedReward.title}`);
       closeRedeem();
@@ -120,6 +125,23 @@ export default function Rewards() {
             You have <span className="font-bold text-yellow-600 dark:text-yellow-300">{points}</span> points
           </div>
         </header>
+
+        {/* Pool status banner */}
+        {poolStatus !== null && (
+          <div className={`rounded-2xl border px-5 py-3 text-sm ${
+            poolStatus.isOpen
+              ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+              : 'bg-amber-500/5 border-amber-500/20 text-amber-700 dark:text-amber-300'
+          }`}>
+            {poolStatus.isOpen ? (
+              <span>
+                <strong>{poolStatus.semesterLabel}</strong> — ${((poolStatus.budgetCents - poolStatus.spentCents) / 100).toFixed(2)} remaining of ${(poolStatus.budgetCents / 100).toFixed(2)} semester budget
+              </span>
+            ) : (
+              <span>No active semester — redemptions are currently closed</span>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-2">

@@ -60,6 +60,8 @@ export const users = {
     request(`/users/${userId}/module-progress/${moduleId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   submitQuiz: (userId, body) => request(`/users/${userId}/quiz`, { method: 'POST', body: JSON.stringify(body) }),
   activity: (userId) => request(`/users/${userId}/activity`),
+  pointsSummary: (userId) => request(`/users/${userId}/points-summary`),
+  referrals: (userId) => request(`/users/${userId}/referrals`),
 };
 
 // Modules
@@ -71,7 +73,12 @@ export const modules = {
 // Rewards
 export const rewards = {
   list: () => request('/rewards'),
-  redeem: (userId, rewardId) => request('/rewards/redeem', { method: 'POST', body: JSON.stringify({ userId, rewardId }) }),
+  redeem: (userId, rewardId, idempotencyKey) => request('/rewards/redeem', {
+    method: 'POST',
+    body: JSON.stringify({ userId, rewardId }),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  }),
+  poolStatus: () => request('/rewards/pool-status'),
   history: (userId) => request(`/rewards/history/${userId}`),
 };
 
@@ -90,6 +97,12 @@ export const bookmarks = {
   list: (userId) => request(`/users/${userId}/bookmarks`),
   add: (userId, moduleId) => request(`/users/${userId}/bookmarks/${moduleId}`, { method: 'POST' }),
   remove: (userId, moduleId) => request(`/users/${userId}/bookmarks/${moduleId}`, { method: 'DELETE' }),
+};
+
+// Events
+export const events = {
+  list: () => request('/events'),
+  checkin: (eventId, code) => request(`/events/${eventId}/checkin`, { method: 'POST', body: JSON.stringify({ code }) }),
 };
 
 // Comments
