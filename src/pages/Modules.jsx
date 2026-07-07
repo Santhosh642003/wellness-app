@@ -5,6 +5,7 @@ import Toast from "../components/Toast";
 import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
 import { modules as modulesApi, users as usersApi, bookmarks as bookmarksApi } from "../lib/api";
+import { mapModule } from "../lib/moduleUtils";
 
 const CATEGORY_COLORS = {
   Foundations: { bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
@@ -16,32 +17,6 @@ const CATEGORY_COLORS = {
 const DEFAULT_COLOR = { bg: "bg-slate-100 dark:bg-white/5", border: "border-slate-200 dark:border-gray-700", text: "text-slate-500 dark:text-gray-400", dot: "bg-slate-400" };
 function getColor(category) { return CATEGORY_COLORS[category] || DEFAULT_COLOR; }
 
-function mapModule(m) {
-  const videos = Array.isArray(m.videos) && m.videos.length > 0
-    ? m.videos
-    : m.videoUrl
-    ? [{ id: "v0", url: m.videoUrl, title: m.title || "Video", duration: m.duration || "" }]
-    : [];
-  return {
-    id: m.id,
-    slug: m.slug,
-    title: m.title,
-    desc: m.description,
-    mins: parseInt(m.duration) || 10,
-    points: m.pointsValue,
-    watchedPct: m.userProgress ? Math.round(m.userProgress.watchedPercent ?? 0) : 0,
-    locked: m.locked,
-    completed: m.userProgress?.completed ?? false,
-    quizPassed: m.userProgress?.quizPassed ?? false,
-    category: m.category || "General",
-    orderIndex: m.orderIndex ?? 0,
-    keyPoints: Array.isArray(m.keyPoints) ? m.keyPoints : [],
-    videos,
-    videoCount: videos.length,
-    videoProgress: m.userProgress?.videoProgress || {},
-    documentCount: Array.isArray(m.documents) ? m.documents.length : 0,
-  };
-}
 
 function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
   if (completed) {
@@ -85,22 +60,30 @@ function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
   );
 }
 
-function StepIndicator({ watchedPct, quizPassed, completed }) {
-  const steps = [
-    { label: "Watch", done: watchedPct >= 80 || completed },
-    { label: "Quiz", done: quizPassed || completed },
-    { label: "Done", done: completed },
+function StepIndicator({ watchedPct, quizPassed, completed, videoCount = 1, videoProgress = {} }) {
+  // One segment per chapter (or one for single-video) + Quiz + Done
+  const chapterSegments = videoCount > 1
+    ? Array.from({ length: videoCount }, (_, i) => (videoProgress[String(i)] ?? 0) >= 80 || completed)
+    : [watchedPct >= 80 || completed];
+  const segments = [
+    ...chapterSegments,
+    quizPassed || completed,
+    completed,
   ];
+  const chaptersDone = chapterSegments.filter(Boolean).length;
+  const allChaptersDone = chaptersDone >= videoCount;
+  const statusText = completed ? "Complete"
+    : quizPassed ? "Quiz done"
+    : allChaptersDone ? "Videos done"
+    : watchedPct > 0 || chaptersDone > 0 ? "Watching"
+    : "Not started";
+
   return (
-    <div className="flex items-center gap-0.5">
-      {steps.map((s, i) => (
-        <div key={i} className="flex items-center gap-0.5">
-          <div className={`h-1.5 w-8 rounded-full transition-all ${s.done ? "bg-gradient-to-r from-blue-500 to-emerald-400" : "bg-slate-200 dark:bg-gray-700"}`} />
-        </div>
+    <div className="flex items-center gap-0.5 flex-wrap">
+      {segments.map((done, i) => (
+        <div key={i} className={`h-1.5 w-6 rounded-full transition-all ${done ? "bg-gradient-to-r from-blue-500 to-emerald-400" : "bg-slate-200 dark:bg-gray-700"}`} />
       ))}
-      <span className="ml-1.5 text-[10px] text-slate-400 dark:text-gray-500">
-        {completed ? "Complete" : quizPassed ? "2/3" : watchedPct >= 80 ? "1/3" : watchedPct > 0 ? "Watching" : "0/3"}
-      </span>
+      <span className="ml-1 text-[10px] text-slate-400 dark:text-gray-500">{statusText}</span>
     </div>
   );
 }
@@ -130,57 +113,9 @@ function BookmarkButton({ moduleId, bookmarked, onToggle }) {
   );
 }
 
-function ChapterRow({ video, index, progress, isModuleCompleted, onClick }) {
-  const pct = progress;
-  const done = pct >= 80 || isModuleCompleted;
-  const started = pct > 0 && !done;
-  return (
-    <button
-      onClick={() => onClick(index)}
-      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all group
-        ${done
-          ? "border-emerald-200 dark:border-emerald-500/25 bg-emerald-50/50 dark:bg-emerald-500/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-          : started
-          ? "border-blue-200 dark:border-blue-500/25 bg-blue-50/30 dark:bg-blue-500/5 hover:bg-blue-50/60 dark:hover:bg-blue-500/10"
-          : "border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] hover:border-blue-300/50 dark:hover:border-blue-700/40"
-        }`}
-    >
-      <div className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center text-[11px] font-bold
-        ${done ? "bg-emerald-500 text-white" : started ? "bg-blue-500 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-400"}`}>
-        {done ? (
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-          </svg>
-        ) : index + 1}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-slate-800 dark:text-gray-200 truncate leading-tight">
-          {video.title || `Chapter ${index + 1}`}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          {video.duration && <span className="text-[10px] text-slate-400 dark:text-gray-600">{video.duration}</span>}
-          {started && <span className="text-[10px] text-blue-500 dark:text-blue-400">{pct}% watched</span>}
-        </div>
-        {started && (
-          <div className="mt-1.5 h-1 w-full bg-slate-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
-          </div>
-        )}
-      </div>
-
-      <div className={`shrink-0 text-[11px] font-semibold transition
-        ${done ? "text-emerald-600 dark:text-emerald-400"
-          : started ? "text-blue-600 dark:text-blue-400"
-          : "text-slate-400 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400"}`}>
-        {done ? "Done" : started ? "Continue" : "Watch →"}
-      </div>
-    </button>
-  );
-}
 
 function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevModuleTitle = null }) {
-  const [expanded, setExpanded] = useState(false);
+  const [chaptersExpanded, setChaptersExpanded] = useState(false);
   const color = getColor(m.category);
   const pct = m.watchedPct;
   const isMultiVideo = m.videoCount > 1;
@@ -192,8 +127,6 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
           ? "border-slate-200 dark:border-gray-800 opacity-60"
           : m.completed
           ? "border-emerald-400/30"
-          : expanded
-          ? "border-blue-400/40 shadow-md"
           : "border-slate-200 dark:border-gray-800 hover:border-blue-400/40 hover:shadow-md"}`}
     >
       {/* Top accent bar */}
@@ -218,9 +151,7 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
               ) : index + 1}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-tight">{m.title}</h3>
-              </div>
+              <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-tight">{m.title}</h3>
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${color.bg} ${color.border} ${color.text}`}>
                   {m.category}
@@ -237,15 +168,19 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
               </div>
               {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
             </div>
-            <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">{m.mins} min</div>
-            {isMultiVideo && (
-              <div className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">{m.videoCount} chapters</div>
-            )}
+            <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">{m.mins} min{isMultiVideo ? ` · ${m.videoCount} ch` : ""}</div>
           </div>
         </div>
 
         {/* Description */}
         <p className="text-slate-500 dark:text-gray-400 text-xs leading-relaxed line-clamp-2 mb-4">{m.desc}</p>
+
+        {/* Locked card: show what they're working toward */}
+        {m.locked && (
+          <div className="text-[11px] text-slate-400 dark:text-gray-500 mb-4">
+            {prevModuleTitle ? `Complete "${prevModuleTitle}" to unlock` : "Complete the previous module to unlock"}
+          </div>
+        )}
 
         {/* Key points (only for single-video, non-locked) */}
         {m.keyPoints.length > 0 && !m.locked && !isMultiVideo && (
@@ -262,12 +197,12 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
           </div>
         )}
 
-        {/* Progress */}
+        {/* Progress (hidden for locked) */}
         {!m.locked && (
           <div className="mb-4 space-y-2">
             <div>
               <div className="flex justify-between text-[10px] text-slate-400 dark:text-gray-500 mb-1">
-                <span>{isMultiVideo ? "Overall progress" : "Video progress"}</span>
+                <span>Watch progress</span>
                 <span className={pct >= 80 ? "text-emerald-500 font-semibold" : ""}>{pct}%</span>
               </div>
               <div className="h-1.5 w-full bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden">
@@ -277,7 +212,13 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
                 />
               </div>
             </div>
-            <StepIndicator watchedPct={pct} quizPassed={m.quizPassed} completed={m.completed} />
+            <StepIndicator
+              watchedPct={pct}
+              quizPassed={m.quizPassed}
+              completed={m.completed}
+              videoCount={m.videoCount}
+              videoProgress={m.videoProgress}
+            />
           </div>
         )}
 
@@ -289,76 +230,61 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
           </div>
         )}
 
-        {/* CTA — multi-video: accordion chapters | single: navigate directly */}
-        {isMultiVideo && !m.locked ? (
-          <div>
+        {/* Primary CTA — always navigates to ModulePlayer */}
+        <button
+          disabled={m.locked}
+          onClick={() => !m.locked && onNavigate(m.id, 0)}
+          className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+            ${m.locked
+              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+              : m.completed
+              ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
+              : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"
+            }`}
+        >
+          {m.locked
+            ? "🔒 Locked"
+            : m.completed
+            ? "Review"
+            : pct > 0
+            ? `Continue · ${pct}%`
+            : isMultiVideo
+            ? `Start · ${m.videoCount} chapters`
+            : "Start"}
+        </button>
+
+        {/* Read-only chapter list toggle (multi-video only, non-locked) */}
+        {isMultiVideo && !m.locked && (
+          <div className="mt-2">
             <button
-              onClick={() => setExpanded((v) => !v)}
-              className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-between
-                ${m.completed
-                  ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
-                  : expanded
-                  ? "bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400"
-                  : pct > 0
-                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm"
-                  : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"
-                }`}
+              onClick={() => setChaptersExpanded((v) => !v)}
+              className="w-full flex items-center justify-center gap-1 text-[11px] text-slate-400 dark:text-gray-600 hover:text-slate-600 dark:hover:text-gray-400 transition py-1"
             >
-              <span>
-                {m.completed
-                  ? "Review Chapters"
-                  : pct > 0
-                  ? `▶ Continue — ${pct}% done`
-                  : `View ${m.videoCount} Chapters`}
-              </span>
-              <svg
-                className={`w-4 h-4 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
+              <span>{chaptersExpanded ? "Hide" : "Show"} chapters</span>
+              <svg className={`w-3 h-3 transition-transform duration-200 ${chaptersExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-
-            {expanded && (
-              <div className="mt-3 space-y-2">
-                <div className="text-[10px] font-semibold text-slate-400 dark:text-gray-600 uppercase tracking-wider px-1 mb-2">
-                  Chapters
-                </div>
-                {m.videos.map((video, idx) => (
-                  <ChapterRow
-                    key={video.id || idx}
-                    video={video}
-                    index={idx}
-                    progress={m.videoProgress[String(idx)] ?? 0}
-                    isModuleCompleted={m.completed}
-                    onClick={(i) => onNavigate(m.id, i)}
-                  />
-                ))}
+            {chaptersExpanded && (
+              <div className="mt-1 border-t border-slate-100 dark:border-gray-800/60 pt-2 space-y-1">
+                {m.videos.map((video, idx) => {
+                  const vPct = m.videoProgress[String(idx)] ?? 0;
+                  const done = vPct >= 80 || m.completed;
+                  return (
+                    <div key={video.id || idx} className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-gray-400 py-0.5">
+                      <div className={`shrink-0 h-1.5 w-1.5 rounded-full ${done ? "bg-emerald-400" : vPct > 0 ? "bg-blue-400" : "bg-slate-300 dark:bg-gray-700"}`} />
+                      <span className="flex-1 truncate">{video.title || `Chapter ${idx + 1}`}</span>
+                      {done
+                        ? <span className="text-emerald-500 shrink-0">✓</span>
+                        : vPct > 0
+                        ? <span className="text-blue-400 shrink-0">{vPct}%</span>
+                        : null}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-        ) : (
-          <button
-            disabled={m.locked}
-            onClick={() => !m.locked && onNavigate(m.id, 0)}
-            className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
-              ${m.locked
-                ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
-                : m.completed
-                ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
-                : pct > 0
-                ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm"
-                : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"
-              }`}
-          >
-            {m.locked
-              ? prevModuleTitle ? `🔒 Complete "${prevModuleTitle}" first` : "🔒 Locked"
-              : m.completed
-              ? "Review Module"
-              : pct > 0
-              ? `▶ Continue — ${pct}% watched`
-              : "Start Module →"}
-          </button>
         )}
       </div>
     </div>

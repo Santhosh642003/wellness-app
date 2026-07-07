@@ -15,9 +15,17 @@ router.get('/:userId', requireSelf, async (req, res, next) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     const { rows: [progress] } = await pool.query('SELECT * FROM user_progress WHERE "userId"=$1', [req.params.userId]);
     const { rows: moduleProgresses } = await pool.query(
-      `SELECT ump.*, m.title, m.slug, m.category, m."orderIndex", m."pointsValue", m.locked
+      `SELECT ump.*, m.title, m.slug, m.category, m."orderIndex", m."pointsValue",
+              CASE
+                WHEN m."orderIndex" = 0 THEN false
+                WHEN prev_prog.completed = true THEN false
+                ELSE true
+              END AS locked
        FROM user_module_progress ump
        JOIN modules m ON m.id = ump."moduleId"
+       LEFT JOIN modules prev_m ON prev_m."orderIndex" = m."orderIndex" - 1
+       LEFT JOIN user_module_progress prev_prog
+         ON prev_prog."moduleId" = prev_m.id AND prev_prog."userId" = $1
        WHERE ump."userId"=$1
        ORDER BY m."orderIndex"`,
       [req.params.userId]

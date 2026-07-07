@@ -8,21 +8,7 @@ import Toast from "../components/Toast";
 import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
 import { users as usersApi, modules as modulesApi } from "../lib/api";
-
-function mapModule(m) {
-  return {
-    id: m.id,
-    slug: m.slug,
-    title: m.title,
-    desc: m.description,
-    mins: parseInt(m.duration) || 10,
-    points: m.pointsValue,
-    progress: m.userProgress ? m.userProgress.watchedPercent / 100 : 0,
-    locked: m.locked,
-    completed: m.userProgress?.completed ?? false,
-    category: m.category,
-  };
-}
+import { mapModule } from "../lib/moduleUtils";
 
 function todayStr() {
   return new Date().toDateString();
