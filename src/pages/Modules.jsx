@@ -370,6 +370,7 @@ export default function Modules() {
   const { user } = useAuth();
   const [modules, setModules] = useState([]);
   const [points, setPoints] = useState(0);
+  const [lifetimeEarned, setLifetimeEarned] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
@@ -385,16 +386,20 @@ export default function Modules() {
 
   const loadModules = useCallback(async () => {
     try {
-      const [mods, userData, bmarks] = await Promise.all([
+      const [mods, userData, bmarks, summary] = await Promise.all([
         modulesApi.list(),
         user?.id ? usersApi.get(user.id) : Promise.resolve(null),
         user?.id ? bookmarksApi.list(user.id).catch(() => []) : Promise.resolve([]),
+        user?.id ? usersApi.pointsSummary(user.id).catch(() => null) : Promise.resolve(null),
       ]);
       setModules((mods || []).map(mapModule));
       setBookmarkedIds(new Set((bmarks || []).map((b) => b.moduleId)));
       if (userData?.progress) {
         setPoints(userData.progress.points || 0);
         setStreakDays(userData.progress.streakDays || 0);
+      }
+      if (summary != null) {
+        setLifetimeEarned(summary.lifetimeEarned ?? 0);
       }
     } catch (err) {
       console.error("Failed to load modules", err);
@@ -490,7 +495,7 @@ export default function Modules() {
             { label: "Completed", value: stats.completed, total: stats.total, icon: "✅", color: "text-emerald-600 dark:text-emerald-400" },
             { label: "In Progress", value: stats.inProgress, total: null, icon: "▶", color: "text-blue-600 dark:text-blue-400" },
             { label: "Locked", value: stats.locked, total: null, icon: "🔒", color: "text-slate-500 dark:text-gray-400" },
-            { label: "Points Earned", value: points, total: null, icon: "⭐", color: "text-yellow-600 dark:text-yellow-300" },
+            { label: "Points Earned", value: lifetimeEarned, total: null, icon: "⭐", color: "text-yellow-600 dark:text-yellow-300" },
           ].map((s) => (
             <div key={s.label} className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm">
               <div className="text-lg mb-1">{s.icon}</div>

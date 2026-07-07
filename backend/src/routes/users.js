@@ -467,7 +467,12 @@ router.get('/:userId/points-summary', requireSelf, async (req, res, next) => {
       sources.push({ ...s, scope: 'lifetime', earned, headroom: Math.max(0, s.cap - earned) });
     }
 
-    res.json({ semesterLabel, sources });
+    const { rows: [lifetimeRow] } = await pool.query(
+      `SELECT COALESCE(SUM(points), 0) AS earned FROM point_ledger WHERE "userId"=$1 AND points > 0`,
+      [userId]
+    );
+
+    res.json({ semesterLabel, sources, lifetimeEarned: parseInt(lifetimeRow.earned) });
   } catch (err) {
     next(err);
   }
