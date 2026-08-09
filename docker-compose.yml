@@ -75,6 +75,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      PORT: 80
+      BACKEND_URL: http://backend:3001
     ports:
       - "80:80"
     networks:
@@ -88,6 +91,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      PORT: 8080
+      BACKEND_URL: http://backend:3001
     ports:
       - "8080:8080"
     networks:
