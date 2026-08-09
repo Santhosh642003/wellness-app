@@ -7,7 +7,7 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 // POST /api/transcribe
-router.post('/transcribe', authenticate, upload.single('audio'), async (req, res, next) => {
+router.post('/', authenticate, upload.single('audio'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
 

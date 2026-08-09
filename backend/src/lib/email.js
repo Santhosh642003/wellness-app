@@ -14,7 +14,11 @@ const transporter = createTransport();
 
 export async function sendOtpEmail(toEmail, code) {
   if (!transporter) {
-    // Dev mode — log to console and skip sending
+    if (process.env.NODE_ENV === 'production') {
+      const err = new Error('Email delivery is not configured — contact support');
+      err.status = 503;
+      throw err;
+    }
     console.log(`[DEV] OTP for ${toEmail}: ${code}`);
     return { devMode: true };
   }
@@ -112,6 +116,11 @@ export async function sendAnnouncementEmail(toEmail, title, body) {
 
 export async function sendPasswordResetEmail(toEmail, resetUrl) {
   if (!transporter) {
+    if (process.env.NODE_ENV === 'production') {
+      const err = new Error('Email delivery is not configured — contact support');
+      err.status = 503;
+      throw err;
+    }
     console.log(`[DEV] Password reset link for ${toEmail}: ${resetUrl}`);
     return { devMode: true };
   }

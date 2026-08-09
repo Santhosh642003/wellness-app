@@ -622,45 +622,6 @@ router.post('/users/bulk', async (req, res, next) => {
   }
 });
 
-// Enhanced stats with more detail
-router.get('/stats/detail', async (req, res, next) => {
-  try {
-    const [
-      users, points, completions, redemptions, quizzes,
-      modules, rewards, recentUsers, topUsers,
-    ] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM users'),
-      pool.query('SELECT COALESCE(SUM(points),0) as total, COALESCE(AVG(points),0) as avg FROM user_progress'),
-      pool.query('SELECT COUNT(*) FROM user_module_progress WHERE completed=true'),
-      pool.query('SELECT COUNT(*), COALESCE(SUM("pointsSpent"),0) as total_pts FROM reward_redemptions'),
-      pool.query('SELECT COUNT(*) FILTER (WHERE passed=true) as passed, COUNT(*) as total FROM quiz_attempts'),
-      pool.query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE locked=false) as unlocked FROM modules'),
-      pool.query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE available=true) as available FROM rewards'),
-      pool.query(`SELECT COUNT(*) FROM users WHERE "createdAt" > NOW() - INTERVAL '7 days'`),
-      pool.query(`SELECT u.name, u.email, COALESCE(p.points,0) as points
-                  FROM users u LEFT JOIN user_progress p ON p."userId"=u.id
-                  ORDER BY points DESC LIMIT 5`),
-    ]);
-    res.json({
-      totalUsers: parseInt(users.rows[0].count),
-      totalPointsDistributed: parseInt(points.rows[0].total),
-      avgPointsPerUser: Math.round(parseFloat(points.rows[0].avg)),
-      totalCompletions: parseInt(completions.rows[0].count),
-      totalRedemptions: parseInt(redemptions.rows[0].count),
-      totalPointsRedeemed: parseInt(redemptions.rows[0].total_pts),
-      totalQuizzesPassed: parseInt(quizzes.rows[0].passed),
-      totalQuizAttempts: parseInt(quizzes.rows[0].total),
-      quizPassRate: quizzes.rows[0].total > 0 ? Math.round((quizzes.rows[0].passed / quizzes.rows[0].total) * 100) : 0,
-      totalModules: parseInt(modules.rows[0].total),
-      unlockedModules: parseInt(modules.rows[0].unlocked),
-      totalRewards: parseInt(rewards.rows[0].total),
-      availableRewards: parseInt(rewards.rows[0].available),
-      newUsersThisWeek: parseInt(recentUsers.rows[0].count),
-      topUsers: topUsers.rows,
-    });
-  } catch (err) { next(err); }
-});
-
 // --- REWARD POOL ---
 router.get('/reward-pool', async (req, res, next) => {
   try {
