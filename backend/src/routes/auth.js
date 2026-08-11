@@ -76,17 +76,18 @@ function safeUser(user) {
 // POST /api/auth/send-otp
 router.post('/send-otp', async (req, res, next) => {
   try {
+    console.log('[send-otp] step 1: parse');
     const { email } = z.object({
       email: z.string().email().endsWith('@njit.edu', { message: 'Must be an NJIT email address' }),
     }).parse(req.body);
 
     const normalEmail = email.toLowerCase();
 
-    // Check if email already registered
+    console.log('[send-otp] step 2: check existing user');
     const { rows: existing } = await pool.query('SELECT id FROM users WHERE email=$1', [normalEmail]);
     if (existing[0]) return res.status(409).json({ error: 'An account with this email already exists' });
 
-    // Rate limit: max 3 OTPs per email per 15 minutes
+    console.log('[send-otp] step 3: rate limit check');
     const { rows: recent } = await pool.query(
       `SELECT COUNT(*) FROM email_otps WHERE email=$1 AND "createdAt" > NOW() - INTERVAL '15 minutes'`,
       [normalEmail]
@@ -95,28 +96,31 @@ router.post('/send-otp', async (req, res, next) => {
       return res.status(429).json({ error: 'Too many verification attempts. Please wait 15 minutes.' });
     }
 
-    // Clean up expired or used OTPs for this email to keep the table lean
+    console.log('[send-otp] step 4: cleanup expired OTPs');
     await pool.query(
       `DELETE FROM email_otps WHERE email=$1 AND ("expiresAt" < NOW() OR "usedAt" IS NOT NULL)`,
       [normalEmail]
     );
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
+    console.log('[send-otp] step 5: insert OTP row');
     await pool.query(
       `INSERT INTO email_otps (id, email, code, "expiresAt") VALUES ($1,$2,$3,$4)`,
       [randomUUID(), normalEmail, code, expiresAt]
     );
 
+    console.log('[send-otp] step 6: send email');
     const result = await sendOtpEmail(normalEmail, code);
+    console.log('[send-otp] step 7: email done, sending response');
 
     res.json({
       sent: true,
-      // Only return the code in dev mode when SMTP is not configured
       ...(result?.devMode ? { devCode: code, devNote: 'SMTP not configured — code shown for dev only' } : {}),
     });
   } catch (err) {
+    console.error('[send-otp] error at step:', err.message);
     next(err);
   }
 });

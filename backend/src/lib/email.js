@@ -21,6 +21,11 @@ function createTransport() {
 
 const transporter = createTransport();
 
+// Log provider state once at startup so Railway logs confirm which path is active
+console.log('[email] RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
+console.log('[email] SMTP configured:', !!transporter);
+console.log('[email] Active provider:', resend ? 'resend' : transporter ? 'smtp' : 'none');
+
 function isEmailConfigured() {
   return resend !== null || transporter !== null;
 }
@@ -33,9 +38,34 @@ function productionGuard() {
   }
 }
 
+const RESEND_TIMEOUT_MS = 15000;
+
 async function sendViaResend(to, subject, html) {
-  const { error } = await resend.emails.send({ from: resendFrom, to, subject, html });
-  if (error) throw Object.assign(new Error(`Resend error: ${error.message}`), { status: 502 });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
+
+  let result;
+  try {
+    result = await resend.emails.send(
+      { from: resendFrom, to, subject, html },
+      { signal: controller.signal },
+    );
+  } catch (fetchErr) {
+    clearTimeout(timer);
+    const isTimeout = fetchErr.name === 'AbortError';
+    console.error('[email] Resend fetch error:', isTimeout ? 'TIMEOUT after 15s' : fetchErr.message);
+    const err = new Error(isTimeout ? 'Email service timed out' : `Email delivery failed: ${fetchErr.message}`);
+    err.status = 502;
+    throw err;
+  }
+  clearTimeout(timer);
+
+  const { data, error } = result;
+  if (error) {
+    console.error('[email] Resend API error:', JSON.stringify(error));
+    throw Object.assign(new Error(`Resend error: ${error.message}`), { status: 502 });
+  }
+  console.log('[email] Resend send OK, id:', data?.id);
 }
 
 async function sendViaSMTP(to, subject, html) {
@@ -44,10 +74,15 @@ async function sendViaSMTP(to, subject, html) {
 }
 
 async function sendEmail(to, subject, html) {
-  if (resend) return sendViaResend(to, subject, html);
-  if (transporter) return sendViaSMTP(to, subject, html);
+  if (resend) {
+    console.log('[email] Sending via Resend to:', to);
+    return sendViaResend(to, subject, html);
+  }
+  if (transporter) {
+    console.log('[email] Sending via SMTP to:', to);
+    return sendViaSMTP(to, subject, html);
+  }
   productionGuard();
-  // dev-only no-op (caller logs the code themselves)
 }
 
 export async function sendOtpEmail(toEmail, code) {
