@@ -60,6 +60,7 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [referralsList, setReferralsList] = useState([]);
 
   useEffect(() => {
     if (!toast) return;
@@ -70,8 +71,12 @@ export default function Profile() {
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const data = await usersApi.get(user.id);
+      const [data, refs] = await Promise.all([
+        usersApi.get(user.id),
+        usersApi.referrals(user.id).catch(() => []),
+      ]);
       setProfileData(data);
+      setReferralsList(refs || []);
     } catch (err) {
       console.error("Failed to load profile", err);
     } finally {
@@ -371,6 +376,37 @@ export default function Profile() {
                 </div>
               </div>
             )}
+
+            {/* Referrals */}
+            {referralsList.length > 0 && (
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Referrals</h2>
+                <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+                  You earn 100 pts when each invited friend completes 3 modules
+                </p>
+                <div className="space-y-3">
+                  {referralsList.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800">
+                      <div>
+                        <div className="text-sm font-medium text-slate-800 dark:text-gray-200">{r.referredName}</div>
+                        <div className="text-xs text-slate-400 dark:text-gray-500">
+                          {r.modulesCompleted}/3 modules · joined {new Date(r.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                        r.status === 'paid'
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                          : r.status === 'processing'
+                          ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+                          : 'bg-slate-100 dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400'
+                      }`}>
+                        {r.status === 'paid' ? '✓ +100 pts paid' : r.status === 'processing' ? 'Processing…' : `${r.modulesCompleted}/3`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Right Sidebar */}
@@ -395,6 +431,53 @@ export default function Profile() {
               <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">Earn points from modules, quizzes, and streaks</p>
               <button onClick={() => navigate("/rewards")} className="w-full px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]">
                 View rewards store
+              </button>
+            </div>
+
+            {/* Referral Code */}
+            {profileData?.referralCode && (
+              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Refer a Friend</h2>
+                <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+                  Share your code! Your friend gets <strong className="text-blue-500">+25 pts</strong> on signup, and you earn <strong className="text-emerald-500">+100 pts</strong> once they complete 3 modules.
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 rounded-xl px-4 py-2.5 font-mono text-sm font-bold text-slate-900 dark:text-white tracking-wider">
+                    {profileData.referralCode}
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(profileData.referralCode).catch(() => {});
+                      setToast("Referral code copied!");
+                    }}
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-100 dark:bg-[#141414] text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
+                    title="Copy code"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Certificate */}
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Certificate</h2>
+              <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+                {completedCount === totalModules && totalModules > 0
+                  ? "You've completed all modules! View your certificate."
+                  : `Complete all ${totalModules} modules to earn your certificate.`}
+              </p>
+              <button
+                onClick={() => navigate("/certificate")}
+                className={`w-full px-4 py-2 rounded-xl text-sm font-semibold transition
+                  ${completedCount === totalModules && totalModules > 0
+                    ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-white hover:opacity-90"
+                    : "bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]"
+                  }`}
+              >
+                {completedCount === totalModules && totalModules > 0 ? "View Certificate ✨" : "View Progress Certificate"}
               </button>
             </div>
           </aside>

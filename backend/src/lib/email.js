@@ -14,7 +14,11 @@ const transporter = createTransport();
 
 export async function sendOtpEmail(toEmail, code) {
   if (!transporter) {
-    // Dev mode — log to console and skip sending
+    if (process.env.NODE_ENV === 'production') {
+      const err = new Error('Email delivery is not configured — contact support');
+      err.status = 503;
+      throw err;
+    }
     console.log(`[DEV] OTP for ${toEmail}: ${code}`);
     return { devMode: true };
   }
@@ -45,8 +49,78 @@ export async function sendOtpEmail(toEmail, code) {
   });
 }
 
+export async function sendQuizLiveEmail(toEmail, quizTitle, quizUrl) {
+  if (!transporter) {
+    console.log(`[DEV] Quiz live notification for ${toEmail}: ${quizTitle} — ${quizUrl}`);
+    return { devMode: true };
+  }
+
+  const from = process.env.SMTP_FROM || `"NJIT Campus Wellness" <${process.env.SMTP_USER}>`;
+  await transporter.sendMail({
+    from,
+    to: toEmail,
+    subject: `New Quiz Available: ${quizTitle}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0;padding:0;background:#0b0b0b;font-family:'Segoe UI',Helvetica,sans-serif;color:#fff;">
+        <div style="max-width:480px;margin:40px auto;background:#121212;border:1px solid #222;border-radius:16px;padding:40px;">
+          <div style="margin-bottom:24px;">
+            <span style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#6b7280;">NJIT Campus Wellness</span>
+          </div>
+          <h2 style="margin:0 0 8px;font-size:22px;font-weight:600;">New Quiz Available</h2>
+          <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">A new quiz has just gone live on the NJIT Campus Wellness platform. Test your knowledge and earn points!</p>
+          <div style="background:#0f0f0f;border:1px solid #2d2d2d;border-radius:12px;padding:20px;margin-bottom:28px;">
+            <div style="font-size:13px;color:#6b7280;margin-bottom:4px;">Quiz</div>
+            <div style="font-size:18px;font-weight:700;color:#34d399;">${quizTitle}</div>
+          </div>
+          <a href="${quizUrl}" style="display:block;text-align:center;background:linear-gradient(135deg,#3b82f6,#10b981);color:#fff;text-decoration:none;font-weight:600;font-size:16px;padding:16px 32px;border-radius:12px;margin-bottom:28px;">
+            Take the Quiz →
+          </a>
+          <p style="color:#6b7280;font-size:12px;margin:0;">Log in to the NJIT Campus Wellness app to complete this quiz and earn your points. Good luck!</p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+}
+
+export async function sendAnnouncementEmail(toEmail, title, body) {
+  if (!transporter) {
+    console.log(`[DEV] Announcement email for ${toEmail}: ${title}`);
+    return { devMode: true };
+  }
+
+  const from = process.env.SMTP_FROM || `"NJIT Campus Wellness" <${process.env.SMTP_USER}>`;
+  await transporter.sendMail({
+    from,
+    to: toEmail,
+    subject: `NJIT Wellness: ${title}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0;padding:0;background:#0b0b0b;font-family:'Segoe UI',Helvetica,sans-serif;color:#fff;">
+        <div style="max-width:480px;margin:40px auto;background:#121212;border:1px solid #222;border-radius:16px;padding:40px;">
+          <div style="margin-bottom:24px;">
+            <span style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#6b7280;">NJIT Campus Wellness</span>
+          </div>
+          <h2 style="margin:0 0 16px;font-size:22px;font-weight:600;">${title}</h2>
+          <div style="color:#9ca3af;font-size:14px;line-height:1.7;margin:0 0 28px;">${body.replace(/\n/g, '<br>')}</div>
+          <p style="color:#6b7280;font-size:12px;margin:0;">This announcement was sent from the NJIT Campus Wellness platform.</p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+}
+
 export async function sendPasswordResetEmail(toEmail, resetUrl) {
   if (!transporter) {
+    if (process.env.NODE_ENV === 'production') {
+      const err = new Error('Email delivery is not configured — contact support');
+      err.status = 503;
+      throw err;
+    }
     console.log(`[DEV] Password reset link for ${toEmail}: ${resetUrl}`);
     return { devMode: true };
   }

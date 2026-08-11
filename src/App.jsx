@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -11,13 +11,16 @@ import ModuleQuiz from "./pages/ModuleQuiz.jsx";
 import Leaderboard from "./pages/Leaderboard.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
+import Certificate from "./pages/Certificate.jsx";
+import Events from "./pages/Events.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
+  const location = useLocation();
   if (loading) return null;
-  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  if (!isLoggedIn) return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   return children;
 }
 
@@ -36,6 +39,8 @@ export default function App() {
       <Route path="/quiz/biweekly" element={<ProtectedRoute><BiWeeklyQuiz /></ProtectedRoute>} />
       <Route path="/quiz/module/:moduleId" element={<ProtectedRoute><ModuleQuiz /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+      <Route path="/certificate" element={<ProtectedRoute><Certificate /></ProtectedRoute>} />
+      <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

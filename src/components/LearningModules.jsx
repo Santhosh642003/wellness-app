@@ -11,7 +11,7 @@ export default function LearningModules({ modules = [], onContinue }) {
       </div>
 
       {modules.map((m) => {
-        const pct = Math.round((m.progress ?? 0) * 100);
+        const pct = m.watchedPct ?? 0;
         return (
           <div
             key={m.id}
@@ -34,26 +34,33 @@ export default function LearningModules({ modules = [], onContinue }) {
                       Locked
                     </span>
                   )}
+                  {!m.completed && !m.locked && pct > 0 && (
+                    <span className="text-xs font-semibold text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-300/10 border border-orange-200 dark:border-orange-300/20 px-2 py-1 rounded-full">
+                      In Progress
+                    </span>
+                  )}
                 </div>
 
                 <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">{m.desc}</p>
 
                 <div className="flex items-center justify-between text-xs text-slate-400 dark:text-gray-500 mb-2">
-                  <span>Progress</span><span>{pct}%</span>
+                  <span>Watch progress</span><span>{pct}%</span>
                 </div>
                 <div className="h-2 w-full bg-slate-100 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+                  <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${Math.max(pct, m.completed ? 100 : 0)}%` }} />
                 </div>
 
                 <button
-                  disabled={m.locked || m.completed}
-                  onClick={() => m.locked || m.completed ? null : onContinue(m.id)}
+                  disabled={m.locked}
+                  onClick={() => m.locked ? null : onContinue(m.id)}
                   className={`mt-5 w-full px-5 py-3 rounded-xl font-semibold transition
-                    ${m.locked || m.completed
+                    ${m.locked
                       ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-400 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+                      : m.completed
+                      ? "bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20"
                       : "bg-blue-500 text-white hover:bg-blue-600"}`}
                 >
-                  {m.completed ? "Completed ✓" : m.locked ? "🔒 Locked" : "Continue Module"}
+                  {m.completed ? "Review Module" : m.locked ? "🔒 Locked" : pct > 0 ? "Continue Module" : "Start Module"}
                 </button>
               </div>
 

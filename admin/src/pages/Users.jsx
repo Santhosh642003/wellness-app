@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { Search, ChevronUp, ChevronDown, Users as UsersIcon } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, Users as UsersIcon, CheckSquare, Square, Zap, Minus } from 'lucide-react';
 
 const SORT_KEYS = { name: 'name', email: 'email', points: 'points', streakDays: 'streakDays', modulesCompleted: 'modulesCompleted', createdAt: 'createdAt' };
 
@@ -17,6 +17,13 @@ export default function Users() {
   const [sortKey, setSortKey] = useState('createdAt');
   const [sortDir, setSortDir] = useState('desc');
   const [roleFilter, setRoleFilter] = useState('All');
+  const [selected, setSelected] = useState(new Set());
+  const [bulkPoints, setBulkPoints] = useState('');
+  const [bulkAction, setBulkAction] = useState('award-points');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState('');
+  const [bulkConfirm, setBulkConfirm] = useState(null); // { pts, delta, action, count, reason }
+  const [bulkReason, setBulkReason] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,6 +56,56 @@ export default function Users() {
     else { setSortKey(key); setSortDir('desc'); }
   };
 
+  const toggleSelect = (id, e) => {
+    e.stopPropagation();
+    setSelected(prev => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      return s;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === processed.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(processed.map(u => u.id)));
+    }
+  };
+
+  const prepareBulk = () => {
+    if (!selected.size || !bulkPoints) return;
+    const pts = parseInt(bulkPoints);
+    if (!pts || pts <= 0) return;
+    const delta = bulkAction === 'award-points' ? pts : -pts;
+    setBulkConfirm({ pts, delta, action: bulkAction, count: selected.size });
+  };
+
+  const executeBulk = async () => {
+    if (!bulkConfirm) return;
+    setBulkLoading(true);
+    setBulkMsg('');
+    try {
+      const res = await api.bulkAction({
+        userIds: [...selected],
+        action: bulkConfirm.action,
+        points: bulkConfirm.pts,
+        reason: bulkReason || undefined,
+      });
+      setBulkMsg(`✓ ${res.action === 'award-points' ? '+' : '-'}${bulkConfirm.pts} pts applied to ${res.affected} user${res.affected !== 1 ? 's' : ''}`);
+      const updated = await api.users();
+      setUsers(updated);
+      setSelected(new Set());
+      setBulkPoints('');
+      setBulkReason('');
+    } catch (err) {
+      setBulkMsg(`Error: ${err.message}`);
+    } finally {
+      setBulkLoading(false);
+      setBulkConfirm(null);
+    }
+  };
+
   const Th = ({ col, label }) => (
     <th className="px-4 py-3 cursor-pointer select-none hover:text-white transition-colors" onClick={() => toggleSort(col)}>
       <span className="flex items-center">
@@ -56,6 +113,9 @@ export default function Users() {
       </span>
     </th>
   );
+
+  const allSelected = processed.length > 0 && selected.size === processed.length;
+  const someSelected = selected.size > 0 && selected.size < processed.length;
 
   return (
     <div className="p-8">
@@ -87,10 +147,60 @@ export default function Users() {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="mb-4 bg-gray-900 border border-emerald-600/30 rounded-xl px-5 py-3 flex items-center gap-4 flex-wrap">
+          <span className="text-emerald-400 text-sm font-semibold">{selected.size} user{selected.size !== 1 ? 's' : ''} selected</span>
+          <div className="flex items-center gap-2">
+            <select
+              value={bulkAction}
+              onChange={e => setBulkAction(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500"
+            >
+              <option value="award-points">Award points</option>
+              <option value="revoke-points">Revoke points</option>
+            </select>
+            <input
+              type="number"
+              value={bulkPoints}
+              onChange={e => setBulkPoints(e.target.value)}
+              placeholder="Points"
+              min={1}
+              className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500"
+            />
+            <button
+              onClick={prepareBulk}
+              disabled={bulkLoading || !bulkPoints}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+            >
+              <Zap size={12} />
+              {bulkLoading ? 'Applying…' : 'Apply'}
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white border border-gray-700 transition"
+            >
+              <Minus size={12} />
+              Clear
+            </button>
+          </div>
+          {bulkMsg && (
+            <span className={`text-xs font-medium ${bulkMsg.startsWith('✓') ? 'text-emerald-400' : 'text-red-400'}`}>
+              {bulkMsg}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-800 text-gray-400 text-left text-xs uppercase tracking-wide">
             <tr>
+              <th className="px-4 py-3 w-10">
+                <button onClick={toggleSelectAll} className="text-gray-500 hover:text-white transition">
+                  {allSelected ? <CheckSquare size={14} className="text-emerald-400" /> : someSelected ? <CheckSquare size={14} className="text-gray-600" /> : <Square size={14} />}
+                </button>
+              </th>
               <Th col="name" label="Name" />
               <th className="px-4 py-3">Campus / Role</th>
               <Th col="points" label="Points" />
@@ -101,7 +211,7 @@ export default function Users() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                 <div className="flex items-center justify-center gap-2">
                   <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
                   Loading users…
@@ -109,36 +219,44 @@ export default function Users() {
               </td></tr>
             )}
             {!loading && processed.map(u => (
-              <tr key={u.id} onClick={() => navigate(`/users/${u.id}`)}
-                className="border-b border-gray-800/50 hover:bg-gray-800/50 cursor-pointer transition-colors">
-                <td className="px-4 py-3">
+              <tr key={u.id}
+                className={`border-b border-gray-800/50 hover:bg-gray-800/50 cursor-pointer transition-colors ${selected.has(u.id) ? 'bg-emerald-900/10' : ''}`}>
+                <td className="px-4 py-3" onClick={e => toggleSelect(u.id, e)}>
+                  <button className="text-gray-500 hover:text-emerald-400 transition">
+                    {selected.has(u.id) ? <CheckSquare size={14} className="text-emerald-400" /> : <Square size={14} />}
+                  </button>
+                </td>
+                <td className="px-4 py-3" onClick={() => navigate(`/users/${u.id}`)}>
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-emerald-600/20 border border-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs font-bold shrink-0">
                       {u.initials || u.name?.[0]?.toUpperCase() || '?'}
                     </div>
-                    <span className="text-white font-medium">{u.name}</span>
+                    <div>
+                      <p className="text-white font-medium">{u.name}</p>
+                      <p className="text-gray-500 text-xs">{u.email}</p>
+                    </div>
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" onClick={() => navigate(`/users/${u.id}`)}>
                   <p className="text-gray-300 text-xs">{u.campus || '—'}</p>
                   <p className="text-gray-500 text-xs">{u.role}</p>
                 </td>
-                <td className="px-4 py-3 text-emerald-400 font-semibold">{parseInt(u.points).toLocaleString()}</td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-emerald-400 font-semibold" onClick={() => navigate(`/users/${u.id}`)}>{parseInt(u.points).toLocaleString()}</td>
+                <td className="px-4 py-3" onClick={() => navigate(`/users/${u.id}`)}>
                   <span className={`text-xs font-medium ${u.streakDays > 0 ? 'text-yellow-400' : 'text-gray-600'}`}>
                     {u.streakDays > 0 ? `🔥 ${u.streakDays}d` : '—'}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" onClick={() => navigate(`/users/${u.id}`)}>
                   <span className={`text-xs font-semibold px-2 py-1 rounded-full ${parseInt(u.modulesCompleted) > 0 ? 'bg-emerald-600/10 border border-emerald-600/20 text-emerald-400' : 'text-gray-600'}`}>
                     {u.modulesCompleted}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs" onClick={() => navigate(`/users/${u.id}`)}>{new Date(u.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
             {!loading && processed.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center">
+              <tr><td colSpan={7} className="px-4 py-12 text-center">
                 <UsersIcon size={32} className="text-gray-700 mx-auto mb-2" />
                 <p className="text-gray-500 text-sm">No users found</p>
               </td></tr>
@@ -146,6 +264,46 @@ export default function Users() {
           </tbody>
         </table>
       </div>
+
+      {/* Bulk action confirmation modal */}
+      {bulkConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-white font-semibold mb-2">Confirm Bulk Action</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              {bulkConfirm.action === 'award-points' ? 'Award' : 'Deduct'}{' '}
+              <span className="text-emerald-400 font-bold">{bulkConfirm.pts} pts</span>{' '}
+              {bulkConfirm.action === 'award-points' ? 'to' : 'from'}{' '}
+              <span className="text-white font-bold">{bulkConfirm.count} user{bulkConfirm.count !== 1 ? 's' : ''}</span>
+              {' '}(total delta: {bulkConfirm.delta > 0 ? '+' : ''}{bulkConfirm.delta * bulkConfirm.count} pts).
+            </p>
+            <div className="mb-4">
+              <label className="text-gray-400 text-xs block mb-1">Reason (optional, stored for audit)</label>
+              <input
+                value={bulkReason}
+                onChange={e => setBulkReason(e.target.value)}
+                placeholder="e.g. Attendance bonus"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={executeBulk}
+                disabled={bulkLoading}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+              >
+                {bulkLoading ? 'Applying…' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => { setBulkConfirm(null); setBulkReason(''); }}
+                className="flex-1 bg-gray-800 border border-gray-700 text-gray-300 hover:text-white py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

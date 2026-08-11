@@ -50,21 +50,6 @@ export const auth = {
   resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 };
 
-// Transcription
-export const transcribe = async (audioBlob) => {
-  const token = getToken();
-  const formData = new FormData();
-  formData.append('audio', audioBlob, 'audio.webm');
-  const res = await fetch(`${BASE_URL}/transcribe`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  return data;
-};
-
 // Users
 export const users = {
   get: (userId) => request(`/users/${userId}`),
@@ -75,6 +60,8 @@ export const users = {
     request(`/users/${userId}/module-progress/${moduleId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   submitQuiz: (userId, body) => request(`/users/${userId}/quiz`, { method: 'POST', body: JSON.stringify(body) }),
   activity: (userId) => request(`/users/${userId}/activity`),
+  pointsSummary: (userId) => request(`/users/${userId}/points-summary`),
+  referrals: (userId) => request(`/users/${userId}/referrals`),
 };
 
 // Modules
@@ -86,16 +73,41 @@ export const modules = {
 // Rewards
 export const rewards = {
   list: () => request('/rewards'),
-  redeem: (userId, rewardId) => request('/rewards/redeem', { method: 'POST', body: JSON.stringify({ userId, rewardId }) }),
+  redeem: (userId, rewardId, idempotencyKey) => request('/rewards/redeem', {
+    method: 'POST',
+    body: JSON.stringify({ userId, rewardId }),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  }),
+  poolStatus: () => request('/rewards/pool-status'),
   history: (userId) => request(`/rewards/history/${userId}`),
 };
 
 // Leaderboard
 export const leaderboard = {
-  list: () => request('/leaderboard'),
+  list: (period = 'all') => request(`/leaderboard?period=${period}`),
 };
 
 // Notifications
 export const notifications = {
   list: () => request('/notifications'),
+};
+
+// Bookmarks
+export const bookmarks = {
+  list: (userId) => request(`/users/${userId}/bookmarks`),
+  add: (userId, moduleId) => request(`/users/${userId}/bookmarks/${moduleId}`, { method: 'POST' }),
+  remove: (userId, moduleId) => request(`/users/${userId}/bookmarks/${moduleId}`, { method: 'DELETE' }),
+};
+
+// Events
+export const events = {
+  list: () => request('/events'),
+  checkin: (eventId, code) => request(`/events/${eventId}/checkin`, { method: 'POST', body: JSON.stringify({ code }) }),
+};
+
+// Comments
+export const comments = {
+  list: (moduleId) => request(`/modules/${moduleId}/comments`),
+  add: (moduleId, body) => request(`/modules/${moduleId}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
+  delete: (moduleId, commentId) => request(`/modules/${moduleId}/comments/${commentId}`, { method: 'DELETE' }),
 };

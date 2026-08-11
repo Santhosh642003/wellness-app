@@ -3,6 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { Users, Star, CheckCircle, ShoppingBag, Trophy, TrendingUp, BookOpen, Gift, Zap, BarChart2 } from 'lucide-react';
 
+// Simple bar chart — no external lib required
+function MiniBarChart({ data, color = '#10b981', label }) {
+  if (!data || data.length === 0) return <div className="text-gray-600 text-xs py-4 text-center">No data for period</div>;
+  const max = Math.max(...data.map((d) => d.count), 1);
+  return (
+    <div>
+      <div className="text-xs text-gray-500 mb-2">{label}</div>
+      <div className="flex items-end gap-0.5 h-20">
+        {data.map((d) => (
+          <div key={d.date} className="flex-1 flex flex-col items-center justify-end group relative" title={`${d.date}: ${d.count}`}>
+            <div
+              className="w-full rounded-sm transition-all"
+              style={{ height: `${Math.max(2, (d.count / max) * 76)}px`, background: color }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Skeleton() {
   return <div className="h-7 w-20 bg-gray-800 rounded animate-pulse" />;
 }
@@ -22,13 +43,23 @@ function StatCard({ icon: Icon, label, value, sub, color, loading }) {
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [poolOpen, setPoolOpen] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.stats()
-      .then(setStats)
+    Promise.all([
+      api.stats(),
+      api.analytics().catch(() => null),
+      api.rewardPool().catch(() => null),
+    ])
+      .then(([s, a, pools]) => {
+        setStats(s);
+        setAnalytics(a);
+        setPoolOpen(Array.isArray(pools) ? pools.some((p) => !p.closedAt) : null);
+      })
       .catch(() => setError('Failed to load stats. Check backend connection.'))
       .finally(() => setLoading(false));
   }, []);
@@ -60,6 +91,24 @@ export default function Dashboard() {
         </div>
       )}
 
+      {poolOpen === false && (
+        <div className="flex items-start gap-3 mb-6 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-4">
+          <Trophy size={18} className="text-amber-400 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-amber-300 font-semibold text-sm">No active reward semester</p>
+            <p className="text-amber-400/80 text-xs mt-0.5">
+              Students cannot earn points or redeem rewards until a semester is opened.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/reward-pool')}
+            className="shrink-0 text-xs font-medium text-amber-300 border border-amber-400/40 rounded-lg px-3 py-1.5 hover:bg-amber-400/10 transition-colors"
+          >
+            Open semester →
+          </button>
+        </div>
+      )}
+
       {/* Primary stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
         <StatCard icon={Users} label="Total Users" value={stats?.totalUsers?.toLocaleString()}
@@ -84,6 +133,28 @@ export default function Dashboard() {
         <StatCard icon={Zap} label="Quiz Attempts" value={stats?.totalQuizAttempts?.toLocaleString()}
           sub="all time" color="bg-orange-600" loading={loading} />
       </div>
+
+      {/* Analytics charts */}
+      {analytics && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 className="text-white font-semibold text-sm mb-4">New Registrations (30 days)</h3>
+            <MiniBarChart data={analytics.registrations} color="#3b82f6" label="Daily new users" />
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 className="text-white font-semibold text-sm mb-4">Module Completions (30 days)</h3>
+            <MiniBarChart data={analytics.completions} color="#10b981" label="Daily completions" />
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 className="text-white font-semibold text-sm mb-4">Quiz Attempts (30 days)</h3>
+            <MiniBarChart data={analytics.quizAttempts} color="#f59e0b" label="Daily quiz attempts" />
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 className="text-white font-semibold text-sm mb-4">Daily Claims (30 days)</h3>
+            <MiniBarChart data={analytics.dailyClaims} color="#8b5cf6" label="Daily point claims" />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Top users leaderboard */}

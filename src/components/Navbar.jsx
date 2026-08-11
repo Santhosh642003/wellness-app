@@ -56,25 +56,25 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#2b2b2b]/90 backdrop-blur border-b border-black/20">
+    <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-[#2b2b2b]/90 backdrop-blur border-b border-slate-200/70 dark:border-black/20">
       <div className="max-w-7xl mx-auto flex items-center px-6 py-4">
         {/* Left */}
         <div className="flex items-center gap-5 mr-14">
           <img
             src="/njit_logo.png"
             alt="NJIT"
-            className="h-10 w-auto filter grayscale invert brightness-110"
+            className="h-10 w-auto grayscale dark:invert dark:brightness-110"
             draggable="false"
           />
-          <div className="h-10 w-px bg-gray-500/60" />
-          <div className="text-white font-semibold">
+          <div className="h-10 w-px bg-slate-300 dark:bg-gray-500/60" />
+          <div className="text-slate-900 dark:text-white font-semibold">
             Campus Wellness Services
           </div>
         </div>
 
         {/* Right */}
         <div className="ml-auto flex items-center gap-8">
-          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-gray-100">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-700 dark:text-gray-100">
             {links.map((l) => (
               <a
                 key={l.id}
@@ -82,8 +82,8 @@ export default function Navbar() {
                 onClick={() => handleClick(l.id)}
                 className={`relative py-1 transition-colors ${
                   active === l.id
-                    ? "text-white"
-                    : "text-white/90 hover:text-white"
+                    ? "text-slate-900 dark:text-white"
+                    : "text-slate-600 dark:text-white/90 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 {l.label}

@@ -16,14 +16,17 @@ export default function ModuleQuiz() {
   const [allModules, setAllModules] = useState([]);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null); // {passed, score, total, pointsEarned}
+  const [points, setPoints] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("wellness_token");
     Promise.all([
       fetch(`/api/modules/${moduleId}/quiz`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).then((r) => r.json()),
       modulesApi.list(),
+      user?.id ? usersApi.get(user.id) : Promise.resolve(null),
     ])
-      .then(([quizData, all]) => {
+      .then(([quizData, all, userData]) => {
         if (quizData.error) throw new Error(quizData.error);
         setQuestions(
           (quizData.questions || []).map((q) => ({
@@ -35,9 +38,13 @@ export default function ModuleQuiz() {
         const current = all.find((m) => m.id === moduleId);
         setMod(current || null);
         setAllModules(all);
+        if (userData?.progress) {
+          setPoints(userData.progress.points || 0);
+          setStreakDays(userData.progress.streakDays || 0);
+        }
       })
       .catch((err) => setError(err.message));
-  }, [moduleId]);
+  }, [moduleId, user?.id]);
 
   const onFinish = async (engineResult) => {
     let pointsEarned = 0;
@@ -67,7 +74,7 @@ export default function ModuleQuiz() {
   if (error) {
     return (
       <div style={pageStyle} className="items-center justify-center">
-        <DashboardNav initials={user?.initials || "?"} />
+        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error}</p>
@@ -94,7 +101,7 @@ export default function ModuleQuiz() {
     const pct = result.total > 0 ? Math.round((result.score / result.total) * 100) : 0;
     return (
       <div style={pageStyle}>
-        <DashboardNav initials={user?.initials || "?"} />
+        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
         <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-md w-full text-center space-y-6">
             {/* Pass / fail icon */}
@@ -201,7 +208,7 @@ export default function ModuleQuiz() {
   // ── Quiz screen ──────────────────────────────────────────────────────────
   return (
     <div style={pageStyle}>
-      <DashboardNav initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
       <div className="flex-1">
         <QuizEngine
           title={mod ? `${mod.title} — Quiz` : "Module Quiz"}

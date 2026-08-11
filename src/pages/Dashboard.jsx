@@ -8,21 +8,7 @@ import Toast from "../components/Toast";
 import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
 import { users as usersApi, modules as modulesApi } from "../lib/api";
-
-function mapModule(m) {
-  return {
-    id: m.id,
-    slug: m.slug,
-    title: m.title,
-    desc: m.description,
-    mins: parseInt(m.duration) || 10,
-    points: m.pointsValue,
-    progress: m.userProgress ? m.userProgress.watchedPercent / 100 : 0,
-    locked: m.locked,
-    completed: m.userProgress?.completed ?? false,
-    category: m.category,
-  };
-}
+import { mapModule } from "../lib/moduleUtils";
 
 function todayStr() {
   return new Date().toDateString();
@@ -38,6 +24,7 @@ export default function Dashboard() {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+  const [pointsSummary, setPointsSummary] = useState(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -48,15 +35,17 @@ export default function Dashboard() {
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const [userData, mods] = await Promise.all([
+      const [userData, mods, summary] = await Promise.all([
         usersApi.get(user.id),
         modulesApi.list(),
+        usersApi.pointsSummary(user.id).catch(() => null),
       ]);
       const p = userData.progress || {};
       setPoints(p.points || 0);
       setStreakDays(p.streakDays || 0);
       setLastClaimDate(p.lastClaimDate || null);
       setModules((mods || []).map(mapModule));
+      setPointsSummary(summary);
     } catch (err) {
       console.error("Failed to load dashboard data", err);
     } finally {
@@ -122,6 +111,32 @@ export default function Dashboard() {
           />
 
           <LearningModules modules={modules} onContinue={continueModule} />
+
+          {/* Points earning caps */}
+          {pointsSummary && pointsSummary.semesterLabel && (
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
+                Points Earning — {pointsSummary.semesterLabel}
+              </h2>
+              <p className="text-xs text-slate-400 dark:text-gray-500 mb-4">How much you can still earn from each source this semester</p>
+              <div className="space-y-3">
+                {pointsSummary.sources.filter(s => s.scope === 'semester').map((s) => (
+                  <div key={s.source}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-600 dark:text-gray-400">{s.label}</span>
+                      <span className="text-slate-500 dark:text-gray-500">{s.earned}/{s.cap} pts</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${s.headroom === 0 ? 'bg-slate-300 dark:bg-gray-600' : 'bg-gradient-to-r from-blue-500 to-emerald-400'}`}
+                        style={{ width: `${Math.min(100, (s.earned / s.cap) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <aside className="lg:col-span-4">

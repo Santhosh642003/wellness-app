@@ -11,7 +11,7 @@ export default function Hero() {
       </h1>
 
       {/* Subtitle */}
-      <p className="max-w-3xl mx-auto text-gray-200/90 leading-relaxed mb-14">
+      <p className="max-w-3xl mx-auto text-slate-600 dark:text-gray-200/90 leading-relaxed mb-14">
         Getting informed about <span className="font-semibold">HPV</span> and{" "}
         <span className="font-semibold">Meningitis B</span> vaccines shouldn’t
         be confusing or boring. That’s why we’ve created quick, fun, and

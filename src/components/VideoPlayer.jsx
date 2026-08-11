@@ -7,7 +7,7 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, className = "" }) {
+export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, caption = null, captionsOn = false, hasTranscript = false, onToggleCaptions, className = "" }) {
   const internalRef = useRef(null);
   const videoRef = externalRef || internalRef;
   const containerRef = useRef(null);
@@ -119,7 +119,6 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => { if (videoRef.current) { setDuration(videoRef.current.duration); onLoadedMetadata?.(); } }}
         onEnded={() => { setPlaying(false); setShowControls(true); onEnded?.(); }}
-        onClick={(e) => e.stopPropagation()}
       />
 
       {/* Big play button overlay (when paused) */}
@@ -129,6 +128,17 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
             <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
+          </div>
+        </div>
+      )}
+
+      {/* In-player subtitle overlay */}
+      {caption && (
+        <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 transition-all duration-200 ${showControls ? "bottom-20" : "bottom-5"}`}>
+          <div className="max-w-[80%] text-center">
+            <span className="inline-block bg-black/75 text-white text-sm sm:text-base font-medium leading-snug rounded px-3 py-1 shadow-lg" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+              {caption}
+            </span>
           </div>
         </div>
       )}
@@ -213,6 +223,21 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
                 ))}
               </div>
             </div>
+
+            {/* CC */}
+            <button
+              onClick={onToggleCaptions}
+              disabled={!hasTranscript}
+              title={!hasTranscript ? "No transcript available" : captionsOn ? "Turn off captions" : "Turn on captions"}
+              className={`text-xs font-bold px-1.5 py-0.5 rounded border transition shrink-0
+                ${captionsOn
+                  ? "bg-white text-black border-white"
+                  : hasTranscript
+                    ? "text-white/80 border-white/30 hover:border-white hover:text-white"
+                    : "text-white/20 border-white/10 cursor-not-allowed"}`}
+            >
+              CC
+            </button>
 
             {/* Fullscreen */}
             <button onClick={toggleFullscreen} className="text-white hover:text-emerald-400 transition shrink-0">

@@ -7,6 +7,7 @@ import { OAuth2Client } from 'google-auth-library';
 import pool from '../lib/db.js';
 import { authenticate } from '../middleware/auth.js';
 import { sendOtpEmail, sendPasswordResetEmail } from '../lib/email.js';
+import { awardPoints } from '../lib/points.js';
 
 const router = Router();
 
@@ -47,7 +48,14 @@ const registerSchema = z.object({
   role: z.string().optional(),
   campus: z.string().optional(),
   otpCode: z.string().length(6, 'Verification code must be 6 digits'),
+  referralCode: z.string().max(12).optional(),
 });
+
+function generateReferralCode(name) {
+  const prefix = name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
+  const suffix = Math.random().toString(36).toUpperCase().slice(2, 7);
+  return `${prefix}${suffix}`;
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -138,15 +146,34 @@ router.post('/register', async (req, res, next) => {
     const hashed = await bcrypt.hash(data.password, 14); // bcrypt cost 14 for strong hashing
     const userId = randomUUID();
 
+    // Generate unique referral code for this user
+    let referralCode;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      referralCode = generateReferralCode(data.name);
+      const { rows: check } = await pool.query('SELECT id FROM users WHERE "referralCode"=$1', [referralCode]);
+      if (!check[0]) break;
+      if (attempt === 4) return res.status(500).json({ error: 'Could not generate unique referral code, please try again' });
+    }
+
+    // Resolve referrer if referralCode provided
+    let referrerId = null;
+    if (data.referralCode) {
+      const { rows: [referrer] } = await pool.query(
+        'SELECT id FROM users WHERE "referralCode"=$1', [data.referralCode.toUpperCase()]
+      );
+      if (referrer) referrerId = referrer.id;
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(
-        `INSERT INTO users (id, email, name, password, initials, role, campus, major, "yearOfStudy", ethnicity, "emailVerified")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`,
+        `INSERT INTO users (id, email, name, password, initials, role, campus, major, "yearOfStudy", ethnicity, "emailVerified", "referralCode")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,$11)`,
         [userId, normalEmail, data.name.trim(), hashed, initials,
          data.role || 'Student', data.campus || 'NJIT Newark',
-         data.major || null, data.yearOfStudy || null, data.ethnicity || null]
+         data.major || null, data.yearOfStudy || null, data.ethnicity || null,
+         referralCode]
       );
       await client.query(`INSERT INTO user_progress (id, "userId") VALUES ($1,$2)`, [randomUUID(), userId]);
       const { rows: modules } = await client.query('SELECT id FROM modules');
@@ -155,6 +182,20 @@ router.post('/register', async (req, res, next) => {
           `INSERT INTO user_module_progress (id, "userId", "moduleId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
           [randomUUID(), userId, m.id]
         );
+      }
+      // 200-pt joining bonus — lifetime cap of 200 makes it naturally once-ever
+      try {
+        await awardPoints(client, { userId, source: 'joining_bonus', points: 200, capPoints: 200, capScope: 'lifetime' });
+      } catch (_) { /* lifetime awards don't throw NO_ACTIVE_SEMESTER */ }
+      // Create referral record (referrer payout is deferred until invitee completes 3 modules)
+      // Invitee gets 25 pts immediately on signup as a welcome bonus
+      if (referrerId) {
+        await client.query(
+          `INSERT INTO referrals (id, "referrerId", "referredId", "pointsAwarded") VALUES ($1,$2,$3,0)`,
+          [randomUUID(), referrerId, userId]
+        );
+        // Invitee welcome bonus — no cap (naturally once-ever via UNIQUE referredId constraint)
+        await awardPoints(client, { userId, source: 'referral_referred', points: 25, refId: referrerId });
       }
       await client.query('COMMIT');
     } catch (err) {
@@ -221,13 +262,15 @@ router.post('/google', async (req, res, next) => {
         : fullName.slice(0, 2).toUpperCase();
       const userId = randomUUID();
 
+      const googleReferralCode = generateReferralCode(fullName);
+
       const dbClient = await pool.connect();
       try {
         await dbClient.query('BEGIN');
         await dbClient.query(
-          `INSERT INTO users (id, email, name, password, initials, role, campus, "emailVerified")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,true)`,
-          [userId, email, fullName.trim(), '', initials, 'Student', 'NJIT Newark']
+          `INSERT INTO users (id, email, name, password, initials, role, campus, "emailVerified", "referralCode")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
+          [userId, email, fullName.trim(), '', initials, 'Student', 'NJIT Newark', googleReferralCode]
         );
         await dbClient.query(`INSERT INTO user_progress (id, "userId") VALUES ($1,$2)`, [randomUUID(), userId]);
         const { rows: modules } = await dbClient.query('SELECT id FROM modules');
@@ -237,6 +280,10 @@ router.post('/google', async (req, res, next) => {
             [randomUUID(), userId, m.id]
           );
         }
+        // 200-pt joining bonus for new Google users
+        try {
+          await awardPoints(dbClient, { userId, source: 'joining_bonus', points: 200, capPoints: 200, capScope: 'lifetime' });
+        } catch (_) { /* lifetime awards don't throw NO_ACTIVE_SEMESTER */ }
         await dbClient.query('COMMIT');
       } catch (err) {
         await dbClient.query('ROLLBACK');

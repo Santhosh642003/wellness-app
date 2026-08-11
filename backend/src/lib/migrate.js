@@ -121,6 +121,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS ethnicity TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE modules ADD COLUMN IF NOT EXISTS "keyPoints" JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE modules ADD COLUMN IF NOT EXISTS transcript JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE rewards ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;
 `;
 
@@ -162,6 +163,94 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 `;
 
+const COMMUNITY_AND_REFERRALS = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "referralCode" TEXT UNIQUE;
+
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "moduleId" TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("userId", "moduleId")
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "moduleId" TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS comments_module_idx ON comments("moduleId");
+
+CREATE TABLE IF NOT EXISTS referrals (
+  id TEXT PRIMARY KEY,
+  "referrerId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "referredId" TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  "pointsAwarded" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`;
+
+const MULTI_VIDEO_AND_DOCS = `
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS videos JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE user_module_progress ADD COLUMN IF NOT EXISTS "videoProgress" JSONB DEFAULT '{}'::jsonb;
+`;
+
+const IDEMPOTENCY_AND_LEDGER = `
+ALTER TABLE reward_redemptions ADD COLUMN IF NOT EXISTS "idempotencyKey" TEXT UNIQUE;
+
+CREATE TABLE IF NOT EXISTS point_ledger (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  points INTEGER NOT NULL,
+  "refId" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS point_ledger_user_idx ON point_ledger("userId");
+CREATE INDEX IF NOT EXISTS point_ledger_created_idx ON point_ledger("createdAt");
+`;
+
+const BATCH2_SCHEMA = `
+CREATE TABLE IF NOT EXISTS reward_pool (
+  id TEXT PRIMARY KEY,
+  "semesterLabel" TEXT UNIQUE NOT NULL,
+  "budgetCents" INTEGER NOT NULL,
+  "spentCents" INTEGER NOT NULL DEFAULT 0,
+  "closedAt" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS one_open_pool ON reward_pool ((1)) WHERE "closedAt" IS NULL;
+
+ALTER TABLE point_ledger ADD COLUMN IF NOT EXISTS "semesterLabel" TEXT;
+ALTER TABLE reward_redemptions ADD COLUMN IF NOT EXISTS "poolId" TEXT REFERENCES reward_pool(id);
+
+CREATE TABLE IF NOT EXISTS events (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  "checkInCode" TEXT NOT NULL,
+  "startsAt" TIMESTAMPTZ NOT NULL,
+  "endsAt" TIMESTAMPTZ NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS event_checkins (
+  id TEXT PRIMARY KEY,
+  "eventId" TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "checkedInAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE("eventId", "userId")
+);
+CREATE INDEX IF NOT EXISTS event_checkins_user_idx ON event_checkins("userId");
+
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMPTZ;
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS "modulesAtPayout" INTEGER;
+`;
+
 export async function migrate() {
   try {
     await pool.query(MIGRATION);
@@ -169,6 +258,10 @@ export async function migrate() {
     await pool.query(OTP_TABLE);
     await pool.query(RESET_TABLE);
     await pool.query(SCHEDULING_AND_NOTIFICATIONS);
+    await pool.query(COMMUNITY_AND_REFERRALS);
+    await pool.query(MULTI_VIDEO_AND_DOCS);
+    await pool.query(IDEMPOTENCY_AND_LEDGER);
+    await pool.query(BATCH2_SCHEMA);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

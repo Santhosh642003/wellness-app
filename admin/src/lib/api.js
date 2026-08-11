@@ -53,6 +53,45 @@ export const api = {
   updateNotification: (id, body) => req(`/notifications/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteNotification: (id) => req(`/notifications/${id}`, { method: 'DELETE' }),
 
+  // reward pool
+  rewardPool: () => req('/reward-pool'),
+  createRewardPool: (body) => req('/reward-pool', { method: 'POST', body: JSON.stringify(body) }),
+  updateRewardPool: (id, body) => req(`/reward-pool/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  // events
+  events: () => req('/events'),
+  createEvent: (body) => req('/events', { method: 'POST', body: JSON.stringify(body) }),
+  updateEvent: (id, body) => req(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEvent: (id) => req(`/events/${id}`, { method: 'DELETE' }),
+  rotateEventCode: (id) => req(`/events/${id}/rotate-code`, { method: 'POST' }),
+  eventCheckins: (id) => req(`/events/${id}/checkins`),
+
+  // analytics
+  analytics: () => req('/stats/analytics'),
+  // bulk user actions
+  bulkAction: (body) => req('/users/bulk', { method: 'POST', body: JSON.stringify(body) }),
+
+  // document upload (returns { url, size, fileType, originalName })
+  uploadDocument: (file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const token = getToken();
+      const formData = new FormData();
+      formData.append('document', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${BASE}/documents/upload`);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.error || `HTTP ${xhr.status}`));
+        } catch { reject(new Error('Invalid response')); }
+      };
+      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.send(formData);
+    });
+  },
+
   // image upload (returns { url })
   uploadImage: (file, onProgress) => {
     return new Promise((resolve, reject) => {

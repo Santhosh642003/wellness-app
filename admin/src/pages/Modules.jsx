@@ -1,34 +1,170 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { Plus, Pencil, Trash2, X, Check, Upload, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, Upload, ChevronDown, ChevronUp, Info, FileText, Video } from 'lucide-react';
 
 const CATEGORIES = ['Foundations', 'HPV', 'MenB', 'Bonus', 'General'];
 
 const EMPTY = {
   slug: '', title: '', description: '', duration: '', category: 'Foundations',
-  orderIndex: 0, pointsValue: 100, locked: true, videoUrl: '',
-  keyPoints: [], transcript: [],
+  orderIndex: 0, pointsValue: 100, locked: true,
+  videos: [], documents: [], keyPoints: [],
 };
 
 const EMPTY_Q = { question: '', options: ['', '', '', ''], answerIndex: 0, points: 10, explanation: '' };
-
-// ── Helpers ────────────────────────────────────────────────────────────────
+const EMPTY_VIDEO = { id: '', title: '', url: '', duration: '', transcript: [] };
+const EMPTY_DOC = { id: '', title: '', url: '', fileType: '', size: '' };
 
 function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
-
 function parseKeyPoints(raw) {
   return raw.split('\n').map((s) => s.trim()).filter(Boolean);
 }
-
-function parseTranscript(raw) {
-  try { return JSON.parse(raw); } catch { return null; }
+function tempId() {
+  return `tmp-${Math.random().toString(36).slice(2)}`;
 }
 
-// ── Video Uploader ─────────────────────────────────────────────────────────
+// ── Single Video Row (with per-video transcript) ───────────────────────────
 
-function VideoUploader({ value, onChange }) {
+function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDown }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptRaw, setTranscriptRaw] = useState(() =>
+    Array.isArray(video.transcript) && video.transcript.length > 0
+      ? JSON.stringify(video.transcript, null, 2)
+      : ''
+  );
+  const [transcriptError, setTranscriptError] = useState('');
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setUploading(true); setProgress(0); setUploadError('');
+    try {
+      const r = await api.uploadVideo(file, setProgress);
+      onChange({ ...video, url: r.url });
+    } catch (err) { setUploadError(err.message || 'Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const handleTranscriptChange = (raw) => {
+    setTranscriptRaw(raw);
+    setTranscriptError('');
+    if (!raw.trim()) { onChange({ ...video, transcript: [] }); return; }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) throw new Error();
+      onChange({ ...video, transcript: parsed });
+    } catch {
+      setTranscriptError('Invalid JSON — format: [{"time": 0, "text": "..."}]');
+    }
+  };
+
+  const transcriptCount = Array.isArray(video.transcript) ? video.transcript.length : 0;
+
+  return (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 space-y-3">
+      {/* Title / duration / reorder */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-0.5">
+            <button type="button" onClick={onMoveUp} disabled={index === 0}
+              className="text-gray-600 hover:text-gray-300 disabled:opacity-20 transition">
+              <ChevronUp size={12} />
+            </button>
+            <button type="button" onClick={onMoveDown} disabled={index === total - 1}
+              className="text-gray-600 hover:text-gray-300 disabled:opacity-20 transition">
+              <ChevronDown size={12} />
+            </button>
+          </div>
+          <div className="h-7 w-7 rounded-lg bg-blue-900/40 border border-blue-800/40 flex items-center justify-center text-blue-400 text-xs font-bold">
+            {index + 1}
+          </div>
+          <input
+            value={video.title}
+            onChange={(e) => onChange({ ...video, title: e.target.value })}
+            placeholder={`Chapter ${index + 1} title`}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-emerald-500 flex-1 min-w-0 w-48"
+          />
+          <input
+            value={video.duration}
+            onChange={(e) => onChange({ ...video, duration: e.target.value })}
+            placeholder="Duration (e.g. 5:30)"
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-emerald-500 w-32"
+          />
+        </div>
+        <button type="button" onClick={onRemove}
+          className="text-gray-500 hover:text-red-400 transition shrink-0 p-1">
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {/* URL / upload */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <input ref={inputRef} type="file" accept="video/*" className="hidden"
+          onChange={(e) => handleFile(e.target.files?.[0])} />
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs hover:bg-gray-600 disabled:opacity-50 transition">
+          <Upload size={12} />{uploading ? `${progress}%` : 'Upload'}
+        </button>
+        <input
+          value={video.url}
+          onChange={(e) => onChange({ ...video, url: e.target.value })}
+          placeholder="or paste video URL…"
+          className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500 font-mono"
+        />
+      </div>
+      {uploading && (
+        <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      {uploadError && <p className="text-red-400 text-xs">{uploadError}</p>}
+      {video.url && !uploading && <p className="text-emerald-400 text-xs flex items-center gap-1"><Check size={10} /> Video URL set</p>}
+
+      {/* ── Per-video subtitles & transcript ── */}
+      <div className="border-t border-gray-700/50 pt-2.5">
+        <button type="button" onClick={() => setTranscriptOpen((v) => !v)}
+          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition">
+          {transcriptOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          <span>Subtitles &amp; Transcript</span>
+          {transcriptCount > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-blue-900/40 text-blue-400 border border-blue-800/30 text-[10px]">
+              {transcriptCount} lines
+            </span>
+          )}
+        </button>
+
+        {transcriptOpen && (
+          <div className="mt-2.5 space-y-1.5">
+            <p className="text-gray-600 text-[10px]">
+              JSON array of time-stamped lines — displayed as captions and full transcript in the player
+            </p>
+            <textarea
+              rows={7}
+              value={transcriptRaw}
+              onChange={(e) => handleTranscriptChange(e.target.value)}
+              spellCheck={false}
+              placeholder={'[\n  { "time": 0, "text": "Welcome to this chapter." },\n  { "time": 5, "text": "Today we will cover..." },\n  { "time": 12, "text": "Let\'s get started." }\n]'}
+              className={`w-full bg-gray-900 border rounded-lg px-3 py-2 text-white text-xs focus:outline-none font-mono resize-y
+                ${transcriptError ? 'border-red-500' : 'border-gray-700 focus:border-blue-500'}`}
+            />
+            {transcriptError && <p className="text-red-400 text-[10px]">{transcriptError}</p>}
+            {!transcriptError && transcriptRaw.trim() && transcriptCount > 0 && (
+              <p className="text-emerald-400 text-[10px]">✓ {transcriptCount} transcript entries</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Document Row ───────────────────────────────────────────────────────────
+
+function DocumentRow({ doc, index, onChange, onRemove }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -37,34 +173,67 @@ function VideoUploader({ value, onChange }) {
   const handleFile = async (file) => {
     if (!file) return;
     setUploading(true); setProgress(0); setError('');
-    try { const r = await api.uploadVideo(file, setProgress); onChange(r.url); }
-    catch (err) { setError(err.message || 'Upload failed'); }
+    try {
+      const r = await api.uploadDocument(file, setProgress);
+      onChange({ ...doc, url: r.url, fileType: r.fileType || doc.fileType, size: r.size || doc.size, title: doc.title || r.originalName });
+    } catch (err) { setError(err.message || 'Upload failed'); }
     finally { setUploading(false); }
   };
 
+  const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'txt', 'zip', 'other'];
+
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2 flex-wrap">
-        <input ref={inputRef} type="file" accept="video/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
-          className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm hover:bg-gray-700 disabled:opacity-50 transition">
-          <Upload size={14} />{uploading ? `Uploading ${progress}%` : 'Upload Video'}
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-gray-500 text-xs font-mono w-5 text-right shrink-0">{index + 1}.</span>
+        <input
+          value={doc.title}
+          onChange={(e) => onChange({ ...doc, title: e.target.value })}
+          placeholder="Document title"
+          className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+        />
+        <select
+          value={doc.fileType}
+          onChange={(e) => onChange({ ...doc, fileType: e.target.value })}
+          className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500"
+        >
+          <option value="">Type</option>
+          {FILE_TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+        </select>
+        <button type="button" onClick={onRemove} className="text-gray-500 hover:text-red-400 transition p-1 shrink-0">
+          <Trash2 size={14} />
         </button>
-        <span className="text-gray-500 text-sm self-center">or paste URL below</span>
+      </div>
+
+      <div className="flex gap-2 flex-wrap items-center">
+        <input ref={inputRef} type="file" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs hover:bg-gray-600 disabled:opacity-50 transition">
+          <Upload size={12} />{uploading ? `${progress}%` : 'Upload File'}
+        </button>
+        <input
+          value={doc.url}
+          onChange={(e) => onChange({ ...doc, url: e.target.value })}
+          placeholder="or paste URL…"
+          className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500 font-mono"
+        />
       </div>
       {uploading && (
-        <div className="h-1.5 w-full rounded-full bg-gray-800 overflow-hidden">
-          <div className="h-full bg-emerald-500 transition-all rounded-full" style={{ width: `${progress}%` }} />
+        <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }} />
         </div>
       )}
       {error && <p className="text-red-400 text-xs">{error}</p>}
-      <input value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder="https://... or /uploads/filename.mp4"
-        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
-      {value && (
-        <p className="text-emerald-400 text-xs flex items-center gap-1">
-          <Check size={10} /> Video set: <span className="text-gray-400 truncate max-w-xs">{value}</span>
-        </p>
+      {doc.url && (
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-emerald-400 flex items-center gap-1"><Check size={10} /> File set</span>
+          <input
+            value={doc.size}
+            onChange={(e) => onChange({ ...doc, size: e.target.value })}
+            placeholder="Size (e.g. 2.1 MB)"
+            className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-gray-400 text-xs focus:outline-none focus:border-gray-500 w-28"
+          />
+        </div>
       )}
     </div>
   );
@@ -196,7 +365,6 @@ function QuizEditor({ moduleId, defaultOpen = false }) {
                 ))}
               </div>
 
-              {/* Add / Edit question form */}
               <div className="bg-gray-800/40 border border-gray-700 rounded-xl p-4">
                 <h4 className="text-gray-300 text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-2">
                   {editingQ ? <><Pencil size={11} /> Edit Question</> : <><Plus size={11} /> Add Question</>}
@@ -262,16 +430,25 @@ function QuizEditor({ moduleId, defaultOpen = false }) {
 // ── Module Form ────────────────────────────────────────────────────────────
 
 function ModuleForm({ initial, onSaved, onCancel }) {
-  const [form, setForm] = useState(() => ({
-    ...EMPTY, ...initial,
-    _keyPointsRaw: Array.isArray(initial?.keyPoints) ? initial.keyPoints.join('\n') : '',
-    _transcriptRaw: Array.isArray(initial?.transcript) && initial.transcript.length
-      ? JSON.stringify(initial.transcript, null, 2)
-      : '',
-    _transcriptError: '',
-  }));
+  const [form, setForm] = useState(() => {
+    const videos = Array.isArray(initial?.videos) && initial.videos.length > 0
+      ? initial.videos.map(v => ({ ...EMPTY_VIDEO, ...v, id: v.id || tempId() }))
+      : initial?.videoUrl
+        ? [{ ...EMPTY_VIDEO, id: tempId(), title: initial.title || 'Chapter 1', url: initial.videoUrl, duration: initial.duration || '' }]
+        : [];
+    const documents = Array.isArray(initial?.documents)
+      ? initial.documents.map(d => ({ ...d, id: d.id || tempId() }))
+      : [];
+    return {
+      ...EMPTY, ...initial,
+      videos,
+      documents,
+      _keyPointsRaw: Array.isArray(initial?.keyPoints) ? initial.keyPoints.join('\n') : '',
+    };
+  });
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState(initial?.id || null);
+  const [activeTab, setActiveTab] = useState('videos');
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -280,79 +457,85 @@ function ModuleForm({ initial, onSaved, onCancel }) {
     if (!initial?.id) set('slug', slugify(v));
   };
 
-  const validateTranscript = (raw) => {
-    if (!raw.trim()) return { ok: true, value: [] };
-    const parsed = parseTranscript(raw);
-    if (!parsed) return { ok: false, value: null };
-    if (!Array.isArray(parsed)) return { ok: false, value: null };
-    return { ok: true, value: parsed };
+  const addVideo = () => set('videos', [...form.videos, { ...EMPTY_VIDEO, id: tempId() }]);
+  const updateVideo = (i, v) => set('videos', form.videos.map((x, idx) => idx === i ? v : x));
+  const removeVideo = (i) => set('videos', form.videos.filter((_, idx) => idx !== i));
+  const moveVideo = (i, dir) => {
+    const arr = [...form.videos];
+    const j = i + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    set('videos', arr);
   };
+
+  const addDoc = () => set('documents', [...form.documents, { ...EMPTY_DOC, id: tempId() }]);
+  const updateDoc = (i, d) => set('documents', form.documents.map((x, idx) => idx === i ? d : x));
+  const removeDoc = (i) => set('documents', form.documents.filter((_, idx) => idx !== i));
 
   const save = async () => {
     setSaving(true);
     try {
       const keyPoints = parseKeyPoints(form._keyPointsRaw);
-      const transcriptResult = validateTranscript(form._transcriptRaw);
-      if (!transcriptResult.ok) {
-        set('_transcriptError', 'Invalid JSON. Format: [{"time": 0, "text": "..."}]');
-        return;
-      }
+      const cleanVideos = form.videos
+        .filter(v => v.url)
+        .map(v => ({ ...v, id: v.id || tempId(), transcript: Array.isArray(v.transcript) ? v.transcript : [] }));
+      const cleanDocs = form.documents.filter(d => d.url).map(d => ({ ...d, id: d.id || tempId() }));
       const payload = {
         slug: form.slug, title: form.title, description: form.description,
         duration: form.duration, category: form.category, orderIndex: form.orderIndex,
-        pointsValue: form.pointsValue, locked: form.locked, videoUrl: form.videoUrl,
-        keyPoints, transcript: transcriptResult.value,
+        pointsValue: form.pointsValue, locked: form.locked,
+        videoUrl: cleanVideos[0]?.url || '',
+        videos: cleanVideos,
+        documents: cleanDocs,
+        keyPoints,
       };
       let mod;
       if (savedId) {
         mod = await api.updateModule(savedId, payload);
       } else {
         mod = await api.createModule(payload);
-        // Auto-create quiz for new module
         await api.createQuiz({ moduleId: mod.id, type: 'module', title: `${mod.title} Quiz`, passingScore: 70 });
         setSavedId(mod.id);
-        set('id', mod.id); // so QuizEditor shows
+        set('id', mod.id);
       }
       onSaved(mod, !savedId);
     } catch (err) { alert(err.message); }
     finally { setSaving(false); }
   };
 
-  const isNew = !savedId;
+  const TABS = [
+    { key: 'videos', label: 'Videos', icon: Video, count: form.videos.length },
+    { key: 'documents', label: 'Documents', icon: FileText, count: form.documents.length },
+    { key: 'content', label: 'Content', icon: null },
+  ];
 
   return (
     <div className="bg-gray-900 border border-emerald-600/30 rounded-2xl p-6 mb-6">
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-white font-semibold text-lg">{isNew ? '✦ New Module' : `Edit: ${initial?.title}`}</h3>
+        <h3 className="text-white font-semibold text-lg">{!savedId ? '✦ New Module' : `Edit: ${initial?.title}`}</h3>
         <button onClick={onCancel} className="text-gray-500 hover:text-white transition"><X size={18} /></button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Title */}
+      {/* Basic fields */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-gray-400 text-xs mb-1">Title *</label>
           <input value={form.title} onChange={(e) => handleTitleChange(e.target.value)}
             placeholder="e.g. Introduction to HPV"
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
         </div>
-
-        {/* Slug */}
         <div>
           <label className="block text-gray-400 text-xs mb-1">Slug * <span className="text-gray-600">(auto-filled)</span></label>
           <input value={form.slug} onChange={(e) => set('slug', e.target.value)}
             placeholder="e.g. intro-to-hpv"
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 font-mono" />
         </div>
-
-        {/* Description */}
         <div className="md:col-span-2">
           <label className="block text-gray-400 text-xs mb-1">Description *</label>
           <textarea rows={2} value={form.description} onChange={(e) => set('description', e.target.value)}
             placeholder="Brief summary shown on the modules list"
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none" />
         </div>
-
-        {/* Category */}
         <div>
           <label className="block text-gray-400 text-xs mb-1">Category</label>
           <select value={form.category} onChange={(e) => set('category', e.target.value)}
@@ -360,80 +543,129 @@ function ModuleForm({ initial, onSaved, onCancel }) {
             {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
-
-        {/* Duration */}
         <div>
-          <label className="block text-gray-400 text-xs mb-1">Duration</label>
+          <label className="block text-gray-400 text-xs mb-1">Total Duration</label>
           <input value={form.duration} onChange={(e) => set('duration', e.target.value)}
-            placeholder="e.g. 15 min"
+            placeholder="e.g. 25 min"
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
         </div>
-
-        {/* Points */}
         <div>
           <label className="block text-gray-400 text-xs mb-1">Points on completion</label>
           <input type="number" min={0} value={form.pointsValue} onChange={(e) => set('pointsValue', +e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
         </div>
-
-        {/* Order */}
         <div>
-          <label className="block text-gray-400 text-xs mb-1">Order <span className="text-gray-600">(0 = first, always unlocked)</span></label>
+          <label className="block text-gray-400 text-xs mb-1">Order <span className="text-gray-600">(0 = first)</span></label>
           <input type="number" min={0} value={form.orderIndex} onChange={(e) => set('orderIndex', +e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
         </div>
-
-        {/* Locked toggle */}
         <div className="md:col-span-2 flex items-center gap-3">
           <button type="button" onClick={() => set('locked', !form.locked)}
             className={`relative w-10 h-5 rounded-full transition-colors ${form.locked ? 'bg-gray-700' : 'bg-emerald-600'}`}>
             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.locked ? 'left-0.5' : 'left-5'}`} />
           </button>
           <label className="text-gray-300 text-sm">
-            {form.locked ? '🔒 Locked — requires previous module to be completed' : '🔓 Unlocked — accessible immediately'}
+            {form.locked ? '🔒 Locked — requires previous module' : '🔓 Unlocked — accessible immediately'}
           </label>
-        </div>
-
-        {/* Video */}
-        <div className="md:col-span-2">
-          <label className="block text-gray-400 text-xs mb-2">Video</label>
-          <VideoUploader value={form.videoUrl} onChange={(url) => set('videoUrl', url)} />
-        </div>
-
-        {/* Key Points */}
-        <div className="md:col-span-2">
-          <label className="block text-gray-400 text-xs mb-1">
-            Key Points <span className="text-gray-600">— one per line, shown as "Key Takeaways" in the module player</span>
-          </label>
-          <textarea rows={4} value={form._keyPointsRaw}
-            onChange={(e) => set('_keyPointsRaw', e.target.value)}
-            placeholder={"Vaccines train the immune system without causing disease\nHerd immunity protects those who cannot be vaccinated\nModern vaccines undergo rigorous safety testing"}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 font-mono resize-y" />
-          {form._keyPointsRaw && (
-            <p className="text-gray-500 text-xs mt-1">{parseKeyPoints(form._keyPointsRaw).length} point(s)</p>
-          )}
-        </div>
-
-        {/* Transcript */}
-        <div className="md:col-span-2">
-          <label className="block text-gray-400 text-xs mb-1">
-            Transcript <span className="text-gray-600">— JSON array of {'{'}time (seconds), text{'}'} — used for captions</span>
-          </label>
-          <textarea rows={6} value={form._transcriptRaw}
-            onChange={(e) => { set('_transcriptRaw', e.target.value); set('_transcriptError', ''); }}
-            placeholder={'[\n  { "time": 0, "text": "Welcome to this module." },\n  { "time": 5, "text": "Today we will cover..." }\n]'}
-            className={`w-full bg-gray-800 border rounded-lg px-3 py-2 text-white text-xs focus:outline-none font-mono resize-y ${form._transcriptError ? 'border-red-500' : 'border-gray-700 focus:border-emerald-500'}`} />
-          {form._transcriptError && <p className="text-red-400 text-xs mt-1">{form._transcriptError}</p>}
-          {form._transcriptRaw && !form._transcriptError && (() => {
-            const r = validateTranscript(form._transcriptRaw);
-            if (r.ok && r.value.length) return <p className="text-emerald-400 text-xs mt-1">✓ {r.value.length} transcript entries</p>;
-            return null;
-          })()}
         </div>
       </div>
 
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-gray-800 mb-5">
+        {TABS.map(({ key, label, icon: Icon, count }) => (
+          <button key={key} onClick={() => setActiveTab(key)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px
+              ${activeTab === key
+                ? 'border-emerald-500 text-emerald-400'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}>
+            {Icon && <Icon size={14} />}
+            {label}
+            {count > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold
+                ${activeTab === key ? 'bg-emerald-900/40 text-emerald-400' : 'bg-gray-800 text-gray-500'}`}>
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Videos tab */}
+      {activeTab === 'videos' && (
+        <div className="space-y-3">
+          <p className="text-gray-500 text-xs">
+            Add one or more chapters. Each chapter has its own video, subtitles, and transcript.
+            Students must watch ≥80% of each chapter to unlock the quiz.
+          </p>
+          {form.videos.map((v, i) => (
+            <VideoRow
+              key={v.id}
+              video={v}
+              index={i}
+              total={form.videos.length}
+              onChange={(updated) => updateVideo(i, updated)}
+              onRemove={() => removeVideo(i)}
+              onMoveUp={() => moveVideo(i, -1)}
+              onMoveDown={() => moveVideo(i, 1)}
+            />
+          ))}
+          <button type="button" onClick={addVideo}
+            className="flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 border border-dashed border-emerald-800/50 hover:border-emerald-700 rounded-xl px-4 py-3 w-full justify-center transition">
+            <Plus size={14} /> Add Chapter / Video
+          </button>
+          {form.videos.length === 0 && (
+            <p className="text-amber-500 text-xs flex items-center gap-1"><Info size={12} /> Add at least one video for this module.</p>
+          )}
+        </div>
+      )}
+
+      {/* Documents tab */}
+      {activeTab === 'documents' && (
+        <div className="space-y-3">
+          <p className="text-gray-500 text-xs">Attach PDFs, slides, notes, or any downloadable resources for this module.</p>
+          {form.documents.map((doc, i) => (
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              index={i}
+              onChange={(updated) => updateDoc(i, updated)}
+              onRemove={() => removeDoc(i)}
+            />
+          ))}
+          <button type="button" onClick={addDoc}
+            className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 border border-dashed border-blue-900/50 hover:border-blue-800 rounded-xl px-4 py-3 w-full justify-center transition">
+            <Plus size={14} /> Add Document / Resource
+          </button>
+        </div>
+      )}
+
+      {/* Content tab — key points only (transcripts moved to per-video) */}
+      {activeTab === 'content' && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-gray-400 text-xs mb-1">
+              Key Points <span className="text-gray-600">— one per line, shown as "Key Takeaways" in the player</span>
+            </label>
+            <textarea rows={6} value={form._keyPointsRaw}
+              onChange={(e) => set('_keyPointsRaw', e.target.value)}
+              placeholder={"Vaccines train the immune system\nHerd immunity protects the vulnerable\nModern vaccines undergo rigorous testing"}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 font-mono resize-y" />
+            {form._keyPointsRaw && (
+              <p className="text-gray-500 text-xs mt-1">{parseKeyPoints(form._keyPointsRaw).length} point(s)</p>
+            )}
+          </div>
+          <div className="bg-blue-900/10 border border-blue-800/30 rounded-xl p-4">
+            <p className="text-blue-300/70 text-xs flex items-start gap-1.5">
+              <Info size={12} className="shrink-0 mt-0.5" />
+              Subtitles &amp; transcripts are set per-chapter. Open the <strong className="text-blue-300">Videos</strong> tab, expand any chapter row, and click <strong className="text-blue-300">Subtitles &amp; Transcript</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex gap-3 mt-5">
+      <div className="flex gap-3 mt-6 pt-5 border-t border-gray-800">
         <button onClick={save} disabled={saving}
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-50">
           <Check size={15} />{saving ? 'Saving…' : savedId ? 'Save Changes' : 'Create Module'}
@@ -442,19 +674,10 @@ function ModuleForm({ initial, onSaved, onCancel }) {
           className="flex items-center gap-2 text-gray-400 hover:text-white border border-gray-700 px-5 py-2.5 rounded-lg text-sm transition">
           <X size={15} /> Cancel
         </button>
-        {!isNew && (
-          <p className="text-gray-600 text-xs self-center ml-auto">Module ID: <span className="font-mono">{savedId}</span></p>
-        )}
+        {savedId && <p className="text-gray-600 text-xs self-center ml-auto">ID: <span className="font-mono">{savedId}</span></p>}
       </div>
 
-      {/* Quiz editor — shown once module is saved (has an ID) */}
-      {savedId && <QuizEditor moduleId={savedId} defaultOpen={isNew} />}
-
-      {isNew && !savedId && (
-        <p className="text-gray-600 text-xs mt-4 italic">
-          A quiz will be automatically created after saving. You can add questions from the quiz editor.
-        </p>
-      )}
+      {savedId && <QuizEditor moduleId={savedId} defaultOpen={!initial?.id} />}
     </div>
   );
 }
@@ -471,7 +694,7 @@ const CAT_COLORS = {
 
 export default function Modules() {
   const [modules, setModules] = useState([]);
-  const [form, setForm] = useState(null); // null = closed, {} = new, {...mod} = edit
+  const [form, setForm] = useState(null);
 
   const load = () => api.modules().then((mods) => setModules(mods.sort((a, b) => a.orderIndex - b.orderIndex))).catch(console.error);
   useEffect(() => { load(); }, []);
@@ -479,7 +702,6 @@ export default function Modules() {
   const handleSaved = (mod, isNew) => {
     load();
     if (!isNew) setForm(null);
-    // For new modules, keep form open so admin can add quiz questions
   };
 
   const del = async (id) => {
@@ -492,11 +714,10 @@ export default function Modules() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold text-white">Modules</h2>
-          <p className="text-gray-500 text-sm mt-1">{modules.length} module{modules.length !== 1 ? 's' : ''} · manage content, videos, and quizzes</p>
+          <p className="text-gray-500 text-sm mt-1">{modules.length} module{modules.length !== 1 ? 's' : ''} · manage chapters, documents, and quizzes</p>
         </div>
         <button onClick={() => setForm({})}
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition">
@@ -504,7 +725,6 @@ export default function Modules() {
         </button>
       </div>
 
-      {/* Module form (create / edit) */}
       {form !== null && (
         <ModuleForm
           initial={form}
@@ -513,7 +733,6 @@ export default function Modules() {
         />
       )}
 
-      {/* Module list */}
       {modules.length === 0 ? (
         <div className="text-center py-20 text-gray-600">
           <div className="text-5xl mb-4">📭</div>
@@ -522,54 +741,58 @@ export default function Modules() {
         </div>
       ) : (
         <div className="space-y-3">
-          {modules.map((m) => (
-            <div key={m.id}
-              className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-start gap-4 hover:border-gray-700 transition group">
-              {/* Order number */}
-              <div className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 text-sm font-bold shrink-0">
-                {m.orderIndex + 1}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="text-white font-semibold">{m.title}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${catColor(m.category)}`}>{m.category}</span>
-                  {m.locked
-                    ? <span className="text-xs text-red-400 bg-red-900/20 border border-red-800/30 px-2 py-0.5 rounded-full">🔒 Locked</span>
-                    : <span className="text-xs text-emerald-400 bg-emerald-900/20 border border-emerald-800/30 px-2 py-0.5 rounded-full">🔓 Unlocked</span>
-                  }
+          {modules.map((m) => {
+            const videos = Array.isArray(m.videos) && m.videos.length > 0 ? m.videos : m.videoUrl ? [{ url: m.videoUrl }] : [];
+            const docs = Array.isArray(m.documents) ? m.documents : [];
+            const transcriptCount = videos.reduce((sum, v) => sum + (Array.isArray(v.transcript) ? v.transcript.length : 0), 0);
+            return (
+              <div key={m.id}
+                className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-start gap-4 hover:border-gray-700 transition group">
+                <div className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 text-sm font-bold shrink-0">
+                  {m.orderIndex + 1}
                 </div>
-                <p className="text-gray-500 text-sm truncate">{m.description}</p>
-                <div className="flex items-center gap-3 mt-2 text-xs text-gray-600 flex-wrap">
-                  <span>{m.duration}</span>
-                  <span>·</span>
-                  <span className="text-emerald-500">{m.pointsValue} pts</span>
-                  <span>·</span>
-                  {m.videoUrl
-                    ? <span className="text-emerald-400 flex items-center gap-1"><Check size={10} /> Video set</span>
-                    : <span className="text-amber-500">⚠ No video</span>
-                  }
-                  <span>·</span>
-                  <span>{Array.isArray(m.keyPoints) ? m.keyPoints.length : 0} key points</span>
-                  <span>·</span>
-                  <span>{Array.isArray(m.transcript) ? m.transcript.length : 0} transcript entries</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-white font-semibold">{m.title}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${catColor(m.category)}`}>{m.category}</span>
+                    {m.locked
+                      ? <span className="text-xs text-red-400 bg-red-900/20 border border-red-800/30 px-2 py-0.5 rounded-full">🔒 Locked</span>
+                      : <span className="text-xs text-emerald-400 bg-emerald-900/20 border border-emerald-800/30 px-2 py-0.5 rounded-full">🔓 Unlocked</span>
+                    }
+                  </div>
+                  <p className="text-gray-500 text-sm truncate">{m.description}</p>
+                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-600 flex-wrap">
+                    <span>{m.duration}</span>
+                    <span>·</span>
+                    <span className="text-emerald-500">{m.pointsValue} pts</span>
+                    <span>·</span>
+                    <span className={`flex items-center gap-1 ${videos.length > 0 ? 'text-blue-400' : 'text-amber-500'}`}>
+                      <Video size={10} />
+                      {videos.length > 0 ? `${videos.length} chapter${videos.length !== 1 ? 's' : ''}` : 'No chapters'}
+                    </span>
+                    {docs.length > 0 && (
+                      <><span>·</span><span className="flex items-center gap-1 text-gray-500"><FileText size={10} />{docs.length} doc{docs.length !== 1 ? 's' : ''}</span></>
+                    )}
+                    {transcriptCount > 0 && (
+                      <><span>·</span><span className="text-blue-500/70">{transcriptCount} transcript lines</span></>
+                    )}
+                    <span>·</span>
+                    <span>{Array.isArray(m.keyPoints) ? m.keyPoints.length : 0} key points</span>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition">
+                  <button onClick={() => setForm({ ...m })}
+                    className="flex items-center gap-1.5 text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-3 py-1.5 rounded-lg text-xs transition">
+                    <Pencil size={12} /> Edit
+                  </button>
+                  <button onClick={() => del(m.id)}
+                    className="flex items-center gap-1.5 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-800/50 px-3 py-1.5 rounded-lg text-xs transition">
+                    <Trash2 size={12} /> Delete
+                  </button>
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition">
-                <button onClick={() => setForm({ ...m })}
-                  className="flex items-center gap-1.5 text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-3 py-1.5 rounded-lg text-xs transition">
-                  <Pencil size={12} /> Edit
-                </button>
-                <button onClick={() => del(m.id)}
-                  className="flex items-center gap-1.5 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-800/50 px-3 py-1.5 rounded-lg text-xs transition">
-                  <Trash2 size={12} /> Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

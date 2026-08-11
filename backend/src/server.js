@@ -14,6 +14,7 @@ import moduleRoutes from './routes/modules.js';
 import rewardRoutes from './routes/rewards.js';
 import adminRoutes from './routes/admin.js';
 import leaderboardRoutes from './routes/leaderboard.js';
+import eventRoutes from './routes/events.js';
 import transcribeRoutes from './routes/transcribe.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticate } from './middleware/auth.js';
@@ -94,7 +95,8 @@ app.use('/api/modules', moduleRoutes);
 app.use('/api/rewards', rewardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
-app.use('/api', transcribeRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/transcribe', transcribeRoutes);
 
 // Notifications — authenticated users fetch active notifications
 app.get('/api/notifications', authenticate, async (req, res) => {
