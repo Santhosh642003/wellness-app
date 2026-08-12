@@ -25,7 +25,8 @@ const PER_USER_MODULES_QUERY = `
     ump."watchedPercent",
     ump."quizPassed",
     ump."completedAt",
-    COALESCE(ump."videoProgress", '{}'::jsonb) AS "videoProgress"
+    COALESCE(ump."videoProgress", '{}'::jsonb) AS "videoProgress",
+    COALESCE(ump."videoTimestamps", '{}'::jsonb) AS "videoTimestamps"
   FROM modules m
   LEFT JOIN user_module_progress ump
     ON ump."moduleId" = m.id AND ump."userId" = $1
@@ -40,9 +41,9 @@ const PER_USER_MODULES_QUERY = `
 router.get('/', async (req, res, next) => {
   try {
     const { rows } = await pool.query(PER_USER_MODULES_QUERY, [req.userId]);
-    res.json(rows.map(({ completed, watchedPercent, quizPassed, completedAt, videoProgress, ...module }) => ({
+    res.json(rows.map(({ completed, watchedPercent, quizPassed, completedAt, videoProgress, videoTimestamps, ...module }) => ({
       ...module,
-      userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt, videoProgress } : null,
+      userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt, videoProgress, videoTimestamps } : null,
     })));
   } catch (err) {
     next(err);
@@ -99,8 +100,8 @@ router.get('/:moduleId', async (req, res, next) => {
     );
     const { rows } = await pool.query(query, [req.userId, req.params.moduleId]);
     if (!rows[0]) return res.status(404).json({ error: 'Module not found' });
-    const { completed, watchedPercent, quizPassed, completedAt, videoProgress, ...module } = rows[0];
-    res.json({ ...module, userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt, videoProgress } : null });
+    const { completed, watchedPercent, quizPassed, completedAt, videoProgress, videoTimestamps, ...module } = rows[0];
+    res.json({ ...module, userProgress: completed !== null ? { completed, watchedPercent, quizPassed, completedAt, videoProgress, videoTimestamps } : null });
   } catch (err) {
     next(err);
   }

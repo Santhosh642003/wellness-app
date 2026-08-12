@@ -218,6 +218,7 @@ router.get('/:userId/module-progress', requireSelf, async (req, res, next) => {
 const moduleProgressSchema = z.object({
   watchedPercent: z.number().min(0).max(100).optional(),
   videoProgress: z.record(z.string(), z.number().min(0).max(100)).optional(),
+  videoTimestamps: z.record(z.string(), z.number().min(0)).optional(),
   completed: z.boolean().optional(),
 });
 
@@ -256,6 +257,12 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
         insertCols.push('"videoProgress"');
         insertVals.push(JSON.stringify(data.videoProgress));
         updateClauses.push(`"videoProgress"=EXCLUDED."videoProgress"`);
+      }
+
+      if (data.videoTimestamps && Object.keys(data.videoTimestamps).length > 0) {
+        insertCols.push('"videoTimestamps"');
+        insertVals.push(JSON.stringify(data.videoTimestamps));
+        updateClauses.push(`"videoTimestamps"=EXCLUDED."videoTimestamps"`);
       }
 
       if (resolvedWatchedPercent !== undefined) {
