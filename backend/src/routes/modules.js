@@ -17,6 +17,7 @@ const PER_USER_MODULES_QUERY = `
     COALESCE(m.videos, '[]'::jsonb) AS videos,
     COALESCE(m.documents, '[]'::jsonb) AS documents,
     CASE
+      WHEN m.locked = false THEN false
       WHEN m."orderIndex" = 0 THEN false
       WHEN prev_prog.completed = true THEN false
       ELSE true
