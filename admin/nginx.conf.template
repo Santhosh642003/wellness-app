@@ -4,6 +4,11 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # 127.0.0.11 is Docker's embedded DNS — resolves *.railway.internal hostnames.
+    # valid=30s re-resolves every 30s instead of caching the result from startup.
+    # ipv6=off avoids AAAA lookup failures in Railway's IPv4-only private network.
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
     gzip on;
     gzip_types text/plain text/css application/json application/javascript;
 
@@ -17,7 +22,8 @@ server {
     }
 
     location /api/ {
-        proxy_pass ${BACKEND_URL};
+        set $backend ${BACKEND_URL};
+        proxy_pass $backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
