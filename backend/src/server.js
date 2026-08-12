@@ -56,6 +56,11 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust Railway's single reverse-proxy hop so express-rate-limit can read
+// X-Forwarded-For without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR,
+// and req.ip reflects the real client IP instead of Railway's internal address.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({
   origin: [
