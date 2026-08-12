@@ -39,8 +39,7 @@ const passwordSchema = z.string()
   .regex(/[!@#$%^&*()\-_=+\[\]{}|;:,.<>?]/, 'Password must contain at least one special character');
 
 const registerSchema = z.object({
-  // TEMP: for UI testing only, remove after account created
-  email: z.string().email().refine(v => v.endsWith('@njit.edu') || v === 'santhoshn6403@gmail.com', { message: 'Must be an NJIT email address' }),
+  email: z.string().email().endsWith('@njit.edu', { message: 'Must be an NJIT email address' }),
   password: passwordSchema,
   name: z.string().min(2, 'Name must be at least 2 characters'),
   major: z.string().max(100).optional(),
@@ -79,8 +78,7 @@ router.post('/send-otp', async (req, res, next) => {
   try {
     console.log('[send-otp] step 1: parse');
     const { email } = z.object({
-      // TEMP: for UI testing only, remove after account created
-      email: z.string().email().refine(v => v.endsWith('@njit.edu') || v === 'santhoshn6403@gmail.com', { message: 'Must be an NJIT email address' }),
+      email: z.string().email().endsWith('@njit.edu', { message: 'Must be an NJIT email address' }),
     }).parse(req.body);
 
     const normalEmail = email.toLowerCase();

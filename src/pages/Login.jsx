@@ -90,8 +90,7 @@ export default function Login() {
 
   const normalEmail = email.trim().toLowerCase();
   const isNjitEmail = useMemo(
-    // TEMP: for UI testing only, remove after account created
-    () => (normalEmail.endsWith("@njit.edu") && normalEmail.length > "@njit.edu".length) || normalEmail === "santhoshn6403@gmail.com",
+    () => normalEmail.endsWith("@njit.edu") && normalEmail.length > "@njit.edu".length,
     [normalEmail]
   );
 
