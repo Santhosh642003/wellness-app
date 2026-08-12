@@ -8,6 +8,18 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import 'dotenv/config';
 
+// TEMP DEBUG - remove after OTP issue resolved
+const _LOG_BUF = [];
+const _LOG_BUF_MAX = 200;
+function _pushLog(level, args) {
+  const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+  _LOG_BUF.push({ t: new Date().toISOString(), level, msg });
+  if (_LOG_BUF.length > _LOG_BUF_MAX) _LOG_BUF.shift();
+}
+const _origLog = console.log; console.log = (...a) => { _pushLog('log', a); _origLog(...a); };
+const _origErr = console.error; console.error = (...a) => { _pushLog('error', a); _origErr(...a); };
+// END TEMP DEBUG
+
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import moduleRoutes from './routes/modules.js';
@@ -109,6 +121,16 @@ app.get('/api/notifications', authenticate, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch notifications' });
   }
 });
+
+// TEMP DEBUG - remove after OTP issue resolved
+app.get('/api/debug/recent-logs', (req, res) => {
+  const key = req.headers['x-debug-key'];
+  if (!process.env.DEBUG_KEY || key !== process.env.DEBUG_KEY) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  res.json({ count: _LOG_BUF.length, logs: _LOG_BUF });
+});
+// END TEMP DEBUG
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
