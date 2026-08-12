@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../contexts/AuthContext.jsx";
@@ -86,6 +86,7 @@ export default function Login() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const sendingOtp = useRef(false); // synchronous guard — set before first await, prevents concurrent submissions
 
   const normalEmail = email.trim().toLowerCase();
   const isNjitEmail = useMemo(
@@ -98,6 +99,7 @@ export default function Login() {
   const passwordValid = pwStrength === 5;
 
   const resetRegister = () => {
+    sendingOtp.current = false;
     setStep(1); setName(""); setCampus(CAMPUSES[0]); setMajor(""); setYearOfStudy(""); setEthnicity("");
     setEmail(""); setPassword(""); setConfirmPassword(""); setOtpCode(""); setOtpSent(false); setDevCode(""); setError("");
   };
@@ -128,10 +130,12 @@ export default function Login() {
   // --- Step 2: Send OTP → Step 3 ---
   const sendOtp = async (e) => {
     e.preventDefault();
+    if (sendingOtp.current) return; // guard: ref is set synchronously before first await, safe against rapid multi-click
     if (!isNjitEmail) { setError("Please enter a valid NJIT email address."); return; }
     if (!passwordValid) { setError("Your password does not meet the requirements."); return; }
     if (!passwordsMatch) { setError("Passwords do not match."); return; }
     setError("");
+    sendingOtp.current = true;
     setLoading(true);
     try {
       const result = await authApi.sendOtp({ email: normalEmail });
@@ -141,6 +145,7 @@ export default function Login() {
     } catch (err) {
       setError(err.message || "Failed to send verification code. Please try again.");
     } finally {
+      sendingOtp.current = false;
       setLoading(false);
     }
   };
