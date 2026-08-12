@@ -17,6 +17,7 @@ router.get('/:userId', requireSelf, async (req, res, next) => {
     const { rows: moduleProgresses } = await pool.query(
       `SELECT ump.*, m.title, m.slug, m.category, m."orderIndex", m."pointsValue",
               CASE
+                WHEN m.locked = false THEN false
                 WHEN m."orderIndex" = 0 THEN false
                 WHEN prev_prog.completed = true THEN false
                 ELSE true
