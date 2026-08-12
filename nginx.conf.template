@@ -4,12 +4,12 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # 127.0.0.11 is Docker's embedded DNS — resolves *.railway.internal hostnames.
-    # valid=30s re-resolves every 30s instead of caching the result from startup.
-    # ipv6=off avoids AAAA lookup failures in Railway's IPv4-only private network.
-    # Without this + the $backend variable below, nginx resolves proxy_pass hostnames
-    # once at startup, caches them forever, and silently fails if the IP changes.
-    resolver 127.0.0.11 valid=30s ipv6=off;
+    # Railway's private-network DNS resolver (IPv6, stable across deploys).
+    # 127.0.0.11 is Docker's embedded DNS and does NOT work on Railway.
+    # valid=10s forces re-resolution so a redeployed backend is picked up quickly.
+    # The $backend variable is required — without it nginx ignores the resolver
+    # and caches the upstream IP once at startup, breaking on backend redeploys.
+    resolver [fd12::10] valid=10s ipv6=on;
 
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
