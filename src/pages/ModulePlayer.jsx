@@ -55,6 +55,14 @@ export default function ModulePlayer() {
   const lastSavedPct = useRef(0);
   const saveTimer = useRef(null);
 
+  // Per-video playback timestamps in seconds — { "0": 482, "1": 120 }
+  // Stored in a ref so handleTimeUpdate can update it without triggering re-renders.
+  const videoTimestampsRef = useRef({});
+  // Mirror of watchedPercent kept in a ref for use in stable event listeners.
+  const watchedPercentRef = useRef(0);
+  // Stable ref to the latest saveProgress so the pause listener never re-registers.
+  const saveProgressRef = useRef(null);
+
   const [lastSaved, setLastSaved] = useState(null);
 
   // Caption state
@@ -83,7 +91,9 @@ export default function ModulePlayer() {
         }
         // Restore saved per-video progress
         const savedVP = m?.userProgress?.videoProgress || {};
+        const savedVT = m?.userProgress?.videoTimestamps || {};
         setVideoProgress(savedVP);
+        videoTimestampsRef.current = savedVT;
 
         // Start at the chapter requested via ?chapter=N, default 0
         const chapterParam = parseInt(searchParams.get("chapter") || "0");
@@ -93,6 +103,7 @@ export default function ModulePlayer() {
 
         const savedPct = savedVP[String(safeIdx)] ?? (safeIdx === 0 ? m?.userProgress?.watchedPercent ?? 0 : 0);
         setWatchedPercent(savedPct);
+        watchedPercentRef.current = savedPct;
         lastSavedPct.current = savedPct;
       })
       .catch(console.error)
@@ -113,14 +124,16 @@ export default function ModulePlayer() {
   const allVideosWatched = content.videos.length === 0 || content.videos.every((_, i) => (videoProgress[String(i)] ?? 0) >= 80);
   const quizUnlocked = alreadyCompleted || quizPassed || (content.videos.length > 0 ? allVideosWatched : watchedPercent >= 80);
 
-  // Save progress to the server (debounced)
+  // Save progress to the server
   const saveProgress = useCallback(async (pct, vpOverride) => {
     if (!user?.id || !moduleId) return;
     try {
       const vp = vpOverride ?? videoProgress;
+      const vt = { ...videoTimestampsRef.current };
       await usersApi.updateModuleProgress(user.id, moduleId, {
         watchedPercent: Math.round(pct),
         videoProgress: content.videos.length > 1 ? vp : undefined,
+        videoTimestamps: Object.keys(vt).length > 0 ? vt : undefined,
       });
       lastSavedPct.current = pct;
       setLastSaved(new Date());
@@ -129,43 +142,66 @@ export default function ModulePlayer() {
     }
   }, [user?.id, moduleId, videoProgress, content.videos.length]);
 
-  // Save every 30 seconds if progress advanced
+  // Keep saveProgressRef current so the stable pause listener always calls the latest version
+  useEffect(() => { saveProgressRef.current = saveProgress; });
+
+  // Save every 10 seconds if progress advanced
   useEffect(() => {
     saveTimer.current = setInterval(() => {
-      if (watchedPercent > lastSavedPct.current + 1) {
-        saveProgress(watchedPercent);
+      if (watchedPercentRef.current > lastSavedPct.current + 1) {
+        saveProgressRef.current?.(watchedPercentRef.current);
       }
-    }, 30000);
+    }, 10000);
     return () => clearInterval(saveTimer.current);
-  }, [watchedPercent, saveProgress]);
+  }, []); // stable — reads from refs, no deps needed
 
   // Save on unmount
   useEffect(() => {
     return () => {
-      if (watchedPercent > lastSavedPct.current + 1) {
-        saveProgress(watchedPercent);
+      if (watchedPercentRef.current > lastSavedPct.current + 1) {
+        saveProgressRef.current?.(watchedPercentRef.current);
       }
     };
-  }, [watchedPercent, saveProgress]);
+  }, []); // stable — refs always current
 
-  // Track video time and compute watched % for the current video
+  // Save on pause (registered once; uses stable refs)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onPause = () => {
+      if (watchedPercentRef.current > lastSavedPct.current + 1) {
+        saveProgressRef.current?.(watchedPercentRef.current);
+      }
+    };
+    video.addEventListener('pause', onPause);
+    return () => video.removeEventListener('pause', onPause);
+  }, []); // stable — only registered once on mount
+
+  // Track video time, compute watched %, and record exact playback position in seconds
   const handleTimeUpdate = useCallback((currentTime) => {
     setVideoTime(Math.floor(currentTime));
+    const key = String(currentVideoIdx);
+    // Update exact timestamp for this video (used for second-precision resume)
+    videoTimestampsRef.current[key] = Math.floor(currentTime);
     const dur = videoRef.current?.duration;
     if (dur > 0) {
       const pct = Math.min(100, (currentTime / dur) * 100);
+      const newPct = Math.max(watchedPercentRef.current, pct);
+      watchedPercentRef.current = newPct;
       setWatchedPercent((prev) => Math.max(prev, pct));
       setVideoProgress((prev) => {
-        const key = String(currentVideoIdx);
         if (pct <= (prev[key] ?? 0)) return prev;
         return { ...prev, [key]: Math.round(pct) };
       });
     }
   }, [currentVideoIdx]);
 
-  // On video ended: mark current video 100%
+  // On video ended: mark current video 100% and clear its resume timestamp
   const handleVideoEnded = useCallback(() => {
+    watchedPercentRef.current = 100;
     setWatchedPercent(100);
+    // Clear the timestamp so replaying a completed video starts from the beginning
+    delete videoTimestampsRef.current[String(currentVideoIdx)];
     setVideoProgress((prev) => {
       const updated = { ...prev, [String(currentVideoIdx)]: 100 };
       const percs = Object.values(updated);
@@ -179,27 +215,34 @@ export default function ModulePlayer() {
     });
   }, [saveProgress, currentVideoIdx, content.videos.length]);
 
-  // Seek to saved position when video metadata loads
+  // Seek to saved position when video metadata loads.
+  // Prefers exact timestamp (seconds) stored in videoTimestampsRef; falls back to
+  // percentage-based seek for backward-compat with progress saved before this change.
   const handleMetadataLoaded = useCallback(() => {
     const dur = videoRef.current?.duration;
-    const savedPct = videoProgress[String(currentVideoIdx)] ?? 0;
-    if (dur > 0 && savedPct > 0 && savedPct < 95) {
+    if (!dur || dur <= 0) return;
+    const key = String(currentVideoIdx);
+    const savedTs = videoTimestampsRef.current[key];
+    const savedPct = videoProgress[key] ?? 0;
+    if (savedTs !== undefined && savedTs > 0 && savedTs < dur * 0.95) {
+      videoRef.current.currentTime = savedTs;
+    } else if (savedPct > 0 && savedPct < 95) {
       videoRef.current.currentTime = (savedPct / 100) * dur;
     }
   }, [currentVideoIdx, videoProgress]);
 
-  // When user switches videos, update current video's watched % display
+  // When user switches videos, save current chapter then restore state for new chapter
   const switchVideo = useCallback((idx) => {
-    // Save current video progress first
     const percs = Object.values(videoProgress);
     const avg = percs.length ? Math.round(percs.reduce((a, b) => a + b, 0) / percs.length) : 0;
-    if (watchedPercent > lastSavedPct.current + 1) saveProgress(avg);
+    if (watchedPercentRef.current > lastSavedPct.current + 1) saveProgress(avg);
     setCurrentVideoIdx(idx);
     const savedPct = videoProgress[String(idx)] ?? 0;
     setWatchedPercent(savedPct);
+    watchedPercentRef.current = savedPct;
     lastSavedPct.current = savedPct;
     setVideoTime(0);
-  }, [videoProgress, watchedPercent, saveProgress]);
+  }, [videoProgress, saveProgress]);
 
   // Per-video transcript (updates when current chapter changes)
   const currentTranscript = useMemo(

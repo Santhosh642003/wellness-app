@@ -22,5 +22,7 @@ export function mapModule(m) {
     videoCount: videos.length,
     videoProgress: m.userProgress?.videoProgress || {},
     documentCount: Array.isArray(m.documents) ? m.documents.length : 0,
+    thumbnailUrl: m.thumbnailUrl || null,
+    videoTimestamps: m.userProgress?.videoTimestamps || {},
   };
 }

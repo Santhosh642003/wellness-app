@@ -214,6 +214,14 @@ CREATE INDEX IF NOT EXISTS point_ledger_user_idx ON point_ledger("userId");
 CREATE INDEX IF NOT EXISTS point_ledger_created_idx ON point_ledger("createdAt");
 `;
 
+const MODULE_THUMBNAIL = `
+ALTER TABLE modules ADD COLUMN IF NOT EXISTS "thumbnailUrl" TEXT;
+`;
+
+const VIDEO_TIMESTAMPS = `
+ALTER TABLE user_module_progress ADD COLUMN IF NOT EXISTS "videoTimestamps" JSONB DEFAULT '{}'::jsonb;
+`;
+
 const BATCH2_SCHEMA = `
 CREATE TABLE IF NOT EXISTS reward_pool (
   id TEXT PRIMARY KEY,
@@ -261,6 +269,8 @@ export async function migrate() {
     await pool.query(COMMUNITY_AND_REFERRALS);
     await pool.query(MULTI_VIDEO_AND_DOCS);
     await pool.query(IDEMPOTENCY_AND_LEDGER);
+    await pool.query(MODULE_THUMBNAIL);
+    await pool.query(VIDEO_TIMESTAMPS);
     await pool.query(BATCH2_SCHEMA);
     console.log('Database schema ready');
   } catch (err) {
