@@ -12,7 +12,7 @@ router.use(authenticate);
 const PER_USER_MODULES_QUERY = `
   SELECT
     m.id, m.slug, m.title, m.description, m.duration, m.category,
-    m."orderIndex", m."pointsValue", m."videoUrl", m."createdAt",
+    m."orderIndex", m."pointsValue", m."videoUrl", m."thumbnailUrl", m."createdAt",
     m."keyPoints", m.transcript,
     COALESCE(m.videos, '[]'::jsonb) AS videos,
     COALESCE(m.documents, '[]'::jsonb) AS documents,

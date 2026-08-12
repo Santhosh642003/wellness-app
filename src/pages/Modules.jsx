@@ -9,82 +9,54 @@ import { mapModule } from "../lib/moduleUtils";
 
 const CATEGORY_COLORS = {
   Foundations: { bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
-  HPV: { bg: "bg-violet-500/10", border: "border-violet-500/20", text: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500" },
-  MenB: { bg: "bg-rose-500/10", border: "border-rose-500/20", text: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500" },
-  Bonus: { bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
-  General: { bg: "bg-teal-500/10", border: "border-teal-500/20", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500" },
+  HPV:         { bg: "bg-violet-500/10", border: "border-violet-500/20", text: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500" },
+  MenB:        { bg: "bg-rose-500/10", border: "border-rose-500/20", text: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500" },
+  Bonus:       { bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
+  General:     { bg: "bg-teal-500/10", border: "border-teal-500/20", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500" },
 };
 const DEFAULT_COLOR = { bg: "bg-slate-100 dark:bg-white/5", border: "border-slate-200 dark:border-gray-700", text: "text-slate-500 dark:text-gray-400", dot: "bg-slate-400" };
 function getColor(category) { return CATEGORY_COLORS[category] || DEFAULT_COLOR; }
 
+const CATEGORY_GRADIENTS = {
+  Foundations: "from-blue-600 to-indigo-700",
+  HPV:         "from-violet-600 to-purple-800",
+  MenB:        "from-rose-500 to-red-700",
+  Bonus:       "from-amber-500 to-orange-600",
+  General:     "from-teal-500 to-emerald-700",
+  default:     "from-slate-600 to-slate-800",
+};
+function getThumbnailGrad(category) { return CATEGORY_GRADIENTS[category] || CATEGORY_GRADIENTS.default; }
 
-function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
-  if (completed) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20 text-emerald-600 dark:text-emerald-400">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-        </svg>
-        Completed
-      </span>
-    );
+// Find the first chapter index that is not yet fully watched (for resume)
+function resumeChapterIdx(m) {
+  if (!m.videos || m.videos.length <= 1) return 0;
+  for (let i = 0; i < m.videos.length; i++) {
+    if ((m.videoProgress[String(i)] ?? 0) < 80) return i;
   }
-  if (locked) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">
-        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-        </svg>
-        Locked
-      </span>
-    );
-  }
-  if (quizPassed) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-400/10 border border-blue-400/20 text-blue-600 dark:text-blue-400">
-        Quiz Passed
-      </span>
-    );
-  }
-  if (watchedPct > 0) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-400/10 border border-orange-400/20 text-orange-600 dark:text-orange-400">
-        In Progress
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">
-      Not Started
-    </span>
-  );
+  return 0;
 }
 
-function StepIndicator({ watchedPct, quizPassed, completed, videoCount = 1, videoProgress = {} }) {
-  // One segment per chapter (or one for single-video) + Quiz + Done
-  const chapterSegments = videoCount > 1
-    ? Array.from({ length: videoCount }, (_, i) => (videoProgress[String(i)] ?? 0) >= 80 || completed)
-    : [watchedPct >= 80 || completed];
-  const segments = [
-    ...chapterSegments,
-    quizPassed || completed,
-    completed,
-  ];
-  const chaptersDone = chapterSegments.filter(Boolean).length;
-  const allChaptersDone = chaptersDone >= videoCount;
-  const statusText = completed ? "Complete"
-    : quizPassed ? "Quiz done"
-    : allChaptersDone ? "Videos done"
-    : watchedPct > 0 || chaptersDone > 0 ? "Watching"
-    : "Not started";
-
+function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
+  if (completed) return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20 text-emerald-600 dark:text-emerald-400">
+      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+      Completed
+    </span>
+  );
+  if (locked) return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">
+      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      Locked
+    </span>
+  );
+  if (quizPassed) return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-400/10 border border-blue-400/20 text-blue-600 dark:text-blue-400">Quiz Passed</span>
+  );
+  if (watchedPct > 0) return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-400/10 border border-orange-400/20 text-orange-600 dark:text-orange-400">In Progress</span>
+  );
   return (
-    <div className="flex items-center gap-0.5 flex-wrap">
-      {segments.map((done, i) => (
-        <div key={i} className={`h-1.5 w-6 rounded-full transition-all ${done ? "bg-gradient-to-r from-blue-500 to-emerald-400" : "bg-slate-200 dark:bg-gray-700"}`} />
-      ))}
-      <span className="ml-1 text-[10px] text-slate-400 dark:text-gray-500">{statusText}</span>
-    </div>
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">Not Started</span>
   );
 }
 
@@ -100,152 +72,166 @@ function BookmarkButton({ moduleId, bookmarked, onToggle }) {
     <button
       onClick={handleClick}
       title={bookmarked ? "Remove bookmark" : "Bookmark this module"}
-      className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center border transition-all
+      className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center border transition-all
         ${bookmarked
           ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-500"
-          : "bg-white/80 dark:bg-[#1a1a1a]/80 border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500 hover:text-yellow-500 hover:border-yellow-400/40"
-        }`}
+          : "bg-white/80 dark:bg-[#1a1a1a]/80 border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500 hover:text-yellow-500 hover:border-yellow-400/40"}`}
     >
-      <svg className="w-4 h-4" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <svg className="w-3.5 h-3.5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
       </svg>
     </button>
   );
 }
 
+function ModuleThumbnail({ m, gradient, showPlayHover = true }) {
+  return (
+    <div className="relative aspect-video overflow-hidden bg-slate-900">
+      {m.thumbnailUrl ? (
+        <img src={m.thumbnailUrl} alt={m.title} className="w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <span className="text-7xl font-black text-white/15 select-none">{m.orderIndex + 1}</span>
+        </div>
+      )}
+
+      {/* Lock overlay */}
+      {m.locked && (
+        <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
+          <svg className="w-8 h-8 text-white/60" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+          </svg>
+        </div>
+      )}
+
+      {/* Completion badge */}
+      {m.completed && (
+        <div className="absolute top-2 left-2 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+          Done
+        </div>
+      )}
+
+      {/* Video count badge */}
+      {m.videoCount > 1 && !m.locked && (
+        <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+          {m.videoCount} videos
+        </div>
+      )}
+
+      {/* Watch progress bar at bottom of thumbnail */}
+      {!m.locked && !m.completed && m.watchedPct > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/40">
+          <div className="h-full bg-gradient-to-r from-blue-400 to-emerald-400 transition-all" style={{ width: `${m.watchedPct}%` }} />
+        </div>
+      )}
+      {m.completed && (
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-emerald-400" />
+      )}
+
+      {/* Play hover overlay */}
+      {showPlayHover && !m.locked && (
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <div className="h-12 w-12 rounded-full bg-white/90 shadow-xl flex items-center justify-center">
+            <svg className="w-5 h-5 text-slate-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevModuleTitle = null }) {
   const [chaptersExpanded, setChaptersExpanded] = useState(false);
   const color = getColor(m.category);
+  const gradient = getThumbnailGrad(m.category);
   const pct = m.watchedPct;
   const isMultiVideo = m.videoCount > 1;
+
+  const handleCardClick = () => { if (!m.locked) onNavigate(m.id, resumeChapterIdx(m)); };
 
   return (
     <div
       className={`group relative bg-white dark:bg-[#121212] border rounded-2xl overflow-hidden shadow-sm transition-all duration-200
         ${m.locked
-          ? "border-slate-200 dark:border-gray-800 opacity-60"
+          ? "border-slate-200 dark:border-gray-800 cursor-not-allowed"
           : m.completed
-          ? "border-emerald-400/30"
-          : "border-slate-200 dark:border-gray-800 hover:border-blue-400/40 hover:shadow-md"}`}
+          ? "border-emerald-400/30 cursor-pointer hover:shadow-md hover:border-emerald-400/50"
+          : "border-slate-200 dark:border-gray-800 cursor-pointer hover:border-blue-400/40 hover:shadow-lg"}`}
+      onClick={handleCardClick}
     >
-      {/* Top accent bar */}
-      <div className={`h-1 w-full ${m.completed ? "bg-gradient-to-r from-emerald-400 to-teal-400" : m.locked ? "bg-slate-200 dark:bg-gray-800" : "bg-gradient-to-r from-blue-500 to-emerald-400"}`} />
+      <ModuleThumbnail m={m} gradient={gradient} />
 
-      <div className="p-6">
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className={`shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold
-              ${m.completed ? "bg-emerald-400/10 border border-emerald-400/20 text-emerald-500"
-                : m.locked ? "bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500"
-                : "bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400"}`}>
-              {m.completed ? (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : m.locked ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-                </svg>
-              ) : index + 1}
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-tight">{m.title}</h3>
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${color.bg} ${color.border} ${color.text}`}>
-                  {m.category}
-                </span>
-                <StatusBadge completed={m.completed} locked={m.locked} watchedPct={pct} quizPassed={m.quizPassed} />
-              </div>
-            </div>
+      {/* Card body */}
+      <div className="p-4" onClick={(e) => e.stopPropagation()}>
+        {/* Category + points + bookmark row */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${color.bg} ${color.border} ${color.text}`}>
+              {m.category}
+            </span>
+            <StatusBadge completed={m.completed} locked={m.locked} watchedPct={pct} quizPassed={m.quizPassed} />
           </div>
-
-          <div className="shrink-0 flex flex-col items-end gap-0.5">
-            <div className="flex items-start gap-1.5">
-              <div className="text-xs px-2.5 py-1 rounded-lg bg-yellow-400/10 border border-yellow-400/20 text-yellow-600 dark:text-yellow-300 font-bold">
-                +{m.points} pts
-              </div>
-              {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
-            </div>
-            <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">{m.mins} min{isMultiVideo ? ` · ${m.videoCount} ch` : ""}</div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-300 px-1.5 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/20 whitespace-nowrap">
+              +{m.points} pts
+            </span>
+            {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
           </div>
         </div>
 
-        {/* Description */}
-        <p className="text-slate-500 dark:text-gray-400 text-xs leading-relaxed line-clamp-2 mb-4">{m.desc}</p>
+        {/* Title */}
+        <h3 className={`font-semibold text-sm leading-snug mb-1 line-clamp-2 ${m.locked ? "text-slate-400 dark:text-gray-600" : "text-slate-900 dark:text-white"}`}>
+          {m.title}
+        </h3>
 
-        {/* Locked card: show what they're working toward */}
+        {/* Meta */}
+        <div className="text-[10px] text-slate-400 dark:text-gray-500 mb-3">
+          {m.mins} min
+          {isMultiVideo ? ` · ${m.videoCount} chapters` : ""}
+          {m.documentCount > 0 ? ` · ${m.documentCount} resource${m.documentCount > 1 ? "s" : ""}` : ""}
+        </div>
+
+        {/* Lock message */}
         {m.locked && (
-          <div className="text-[11px] text-slate-400 dark:text-gray-500 mb-4">
+          <p className="text-[11px] text-slate-400 dark:text-gray-500 mb-3">
             {prevModuleTitle ? `Complete "${prevModuleTitle}" to unlock` : "Complete the previous module to unlock"}
-          </div>
+          </p>
         )}
 
-        {/* Key points (only for single-video, non-locked) */}
-        {m.keyPoints.length > 0 && !m.locked && !isMultiVideo && (
-          <div className="mb-4 space-y-1">
-            {m.keyPoints.slice(0, 3).map((kp, i) => (
-              <div key={i} className="flex items-start gap-2 text-[11px] text-slate-500 dark:text-gray-400">
-                <div className={`mt-1 shrink-0 h-1.5 w-1.5 rounded-full ${color.dot}`} />
-                <span className="leading-tight">{kp}</span>
-              </div>
-            ))}
-            {m.keyPoints.length > 3 && (
-              <div className="text-[10px] text-slate-400 dark:text-gray-500 pl-3.5">+{m.keyPoints.length - 3} more topics</div>
-            )}
-          </div>
-        )}
-
-        {/* Progress (hidden for locked) */}
-        {!m.locked && (
-          <div className="mb-4 space-y-2">
-            <div>
-              <div className="flex justify-between text-[10px] text-slate-400 dark:text-gray-500 mb-1">
-                <span>Watch progress</span>
-                <span className={pct >= 80 ? "text-emerald-500 font-semibold" : ""}>{pct}%</span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${pct >= 80 ? "bg-gradient-to-r from-blue-500 to-emerald-400" : "bg-blue-400"}`}
-                  style={{ width: `${Math.max(pct, m.completed ? 100 : 0)}%` }}
-                />
-              </div>
+        {/* Progress bar (not locked, has progress) */}
+        {!m.locked && (pct > 0 || m.completed) && (
+          <div className="mb-3">
+            <div className="flex justify-between text-[10px] mb-1">
+              <span className="text-slate-400 dark:text-gray-500">{m.completed ? "Completed" : "In progress"}</span>
+              <span className={m.completed ? "text-emerald-500 font-semibold" : "text-slate-500 dark:text-gray-400"}>
+                {m.completed ? "100%" : `${pct}%`}
+              </span>
             </div>
-            <StepIndicator
-              watchedPct={pct}
-              quizPassed={m.quizPassed}
-              completed={m.completed}
-              videoCount={m.videoCount}
-              videoProgress={m.videoProgress}
-            />
+            <div className="h-1 w-full bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${m.completed ? "bg-gradient-to-r from-emerald-400 to-teal-400" : "bg-gradient-to-r from-blue-500 to-emerald-400"}`}
+                style={{ width: `${m.completed ? 100 : pct}%` }}
+              />
+            </div>
           </div>
         )}
 
-        {/* Document indicator */}
-        {m.documentCount > 0 && !m.locked && (
-          <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-gray-500 mb-4">
-            <span>📎</span>
-            <span>{m.documentCount} resource{m.documentCount !== 1 ? "s" : ""}</span>
-          </div>
-        )}
-
-        {/* Primary CTA — always navigates to ModulePlayer */}
+        {/* CTA */}
         <button
           disabled={m.locked}
-          onClick={() => !m.locked && onNavigate(m.id, 0)}
-          className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+          onClick={(e) => { e.stopPropagation(); if (!m.locked) onNavigate(m.id, resumeChapterIdx(m)); }}
+          className={`w-full px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200
             ${m.locked
-              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-600 cursor-not-allowed border border-slate-200 dark:border-gray-800"
               : m.completed
               ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
-              : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"
-            }`}
+              : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"}`}
         >
           {m.locked
             ? "🔒 Locked"
             : m.completed
-            ? "Review"
+            ? "Rewatch"
             : pct > 0
             ? `Continue · ${pct}%`
             : isMultiVideo
@@ -253,14 +239,14 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
             : "Start"}
         </button>
 
-        {/* Read-only chapter list toggle (multi-video only, non-locked) */}
+        {/* Chapter list toggle (multi-video, non-locked) */}
         {isMultiVideo && !m.locked && (
           <div className="mt-2">
             <button
-              onClick={() => setChaptersExpanded((v) => !v)}
+              onClick={(e) => { e.stopPropagation(); setChaptersExpanded((v) => !v); }}
               className="w-full flex items-center justify-center gap-1 text-[11px] text-slate-400 dark:text-gray-600 hover:text-slate-600 dark:hover:text-gray-400 transition py-1"
             >
-              <span>{chaptersExpanded ? "Hide" : "Show"} chapters</span>
+              {chaptersExpanded ? "Hide" : "Show"} chapters
               <svg className={`w-3 h-3 transition-transform duration-200 ${chaptersExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -271,14 +257,19 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
                   const vPct = m.videoProgress[String(idx)] ?? 0;
                   const done = vPct >= 80 || m.completed;
                   return (
-                    <div key={video.id || idx} className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-gray-400 py-0.5">
-                      <div className={`shrink-0 h-1.5 w-1.5 rounded-full ${done ? "bg-emerald-400" : vPct > 0 ? "bg-blue-400" : "bg-slate-300 dark:bg-gray-700"}`} />
-                      <span className="flex-1 truncate">{video.title || `Chapter ${idx + 1}`}</span>
-                      {done
-                        ? <span className="text-emerald-500 shrink-0">✓</span>
-                        : vPct > 0
-                        ? <span className="text-blue-400 shrink-0">{vPct}%</span>
-                        : null}
+                    <div
+                      key={video.id || idx}
+                      onClick={(e) => { e.stopPropagation(); onNavigate(m.id, idx); }}
+                      className="flex items-center gap-2 text-[11px] py-0.5 cursor-pointer group/ch"
+                    >
+                      <div className={`shrink-0 h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold transition-colors
+                        ${done ? "bg-emerald-400 text-white" : vPct > 0 ? "bg-blue-400 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400"}`}>
+                        {done ? "✓" : idx + 1}
+                      </div>
+                      <span className="flex-1 truncate text-slate-500 dark:text-gray-400 group-hover/ch:text-blue-500 dark:group-hover/ch:text-blue-400 transition-colors">
+                        {video.title || `Chapter ${idx + 1}`}
+                      </span>
+                      {!done && vPct > 0 && <span className="text-blue-400 shrink-0">{vPct}%</span>}
                     </div>
                   );
                 })}
@@ -286,6 +277,46 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Compact card used in "Continue Watching" horizontal row
+function ContinueCard({ m, onNavigate }) {
+  const gradient = getThumbnailGrad(m.category);
+  const pct = m.watchedPct;
+  const chIdx = resumeChapterIdx(m);
+  const chapterLabel = m.videoCount > 1 ? `Ch ${chIdx + 1} of ${m.videoCount}` : null;
+
+  return (
+    <div
+      className="group shrink-0 w-52 bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-xl overflow-hidden cursor-pointer hover:border-blue-400/40 hover:shadow-md transition-all duration-200"
+      onClick={() => onNavigate(m.id, chIdx)}
+    >
+      {/* Mini thumbnail */}
+      <div className="relative aspect-video overflow-hidden bg-slate-900">
+        {m.thumbnailUrl ? (
+          <img src={m.thumbnailUrl} alt={m.title} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${gradient}`} />
+        )}
+        {/* Progress bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
+          <div className="h-full bg-blue-400 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        {/* Play overlay */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <div className="h-9 w-9 rounded-full bg-white/90 flex items-center justify-center shadow">
+            <svg className="w-4 h-4 text-slate-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+      </div>
+      <div className="p-3">
+        <p className="text-xs font-semibold text-slate-900 dark:text-white line-clamp-1 mb-0.5">{m.title}</p>
+        <p className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">
+          {pct}% watched{chapterLabel ? ` · ${chapterLabel}` : ""}
+        </p>
       </div>
     </div>
   );
@@ -324,9 +355,7 @@ export default function Modules() {
         setPoints(userData.progress.points || 0);
         setStreakDays(userData.progress.streakDays || 0);
       }
-      if (summary != null) {
-        setLifetimeEarned(summary.lifetimeEarned ?? 0);
-      }
+      if (summary != null) setLifetimeEarned(summary.lifetimeEarned ?? 0);
     } catch (err) {
       console.error("Failed to load modules", err);
     } finally {
@@ -350,7 +379,6 @@ export default function Modules() {
     }
   }, [user?.id]);
 
-  // Navigate to a specific chapter (videoIdx) within a module
   const handleNavigate = useCallback((moduleId, chapterIdx = 0) => {
     navigate(`/modules/${moduleId}${chapterIdx > 0 ? `?chapter=${chapterIdx}` : ""}`);
   }, [navigate]);
@@ -361,6 +389,14 @@ export default function Modules() {
     const cats = [...new Set(modules.map((m) => m.category))].sort();
     return ["All", ...cats];
   }, [modules]);
+
+  const continueWatching = useMemo(() =>
+    modules
+      .filter((m) => !m.completed && !m.locked && m.watchedPct > 0)
+      .sort((a, b) => b.watchedPct - a.watchedPct)
+      .slice(0, 8),
+    [modules]
+  );
 
   const filtered = useMemo(() => {
     let list = modules;
@@ -375,9 +411,8 @@ export default function Modules() {
     const inProgress = modules.filter((m) => !m.completed && !m.locked && m.watchedPct > 0).length;
     const locked = modules.filter((m) => m.locked).length;
     const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
-    const totalPoints = modules.filter((m) => m.completed).reduce((acc, m) => acc + (m.points || 0), 0);
     const nextUp = modules.find((m) => !m.completed && !m.locked);
-    return { total, completed, inProgress, locked, pct, totalPoints, nextUp };
+    return { total, completed, inProgress, locked, pct, nextUp };
   }, [modules]);
 
   if (loading) {
@@ -407,7 +442,7 @@ export default function Modules() {
           </div>
           {stats.nextUp && (
             <button
-              onClick={() => handleNavigate(stats.nextUp.id, 0)}
+              onClick={() => handleNavigate(stats.nextUp.id, resumeChapterIdx(stats.nextUp))}
               className="shrink-0 text-sm px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-emerald-400 text-white font-semibold hover:opacity-90 transition"
             >
               Continue Learning →
@@ -415,8 +450,23 @@ export default function Modules() {
           )}
         </div>
 
+        {/* ── Continue Watching ────────────────────────────────────────────── */}
+        {continueWatching.length > 0 && (
+          <section>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+              <span className="h-5 w-1 rounded-full bg-blue-500 inline-block" />
+              Continue Watching
+            </h2>
+            <div className="flex gap-3 overflow-x-auto pb-1 scroll-pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {continueWatching.map((m) => (
+                <ContinueCard key={m.id} m={m} onNavigate={handleNavigate} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Stats strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "Completed", value: stats.completed, total: stats.total, icon: "✅", color: "text-emerald-600 dark:text-emerald-400" },
             { label: "In Progress", value: stats.inProgress, total: null, icon: "▶", color: "text-blue-600 dark:text-blue-400" },
@@ -435,11 +485,11 @@ export default function Modules() {
 
         {/* Overall progress bar */}
         <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold text-slate-700 dark:text-gray-300">Overall Progress</span>
             <span className="text-sm font-bold text-slate-900 dark:text-white">{stats.pct}%</span>
           </div>
-          <div className="h-3 w-full bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden">
+          <div className="h-2.5 w-full bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-700"
               style={{ width: `${stats.pct}%` }}
@@ -452,15 +502,14 @@ export default function Modules() {
           </div>
         </div>
 
-        {/* Bookmark filter + category filter tabs */}
+        {/* Filters */}
         <div className="flex gap-2 flex-wrap items-center">
           <button
             onClick={() => setShowBookmarked((v) => !v)}
             className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all flex items-center gap-1.5
               ${showBookmarked
                 ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-600 dark:text-yellow-300"
-                : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-yellow-400/30"
-              }`}
+                : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-yellow-400/30"}`}
           >
             <svg className="w-3 h-3" fill={showBookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -480,8 +529,7 @@ export default function Modules() {
                     ? cat === "All"
                       ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white"
                       : `${color.bg} ${color.border} ${color.text} shadow-sm`
-                    : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"
-                  }`}
+                    : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"}`}
               >
                 {cat} <span className="opacity-60">({count})</span>
               </button>
@@ -497,7 +545,7 @@ export default function Modules() {
             <p className="text-sm mt-1">{showBookmarked ? "Click the bookmark icon on any module to save it here" : "Check back soon — new modules are coming!"}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((m) => {
               const prevMod = m.locked
                 ? modules.find((mod) => mod.orderIndex === m.orderIndex - 1)

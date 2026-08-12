@@ -99,58 +99,80 @@ export default function ModuleQuiz() {
   // ── Results screen ───────────────────────────────────────────────────────
   if (result) {
     const pct = result.total > 0 ? Math.round((result.score / result.total) * 100) : 0;
+    const totalPointsEarned = (result.pointsEarned || 0) + (result.passed && mod?.pointsValue ? mod.pointsValue : 0);
+
     return (
       <div style={pageStyle}>
         <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
         <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-md w-full text-center space-y-6">
-            {/* Pass / fail icon */}
-            <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center ${
-              result.passed ? "bg-emerald-100 dark:bg-emerald-500/10" : "bg-red-100 dark:bg-red-500/10"
-            }`}>
-              {result.passed ? (
-                <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
+
+            {/* Pass / fail animated icon */}
+            {result.passed ? (
+              <div className="relative mx-auto w-24 h-24">
+                {/* Outer glow ring */}
+                <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" style={{ animationDuration: "1.5s", animationIterationCount: 1 }} />
+                {/* Circle */}
+                <div className="animate-pop-in w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-500/30">
+                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <path className="animate-draw-check" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-500/10 mx-auto flex items-center justify-center">
                 <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div>
+            {/* Heading */}
+            <div className="animate-float-up" style={{ animationDelay: "0.2s" }}>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-                {result.passed ? "Module Complete!" : "Not quite there"}
+                {result.passed ? "Module Complete! 🎉" : "Not quite there"}
               </h1>
               <p className="text-slate-500 dark:text-gray-400 text-sm">
                 {result.passed
-                  ? "You passed the quiz and completed this module."
+                  ? "You passed the quiz and earned your points!"
                   : "You need 70% or more to pass. Review the module and try again."}
               </p>
             </div>
 
+            {/* Points banner — only on pass */}
+            {result.passed && totalPointsEarned > 0 && (
+              <div className="animate-float-up" style={{ animationDelay: "0.35s" }}>
+                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400/20 to-amber-400/20 border border-yellow-400/30 rounded-2xl px-6 py-4">
+                  <span className="text-2xl">⭐</span>
+                  <div className="text-left">
+                    <div className="text-2xl font-black text-yellow-600 dark:text-yellow-300">+{totalPointsEarned} pts</div>
+                    <div className="text-[11px] text-yellow-700/70 dark:text-yellow-300/60">added to your balance</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Score card */}
-            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6 space-y-3">
+            <div className="animate-float-up bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6 space-y-3 text-left" style={{ animationDelay: "0.45s" }}>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500 dark:text-gray-500">Score</span>
+                <span className="text-slate-500 dark:text-gray-500">Quiz score</span>
                 <span className={`font-bold text-lg ${result.passed ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
                   {pct}%
                 </span>
               </div>
               <div className="h-2 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${result.passed ? "bg-gradient-to-r from-blue-500 to-emerald-400" : "bg-red-400"}`}
+                  className={`h-full rounded-full transition-all duration-700 ${result.passed ? "bg-gradient-to-r from-blue-500 to-emerald-400" : "bg-red-400"}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-xs text-slate-400 dark:text-gray-600">
-                <span>Passing: 70%</span>
+                <span>Passing threshold: 70%</span>
                 <span>{result.score} / {result.total} pts</span>
               </div>
               {result.passed && result.pointsEarned > 0 && (
                 <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-100 dark:border-gray-800">
-                  <span className="text-slate-500 dark:text-gray-500">Points earned</span>
+                  <span className="text-slate-500 dark:text-gray-500">Quiz bonus</span>
                   <span className="font-bold text-yellow-600 dark:text-yellow-300">+{result.pointsEarned} pts</span>
                 </div>
               )}
@@ -163,7 +185,7 @@ export default function ModuleQuiz() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex flex-col gap-3">
+            <div className="animate-float-up flex flex-col gap-3" style={{ animationDelay: "0.55s" }}>
               {result.passed ? (
                 <>
                   {nextModule && !nextModule.locked && (
@@ -198,6 +220,7 @@ export default function ModuleQuiz() {
                 </>
               )}
             </div>
+
           </div>
         </div>
         <Footer />
