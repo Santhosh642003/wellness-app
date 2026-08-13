@@ -29,7 +29,7 @@ function ProfileCompletionBar({ profileData, onEdit }) {
     { key: "major", label: "Major" },
     { key: "graduationYear", label: "Graduation Year" },
     { key: "bio", label: "Bio" },
-    { key: "campus", label: "Campus", check: (v) => v && v !== "NJIT Newark" },
+    { key: "campus", label: "Campus" },
   ];
   const filled = fields.filter(({ key, check }) =>
     check ? check(profileData?.[key]) : !!profileData?.[key]
@@ -171,7 +171,7 @@ export default function Profile() {
     setForm({
       name: profileData?.name || "",
       role: profileData?.role || "Student",
-      campus: profileData?.campus || "NJIT Newark",
+      campus: profileData?.campus || "",
       major: profileData?.major || "",
       graduationYear: profileData?.graduationYear || "",
       bio: profileData?.bio || "",
@@ -331,7 +331,9 @@ export default function Profile() {
                             onChange={(e) => setForm((f) => ({ ...f, campus: e.target.value }))}
                             className={INPUT_CLS}
                           >
-                            {["NJIT Newark", "NJIT Jersey City"].map((c) => <option key={c}>{c}</option>)}
+                            <option value="">Select campus…</option>
+                            <option value="Newark">Newark (Main Campus)</option>
+                            <option value="Jersey City">Jersey City</option>
                           </select>
                         </div>
                         <div>
