@@ -1,12 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Camera } from "lucide-react";
 import DashboardNav from "../components/DashboardNav";
 import Footer from "../components/Footer";
 import Toast from "../components/Toast";
 import { useAuth } from "../contexts/AuthContext";
 import { users as usersApi } from "../lib/api";
 
-function ProfileCompletionBar({ profileData }) {
+function SectionCard({ children, accent }) {
+  const bars = {
+    blue:    "from-blue-500 to-blue-400",
+    violet:  "from-violet-500 to-violet-400",
+    amber:   "from-amber-500 to-amber-400",
+    emerald: "from-emerald-500 to-emerald-400",
+    yellow:  "from-yellow-400 to-amber-400",
+    rose:    "from-rose-500 to-pink-400",
+  };
+  return (
+    <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+      {accent && <div className={`h-0.5 w-full bg-gradient-to-r ${bars[accent] || bars.blue}`} />}
+      <div className="p-6">{children}</div>
+    </div>
+  );
+}
+
+function ProfileCompletionBar({ profileData, onEdit }) {
   const fields = [
     { key: "major", label: "Major" },
     { key: "graduationYear", label: "Graduation Year" },
@@ -23,44 +41,66 @@ function ProfileCompletionBar({ profileData }) {
 
   if (pct === 100) {
     return (
-      <div className="mb-6 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl px-5 py-3 flex items-center gap-3">
-        <span className="text-emerald-500 text-lg">✓</span>
-        <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Profile complete!</span>
+      <div className="mb-6 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+          <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Profile complete!</div>
+          <div className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">All profile fields are filled in</div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="mb-6 bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl px-5 py-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-slate-700 dark:text-gray-300">Profile {pct}% complete</span>
-        <span className="text-xs text-slate-400 dark:text-gray-500">{filled}/{fields.length} fields</span>
+      <div className="flex items-center justify-between mb-2.5">
+        <span className="text-sm font-semibold text-slate-700 dark:text-gray-200">Complete your profile</span>
+        <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{pct}%</span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 overflow-hidden">
+      <div className="h-2.5 rounded-full bg-slate-100 dark:bg-[#0f0f0f] overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-500"
+          className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-700 rounded-full"
           style={{ width: `${pct}%` }}
         />
       </div>
       {missing.length > 0 && (
-        <p className="text-xs text-slate-400 dark:text-gray-500 mt-2">
-          Add your {missing.join(", ")} to complete your profile
-        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {missing.map((label) => (
+            <button
+              key={label}
+              onClick={onEdit}
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-blue-400/40 hover:text-blue-600 dark:hover:text-blue-400 transition"
+            >
+              + {label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
+const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+const LABEL_CLS = "block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5";
+
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [toast, setToast] = useState("");
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [referralsList, setReferralsList] = useState([]);
+  const fileInputRef = useRef(null);
+
+  const avatarUrl = profileData?.avatarUrl || user?.avatarUrl || null;
 
   useEffect(() => {
     if (!toast) return;
@@ -85,6 +125,25 @@ export default function Profile() {
   }, [user?.id]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setToast("Please select an image file"); return; }
+    if (file.size > 5 * 1024 * 1024) { setToast("Image must be under 5 MB"); return; }
+    setUploading(true);
+    try {
+      const updated = await usersApi.uploadAvatar(user.id, file);
+      setProfileData((prev) => ({ ...prev, avatarUrl: updated.avatarUrl }));
+      await refreshUser();
+      setToast("Profile photo updated!");
+    } catch (err) {
+      setToast(err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const progress = profileData?.progress || {};
   const moduleProgresses = profileData?.moduleProgresses || [];
@@ -149,219 +208,274 @@ export default function Profile() {
         points={progress.points || 0}
         streakDays={progress.streakDays || 0}
         initials={user?.initials || "?"}
+        avatarUrl={avatarUrl}
       />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Profile</h1>
-            <p className="text-slate-500 dark:text-gray-400 mt-2">Your wellness learning stats and history</p>
-          </div>
-          <button onClick={signOut} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-gray-800 bg-white dark:bg-[#121212] text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-[#151515] text-sm">
-            Sign out
-          </button>
-        </div>
-
-        {/* Profile completion progress */}
-        <ProfileCompletionBar profileData={profileData} />
+        {/* Profile completion */}
+        <ProfileCompletionBar profileData={profileData} onEdit={startEdit} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <section className="lg:col-span-8 space-y-6">
-            {/* User Card */}
-            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-              {!editing ? (
-                <>
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-emerald-400/20 border border-slate-200 dark:border-gray-700 flex items-center justify-center text-lg font-semibold text-slate-900 dark:text-white">
-                        {user?.initials || "?"}
+
+            {/* Hero card */}
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+              <div className="h-1 w-full bg-gradient-to-r from-blue-500 to-emerald-400" />
+              <div className="p-6">
+                {!editing ? (
+                  <div className="flex items-start justify-between gap-6 flex-wrap sm:flex-nowrap">
+                    <div className="flex items-start gap-5">
+                      {/* Avatar with upload */}
+                      <div className="relative shrink-0">
+                        <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-500/20 to-emerald-400/20 border border-slate-200 dark:border-gray-700 overflow-hidden flex items-center justify-center text-2xl font-semibold text-slate-900 dark:text-white">
+                          {avatarUrl
+                            ? <img src={avatarUrl} alt={profileData?.name || "Avatar"} className="h-full w-full object-cover" />
+                            : (user?.initials || "?")}
+                        </div>
+                        <label
+                          htmlFor="avatar-input"
+                          title="Change photo"
+                          className={`absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-blue-500 border-2 border-white dark:border-[#121212] flex items-center justify-center cursor-pointer hover:bg-blue-600 transition ${uploading ? "pointer-events-none" : ""}`}
+                        >
+                          {uploading
+                            ? <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            : <Camera size={12} className="text-white" />}
+                        </label>
+                        <input
+                          ref={fileInputRef}
+                          id="avatar-input"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarChange}
+                        />
                       </div>
+
+                      {/* Identity */}
                       <div>
-                        <div className="text-xl font-semibold text-slate-900 dark:text-white">{profileData?.name || user?.name || "Student"}</div>
-                        <div className="text-slate-500 dark:text-gray-400 text-sm">{user?.email}</div>
-                        <div className="text-slate-400 dark:text-gray-500 text-xs mt-1">
-                          {profileData?.role || "Student"} · {profileData?.campus || "NJIT"}
+                        <div className="text-2xl font-semibold text-slate-900 dark:text-white leading-tight">
+                          {profileData?.name || user?.name || "Student"}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
+                            {profileData?.role || "Student"}
+                          </span>
+                          <span className="text-xs text-slate-400 dark:text-gray-500">{user?.email}</span>
+                        </div>
+                        <div className="text-xs text-slate-400 dark:text-gray-500 mt-1.5">
+                          {profileData?.campus || "NJIT"}
                           {profileData?.major && ` · ${profileData.major}`}
                           {profileData?.graduationYear && ` · Class of ${profileData.graduationYear}`}
                         </div>
+                        {profileData?.bio && (
+                          <p className="text-sm text-slate-600 dark:text-gray-400 mt-3 leading-relaxed max-w-md">
+                            {profileData.bio}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <button onClick={startEdit} className="text-sm px-4 py-2 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-[#141414]">
-                      Edit
-                    </button>
-                  </div>
-                  {profileData?.bio && (
-                    <p className="mt-4 text-sm text-slate-600 dark:text-gray-400 leading-relaxed border-t border-slate-100 dark:border-gray-800 pt-4">
-                      {profileData.bio}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-5">Edit Profile</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Full Name</label>
-                      <input
-                        value={form.name}
-                        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                        className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Role</label>
-                        <select
-                          value={form.role}
-                          onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                        >
-                          {["Student", "Faculty", "Staff"].map((r) => <option key={r}>{r}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Campus</label>
-                        <select
-                          value={form.campus}
-                          onChange={(e) => setForm((f) => ({ ...f, campus: e.target.value }))}
-                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                        >
-                          {["NJIT Newark", "NJIT Jersey City"].map((c) => <option key={c}>{c}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Major</label>
-                        <input
-                          value={form.major}
-                          onChange={(e) => setForm((f) => ({ ...f, major: e.target.value }))}
-                          placeholder="e.g. Computer Science"
-                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Graduation Year</label>
-                        <input
-                          value={form.graduationYear}
-                          onChange={(e) => setForm((f) => ({ ...f, graduationYear: e.target.value }))}
-                          placeholder="e.g. 2026"
-                          className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">
-                        Bio <span className="font-normal text-slate-400">({(form.bio || "").length}/500)</span>
-                      </label>
-                      <textarea
-                        value={form.bio}
-                        onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value.slice(0, 500) }))}
-                        rows={3}
-                        placeholder="Tell us a little about yourself…"
-                        className="w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
-                      />
-                    </div>
-                    <div className="flex gap-3 pt-1">
+
+                    {/* Actions */}
+                    <div className="flex sm:flex-col gap-2 shrink-0 mt-1">
                       <button
-                        onClick={saveEdit}
-                        disabled={saving}
-                        className="px-5 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 disabled:opacity-50"
+                        onClick={startEdit}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#1f1f1f] transition"
                       >
-                        {saving ? "Saving…" : "Save changes"}
+                        Edit profile
                       </button>
                       <button
-                        onClick={cancelEdit}
-                        className="px-5 py-2 rounded-xl text-sm border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-[#141414]"
+                        onClick={signOut}
+                        className="px-4 py-2 rounded-xl text-sm border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-800 transition"
                       >
-                        Cancel
+                        Sign out
                       </button>
                     </div>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-5">Edit Profile</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className={LABEL_CLS}>Full Name</label>
+                        <input
+                          value={form.name}
+                          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                          className={INPUT_CLS}
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className={LABEL_CLS}>Role</label>
+                          <select
+                            value={form.role}
+                            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                            className={INPUT_CLS}
+                          >
+                            {["Student", "Faculty", "Staff"].map((r) => <option key={r}>{r}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={LABEL_CLS}>Campus</label>
+                          <select
+                            value={form.campus}
+                            onChange={(e) => setForm((f) => ({ ...f, campus: e.target.value }))}
+                            className={INPUT_CLS}
+                          >
+                            {["NJIT Newark", "NJIT Jersey City"].map((c) => <option key={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={LABEL_CLS}>Major</label>
+                          <input
+                            value={form.major}
+                            onChange={(e) => setForm((f) => ({ ...f, major: e.target.value }))}
+                            placeholder="e.g. Computer Science"
+                            className={INPUT_CLS}
+                          />
+                        </div>
+                        <div>
+                          <label className={LABEL_CLS}>Graduation Year</label>
+                          <input
+                            value={form.graduationYear}
+                            onChange={(e) => setForm((f) => ({ ...f, graduationYear: e.target.value }))}
+                            placeholder="e.g. 2026"
+                            className={INPUT_CLS}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={LABEL_CLS}>
+                          Bio <span className="font-normal text-slate-400">({(form.bio || "").length}/500)</span>
+                        </label>
+                        <textarea
+                          value={form.bio}
+                          onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value.slice(0, 500) }))}
+                          rows={3}
+                          placeholder="Tell us a little about yourself…"
+                          className={`${INPUT_CLS} resize-none`}
+                        />
+                      </div>
+                      <div className="flex gap-3 pt-1">
+                        <button
+                          onClick={saveEdit}
+                          disabled={saving}
+                          className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 disabled:opacity-50 transition"
+                        >
+                          {saving ? "Saving…" : "Save changes"}
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="px-5 py-2.5 rounded-xl text-sm border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-[#141414] transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Learning Progress */}
-            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+            <SectionCard accent="blue">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Learning Progress</h2>
-                <span className="text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-300">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
                   {overallPct}% overall
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-slate-100 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all" style={{ width: `${overallPct}%` }} />
+              <div className="h-2 rounded-full bg-slate-100 dark:bg-[#0f0f0f] overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all"
+                  style={{ width: `${overallPct}%` }}
+                />
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-4">
+              <div className="mt-4 grid grid-cols-3 gap-3">
                 <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4 text-center">
-                  <div className="text-2xl font-semibold text-slate-900 dark:text-white">{completedCount}</div>
-                  <div className="text-xs text-slate-400 dark:text-gray-500 mt-1">Completed</div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">{completedCount}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500 mt-1">Completed</div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4 text-center">
-                  <div className="text-2xl font-semibold text-slate-900 dark:text-white">{totalModules}</div>
-                  <div className="text-xs text-slate-400 dark:text-gray-500 mt-1">Total Modules</div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">{totalModules}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500 mt-1">Total</div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4">
-                  <div className="text-xs text-slate-400 dark:text-gray-500 mb-2">Next up</div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-gray-200">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500 mb-2">Next up</div>
+                  <div className="text-xs font-semibold text-slate-800 dark:text-gray-200 leading-snug line-clamp-2">
                     {nextModule ? nextModule.title : "All done!"}
                   </div>
                   {nextModule && (
-                    <button onClick={() => navigate(`/modules/${nextModule.moduleId}`)} className="mt-2 w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90">
+                    <button
+                      onClick={() => navigate(`/modules/${nextModule.moduleId}`)}
+                      className="mt-2 w-full px-2 py-1.5 rounded-lg text-[10px] font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition"
+                    >
                       Continue
                     </button>
                   )}
                 </div>
               </div>
-            </div>
+            </SectionCard>
 
-            {/* Module List */}
+            {/* Module History */}
             {moduleProgresses.length > 0 && (
-              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+              <SectionCard>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Module History</h2>
-                  <button onClick={() => navigate("/modules")} className="text-xs text-blue-500 hover:text-blue-400">View all</button>
+                  <button onClick={() => navigate("/modules")} className="text-xs font-semibold text-blue-500 hover:text-blue-400 transition">
+                    View all →
+                  </button>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {moduleProgresses.map((m) => (
-                    <div key={m.moduleId} className="flex items-center gap-3">
+                    <div key={m.moduleId} className="flex items-center gap-3 py-1">
                       <div className={`h-2 w-2 rounded-full shrink-0 ${m.completed ? "bg-emerald-400" : m.locked ? "bg-slate-300 dark:bg-gray-700" : "bg-blue-400"}`} />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-slate-700 dark:text-gray-300 truncate">{m.title}</div>
                       </div>
                       <div className="text-xs text-slate-400 dark:text-gray-600 shrink-0">
-                        {m.completed ? "✓ Done" : m.locked ? "Locked" : `${m.watchedPercent}%`}
+                        {m.completed
+                          ? <span className="text-emerald-500">✓ Done</span>
+                          : m.locked
+                          ? "Locked"
+                          : `${m.watchedPercent}%`}
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </SectionCard>
             )}
 
             {/* Quizzes */}
-            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+            <SectionCard accent="violet">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Quizzes</h2>
               <p className="text-slate-500 dark:text-gray-400 text-sm mb-5">Bi-weekly and module quizzes to earn points</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-5">
+                <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-5">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Bi-weekly Quiz</div>
                   <div className="text-xs text-slate-400 dark:text-gray-500 mt-1 mb-4">~20 questions · Earn bonus points</div>
-                  <button onClick={() => navigate("/quiz/biweekly")} className="w-full px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]">
+                  <button
+                    onClick={() => navigate("/quiz/biweekly")}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-500 to-violet-400 text-white hover:opacity-90 transition"
+                  >
                     Start quiz
                   </button>
                 </div>
-                <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-5">
+                <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Module Quiz</div>
                   <div className="text-xs text-slate-400 dark:text-gray-500 mt-1 mb-4">~10 questions · Unlock next module</div>
-                  <button onClick={() => navigate("/modules")} className="w-full px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]">
+                  <button
+                    onClick={() => navigate("/modules")}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition"
+                  >
                     Go to modules
                   </button>
                 </div>
               </div>
-            </div>
+            </SectionCard>
 
             {/* Redemption History */}
             {redemptions.length > 0 && (
-              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+              <SectionCard accent="amber">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Redemption History</h2>
                 <div className="space-y-3">
                   {redemptions.map((r) => (
@@ -374,12 +488,12 @@ export default function Profile() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </SectionCard>
             )}
 
             {/* Referrals */}
             {referralsList.length > 0 && (
-              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
+              <SectionCard accent="emerald">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Referrals</h2>
                 <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
                   You earn 100 pts when each invited friend completes 3 modules
@@ -394,52 +508,67 @@ export default function Profile() {
                         </div>
                       </div>
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                        r.status === 'paid'
-                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                          : r.status === 'processing'
-                          ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
-                          : 'bg-slate-100 dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400'
+                        r.status === "paid"
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                          : r.status === "processing"
+                          ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
+                          : "bg-slate-100 dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
                       }`}>
-                        {r.status === 'paid' ? '✓ +100 pts paid' : r.status === 'processing' ? 'Processing…' : `${r.modulesCompleted}/3`}
+                        {r.status === "paid" ? "✓ +100 pts paid" : r.status === "processing" ? "Processing…" : `${r.modulesCompleted}/3`}
                       </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </SectionCard>
             )}
           </section>
 
           {/* Right Sidebar */}
           <aside className="lg:col-span-4 space-y-6">
-            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-5">Your Stats</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4">
-                  <div className="text-xs text-slate-400 dark:text-gray-500">Points</div>
-                  <div className="text-2xl font-semibold text-slate-900 dark:text-white mt-1">{progress.points || 0}</div>
+            {/* Stats */}
+            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+              <div className="h-0.5 w-full bg-gradient-to-r from-blue-500 to-orange-400" />
+              <div className="p-6">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4">Your Stats</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-500 dark:text-blue-400 mb-1">Points</div>
+                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-300 leading-none">{(progress.points || 0).toLocaleString()}</div>
+                  </div>
+                  <div className="rounded-2xl border border-orange-400/20 bg-orange-400/5 p-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-orange-500 dark:text-orange-400 mb-1">Streak</div>
+                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-300 leading-none">{progress.streakDays || 0}</div>
+                    <div className="text-[10px] text-orange-400/60 mt-1">days</div>
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4">
-                  <div className="text-xs text-slate-400 dark:text-gray-500">Streak</div>
-                  <div className="text-2xl font-semibold text-slate-900 dark:text-white mt-1">{progress.streakDays || 0}</div>
-                  <div className="text-xs text-slate-400 dark:text-gray-600 mt-0.5">days</div>
+                <div className="mt-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-500 dark:text-emerald-400 mb-1">Modules</div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-300 leading-none">{completedCount}</span>
+                    <span className="text-sm text-emerald-400/70 dark:text-emerald-400/50 mb-0.5">/ {totalModules} done</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Rewards</h2>
-              <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">Earn points from modules, quizzes, and streaks</p>
-              <button onClick={() => navigate("/rewards")} className="w-full px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]">
-                View rewards store
+            {/* Rewards */}
+            <SectionCard accent="amber">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Rewards</h2>
+              <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">Earn points from modules, quizzes, and daily streaks</p>
+              <button
+                onClick={() => navigate("/rewards")}
+                className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-amber-400 text-white hover:opacity-90 transition"
+              >
+                Browse rewards store
               </button>
-            </div>
+            </SectionCard>
 
             {/* Referral Code */}
             {profileData?.referralCode && (
-              <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Refer a Friend</h2>
+              <SectionCard accent="emerald">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Refer a Friend</h2>
                 <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
-                  Share your code! Your friend gets <strong className="text-blue-500">+25 pts</strong> on signup, and you earn <strong className="text-emerald-500">+100 pts</strong> once they complete 3 modules.
+                  Your friend gets <strong className="text-blue-500">+25 pts</strong> on signup, you earn <strong className="text-emerald-500">+100 pts</strong> when they complete 3 modules.
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 rounded-xl px-4 py-2.5 font-mono text-sm font-bold text-slate-900 dark:text-white tracking-wider">
@@ -458,12 +587,12 @@ export default function Profile() {
                     </svg>
                   </button>
                 </div>
-              </div>
+              </SectionCard>
             )}
 
             {/* Certificate */}
-            <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Certificate</h2>
+            <SectionCard accent="yellow">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Certificate</h2>
               <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
                 {completedCount === totalModules && totalModules > 0
                   ? "You've completed all modules! View your certificate."
@@ -471,15 +600,15 @@ export default function Profile() {
               </p>
               <button
                 onClick={() => navigate("/certificate")}
-                className={`w-full px-4 py-2 rounded-xl text-sm font-semibold transition
+                className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition
                   ${completedCount === totalModules && totalModules > 0
-                    ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-white hover:opacity-90"
+                    ? "bg-gradient-to-r from-yellow-400 to-amber-400 text-white hover:opacity-90"
                     : "bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-[#171717]"
                   }`}
               >
                 {completedCount === totalModules && totalModules > 0 ? "View Certificate ✨" : "View Progress Certificate"}
               </button>
-            </div>
+            </SectionCard>
           </aside>
         </div>
       </main>

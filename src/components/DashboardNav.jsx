@@ -24,7 +24,7 @@ function NavItem({ to, children }) {
 
 const STORAGE_KEY = "wellness_notif_seen_count";
 
-export default function DashboardNav({ points = 0, streakDays = 0, initials = "?" }) {
+export default function DashboardNav({ points = 0, streakDays = 0, initials = "?", avatarUrl = null }) {
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
   const [notifs, setNotifs] = useState([]);
@@ -147,9 +147,11 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
           <button
             onClick={() => navigate("/profile")}
             title="Profile"
-            className="h-10 w-10 rounded-2xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center font-semibold text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-[#151515] transition"
+            className="h-10 w-10 rounded-2xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center font-semibold text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-[#151515] transition overflow-hidden"
           >
-            {initials}
+            {avatarUrl
+              ? <img src={avatarUrl} alt={initials} className="h-full w-full object-cover" />
+              : initials}
           </button>
         </div>
       </div>

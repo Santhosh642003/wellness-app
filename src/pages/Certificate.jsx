@@ -44,7 +44,7 @@ export default function Certificate() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav points={points} streakDays={profileData?.progress?.streakDays ?? 0} initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={profileData?.progress?.streakDays ?? 0} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         {/* Header */}

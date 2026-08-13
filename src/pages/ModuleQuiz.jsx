@@ -74,7 +74,7 @@ export default function ModuleQuiz() {
   if (error) {
     return (
       <div style={pageStyle} className="items-center justify-center">
-        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
+        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error}</p>
@@ -103,7 +103,7 @@ export default function ModuleQuiz() {
 
     return (
       <div style={pageStyle}>
-        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
+        <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
         <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-md w-full text-center space-y-6">
 
@@ -231,7 +231,7 @@ export default function ModuleQuiz() {
   // ── Quiz screen ──────────────────────────────────────────────────────────
   return (
     <div style={pageStyle}>
-      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
       <div className="flex-1">
         <QuizEngine
           title={mod ? `${mod.title} — Quiz` : "Module Quiz"}

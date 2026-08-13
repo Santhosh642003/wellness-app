@@ -82,7 +82,7 @@ export default function Events() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
       <main className="max-w-4xl mx-auto px-6 py-10 space-y-8 w-full">
         <header>

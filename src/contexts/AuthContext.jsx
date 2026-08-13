@@ -55,10 +55,19 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('wellness_token');
+    if (!token) return;
+    try {
+      const u = await authApi.me();
+      setUser(u);
+    } catch { /* ignore */ }
+  }, []);
+
   const isLoggedIn = !!user || localStorage.getItem('wellness_logged_in') === 'true';
 
   return (
-    <AuthContext.Provider value={{ user, loading, isLoggedIn, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, isLoggedIn, login, register, loginWithGoogle, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

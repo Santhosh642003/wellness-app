@@ -42,7 +42,7 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
-      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} />
+      <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         {/* Header */}
@@ -100,9 +100,11 @@ export default function Leaderboard() {
                   style={{ gridRow: 1 }}
                 >
                   <span className="text-3xl mb-1">{MEDAL[rank - 1]}</span>
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold mb-2
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold mb-2 overflow-hidden
                     ${rank === 1 ? "bg-yellow-400/20 text-yellow-700 dark:text-yellow-300" : "bg-slate-100 dark:bg-[#1a1a1a] text-slate-700 dark:text-gray-300"}`}>
-                    {e?.initials || "??"}
+                    {e?.avatarUrl
+                      ? <img src={e.avatarUrl} alt={e?.initials || "??"} className="h-full w-full object-cover" />
+                      : (e?.initials || "??")}
                   </div>
                   <div className={`text-xs font-semibold text-center truncate w-full text-center
                     ${isMe ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white"}`}>
@@ -142,12 +144,14 @@ export default function Leaderboard() {
                     </div>
 
                     {/* Avatar */}
-                    <div className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+                    <div className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden
                       ${isMe
                         ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-400/30"
                         : "bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 text-slate-700 dark:text-gray-300"
                       }`}>
-                      {e.initials || "??"}
+                      {e.avatarUrl
+                        ? <img src={e.avatarUrl} alt={e.initials || "??"} className="h-full w-full object-cover" />
+                        : (e.initials || "??")}
                     </div>
 
                     {/* Name / role */}

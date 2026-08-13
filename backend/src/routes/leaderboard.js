@@ -19,6 +19,7 @@ router.get('/', async (req, res, next) => {
            u.id,
            u.name,
            u.initials,
+           u."avatarUrl",
            u.campus,
            u.role,
            COALESCE(up.points, 0)       AS points,
@@ -33,7 +34,7 @@ router.get('/', async (req, res, next) => {
       const interval = period === 'week' ? '7 days' : '30 days';
       ({ rows } = await pool.query(
         `SELECT
-           u.id, u.name, u.initials, u.campus, u.role,
+           u.id, u.name, u.initials, u."avatarUrl", u.campus, u.role,
            COALESCE(up."streakDays", 0) AS "streakDays",
            COALESCE(SUM(pl.points), 0) AS points,
            RANK() OVER (ORDER BY COALESCE(SUM(pl.points), 0) DESC) AS rank
@@ -42,7 +43,7 @@ router.get('/', async (req, res, next) => {
          LEFT JOIN point_ledger pl
            ON pl."userId" = u.id
            AND pl."createdAt" >= NOW() - INTERVAL '${interval}'
-         GROUP BY u.id, u.name, u.initials, u.campus, u.role, up."streakDays"
+         GROUP BY u.id, u.name, u.initials, u."avatarUrl", u.campus, u.role, up."streakDays"
          HAVING COALESCE(SUM(pl.points), 0) > 0
          ORDER BY points DESC
          LIMIT 50`

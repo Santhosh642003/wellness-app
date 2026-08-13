@@ -54,6 +54,24 @@ export const auth = {
 export const users = {
   get: (userId) => request(`/users/${userId}`),
   updateProfile: (userId, body) => request(`/users/${userId}/profile`, { method: 'PATCH', body: JSON.stringify(body) }),
+  uploadAvatar: (userId, file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const token = getToken();
+    return fetch(`${BASE_URL}/users/${userId}/avatar`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.error || `HTTP ${res.status}`);
+        err.status = res.status;
+        throw err;
+      }
+      return data;
+    });
+  },
   dailyClaim: (userId) => request(`/users/${userId}/daily-claim`, { method: 'POST' }),
   getModuleProgress: (userId) => request(`/users/${userId}/module-progress`),
   updateModuleProgress: (userId, moduleId, body) =>

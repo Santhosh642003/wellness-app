@@ -65,8 +65,10 @@ export default function LeaderboardCard() {
                 </span>
 
                 {/* Avatar */}
-                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isMe ? "bg-blue-500 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-300"}`}>
-                  {entry.initials}
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden ${isMe ? "bg-blue-500 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-300"}`}>
+                  {entry.avatarUrl
+                    ? <img src={entry.avatarUrl} alt={entry.initials} className="h-full w-full object-cover" />
+                    : entry.initials}
                 </div>
 
                 {/* Name */}
@@ -96,8 +98,10 @@ export default function LeaderboardCard() {
                 <span className="w-6 text-center text-xs font-bold text-blue-600 dark:text-blue-300 shrink-0">
                   #{myEntry.rank}
                 </span>
-                <div className="h-7 w-7 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-                  {myEntry.initials}
+                <div className="h-7 w-7 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden">
+                  {myEntry.avatarUrl
+                    ? <img src={myEntry.avatarUrl} alt={myEntry.initials} className="h-full w-full object-cover" />
+                    : myEntry.initials}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-xs font-medium text-blue-700 dark:text-blue-200">You</p>
