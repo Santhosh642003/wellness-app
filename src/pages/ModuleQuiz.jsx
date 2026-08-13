@@ -75,14 +75,14 @@ export default function ModuleQuiz() {
     return (
       <div style={pageStyle} className="items-center justify-center">
         <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
-        <div className="flex-1 flex items-center justify-center">
+        <main id="main-content" className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error}</p>
             <button onClick={() => navigate(`/modules/${moduleId}`)} className="text-sm text-blue-500 hover:underline">
               ← Back to Module
             </button>
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     );
@@ -104,7 +104,7 @@ export default function ModuleQuiz() {
     return (
       <div style={pageStyle}>
         <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
-        <div className="flex-1 flex items-center justify-center px-6 py-16">
+        <main id="main-content" className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-md w-full text-center space-y-6">
 
             {/* Pass / fail animated icon */}
@@ -222,7 +222,7 @@ export default function ModuleQuiz() {
             </div>
 
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     );
@@ -232,14 +232,14 @@ export default function ModuleQuiz() {
   return (
     <div style={pageStyle}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
-      <div className="flex-1">
+      <main id="main-content" className="flex-1">
         <QuizEngine
           title={mod ? `${mod.title} — Quiz` : "Module Quiz"}
           subtitle="Score 70% or higher to complete this module and unlock the next one."
           questions={questions}
           onFinish={onFinish}
         />
-      </div>
+      </main>
       <Footer />
     </div>
   );

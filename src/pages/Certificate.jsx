@@ -46,7 +46,7 @@ export default function Certificate() {
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
       <DashboardNav points={points} streakDays={profileData?.progress?.streakDays ?? 0} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+      <main id="main-content" className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div className="flex items-center gap-3">

@@ -218,7 +218,7 @@ export default function Profile() {
         avatarUrl={avatarUrl}
       />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
+      <main id="main-content" className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
         {/* Profile completion */}
         <ProfileCompletionBar profileData={profileData} onEdit={startEdit} />
 

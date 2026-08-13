@@ -322,7 +322,7 @@ export default function ModulePlayer() {
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
+      <main id="main-content" className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
         <button
           onClick={() => navigate("/modules")}
           className="flex items-center gap-2 text-sm text-slate-500 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300 mb-6 transition"

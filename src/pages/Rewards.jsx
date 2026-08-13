@@ -138,7 +138,7 @@ export default function Rewards() {
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
-      <main className="max-w-7xl mx-auto px-6 py-10 space-y-8 w-full">
+      <main id="main-content" className="max-w-7xl mx-auto px-6 py-10 space-y-8 w-full">
         <header>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Rewards Store</h1>
           <p className="text-slate-500 dark:text-gray-400 mt-2">Redeem your points for gift cards and rewards</p>

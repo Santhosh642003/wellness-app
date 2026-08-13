@@ -431,7 +431,7 @@ export default function Modules() {
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
-      <main className="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8 w-full">
+      <main id="main-content" className="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8 w-full">
 
         {/* Page header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">

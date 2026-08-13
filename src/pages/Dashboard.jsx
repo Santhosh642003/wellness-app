@@ -92,7 +92,7 @@ export default function Dashboard() {
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main id="main-content" className="flex-1 max-w-7xl mx-auto w-full px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
         <section className="lg:col-span-8 space-y-8">
           <div>
             <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">

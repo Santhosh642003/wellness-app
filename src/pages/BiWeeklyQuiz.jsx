@@ -75,7 +75,7 @@ export default function BiWeeklyQuiz() {
   if (error) return (
     <div style={pageStyle}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
-      <div className="flex-1 flex items-center justify-center px-6">
+      <main id="main-content" className="flex-1 flex items-center justify-center px-6">
         <div className="max-w-md w-full text-center">
           <div className="w-20 h-20 rounded-full bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center mx-auto mb-6 text-4xl">⚠️</div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">Quiz Unavailable</h1>
@@ -84,7 +84,7 @@ export default function BiWeeklyQuiz() {
             Back to Dashboard
           </button>
         </div>
-      </div>
+      </main>
       <Footer />
     </div>
   );
@@ -105,7 +105,7 @@ export default function BiWeeklyQuiz() {
     return (
       <div style={pageStyle}>
         <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
-        <div className="flex-1 flex items-center justify-center px-6">
+        <main id="main-content" className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md w-full text-center">
             <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-center mx-auto mb-6 text-5xl">🔒</div>
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">Quiz Not Yet Open</h1>
@@ -149,7 +149,7 @@ export default function BiWeeklyQuiz() {
     return (
       <div style={pageStyle}>
         <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
-        <div className="flex-1 flex items-center justify-center px-6">
+        <main id="main-content" className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md w-full text-center">
             <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-[#141414] border border-slate-200 dark:border-gray-800 flex items-center justify-center mx-auto mb-6 text-4xl">
               {alreadyAttempted.passed ? "🏆" : "📋"}
@@ -183,14 +183,14 @@ export default function BiWeeklyQuiz() {
   return (
     <div style={pageStyle}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
-      <div className="flex-1">
+      <main id="main-content" className="flex-1">
         <QuizEngine
           title="Bi-Weekly Competition"
           subtitle="Your chance to earn bonus points — one attempt per two weeks!"
           questions={questions}
           onFinish={onFinish}
         />
-      </div>
+      </main>
       <Footer />
     </div>
   );

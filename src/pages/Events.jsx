@@ -84,7 +84,7 @@ export default function Events() {
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
-      <main className="max-w-4xl mx-auto px-6 py-10 space-y-8 w-full">
+      <main id="main-content" className="max-w-4xl mx-auto px-6 py-10 space-y-8 w-full">
         <header>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Events</h1>
           <p className="text-slate-500 dark:text-gray-400 mt-2">Attend in-person events and earn 250 points per check-in</p>

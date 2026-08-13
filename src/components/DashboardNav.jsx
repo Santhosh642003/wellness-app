@@ -58,6 +58,8 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
   };
 
   return (
+    <>
+    <a href="#main-content" className="skip-to-content">Skip to main content</a>
     <header className="sticky top-0 z-50 bg-white/90 dark:bg-[#0b0b0b]/80 backdrop-blur border-b border-slate-200 dark:border-gray-900">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
         {/* Logo */}
@@ -167,5 +169,6 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
         <NavItem to="/profile"><User size={15} />Profile</NavItem>
       </nav>
     </header>
+    </>
   );
 }

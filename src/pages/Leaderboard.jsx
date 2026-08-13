@@ -44,7 +44,7 @@ export default function Leaderboard() {
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-page)" }}>
       <DashboardNav points={points} streakDays={streakDays} initials={user?.initials || "?"} avatarUrl={user?.avatarUrl} />
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+      <main id="main-content" className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="h-10 w-10 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center">
