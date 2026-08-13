@@ -135,7 +135,7 @@ export default function BiWeeklyQuiz() {
               Back to Dashboard
             </button>
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     );
@@ -174,7 +174,7 @@ export default function BiWeeklyQuiz() {
               Back to Dashboard
             </button>
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     );
