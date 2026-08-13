@@ -44,8 +44,8 @@ function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
     </span>
   );
   if (locked) return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">
-      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">
+      <svg className="w-3 h-3" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
       Locked
     </span>
   );
@@ -56,7 +56,7 @@ function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-400/10 border border-orange-400/20 text-orange-600 dark:text-orange-400">In Progress</span>
   );
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">Not Started</span>
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">Not Started</span>
   );
 }
 
@@ -71,6 +71,7 @@ function BookmarkButton({ moduleId, bookmarked, onToggle }) {
   return (
     <button
       onClick={handleClick}
+      aria-label={bookmarked ? "Remove bookmark" : "Bookmark this module"}
       title={bookmarked ? "Remove bookmark" : "Bookmark this module"}
       className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center border transition-all
         ${bookmarked
@@ -173,7 +174,7 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
             <StatusBadge completed={m.completed} locked={m.locked} watchedPct={pct} quizPassed={m.quizPassed} />
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-300 px-1.5 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/20 whitespace-nowrap">
+            <span className="text-[10px] font-bold text-yellow-700 dark:text-yellow-300 px-1.5 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/20 whitespace-nowrap">
               +{m.points} pts
             </span>
             {!m.locked && <BookmarkButton moduleId={m.id} bookmarked={bookmarked} onToggle={onBookmarkToggle} />}
@@ -226,7 +227,7 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
               ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-600 cursor-not-allowed border border-slate-200 dark:border-gray-800"
               : m.completed
               ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
-              : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"}`}
+              : "bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90 shadow-sm"}`}
         >
           {m.locked
             ? "🔒 Locked"
@@ -443,7 +444,7 @@ export default function Modules() {
           {stats.nextUp && (
             <button
               onClick={() => handleNavigate(stats.nextUp.id, resumeChapterIdx(stats.nextUp))}
-              className="shrink-0 text-sm px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-emerald-400 text-white font-semibold hover:opacity-90 transition"
+              className="shrink-0 text-sm px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-emerald-500 text-white font-semibold hover:opacity-90 transition"
             >
               Continue Learning →
             </button>
@@ -471,7 +472,7 @@ export default function Modules() {
             { label: "Completed", value: stats.completed, total: stats.total, icon: "✅", color: "text-emerald-600 dark:text-emerald-400" },
             { label: "In Progress", value: stats.inProgress, total: null, icon: "▶", color: "text-blue-600 dark:text-blue-400" },
             { label: "Locked", value: stats.locked, total: null, icon: "🔒", color: "text-slate-500 dark:text-gray-400" },
-            { label: "Points Earned", value: lifetimeEarned, total: null, icon: "⭐", color: "text-yellow-600 dark:text-yellow-300" },
+            { label: "Points Earned", value: lifetimeEarned, total: null, icon: "⭐", color: "text-yellow-700 dark:text-yellow-300" },
           ].map((s) => (
             <div key={s.label} className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm">
               <div className="text-lg mb-1">{s.icon}</div>
@@ -503,7 +504,7 @@ export default function Modules() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2 flex-wrap items-center">
+        <div role="group" aria-label="Filter modules" className="flex gap-2 flex-wrap items-center">
           <button
             onClick={() => setShowBookmarked((v) => !v)}
             className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all flex items-center gap-1.5

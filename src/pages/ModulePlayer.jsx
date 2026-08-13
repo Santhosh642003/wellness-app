@@ -354,13 +354,13 @@ export default function ModulePlayer() {
         </div>
 
         {/* Steps indicator */}
-        <div className="flex items-center gap-4 mb-8 flex-wrap">
+        <ol aria-label="Module steps" className="flex items-center gap-4 mb-8 flex-wrap list-none m-0 p-0">
           {[
             { n: 1, label: content.videos.length > 1 ? `Watch All ${content.videos.length} Chapters` : "Watch Video", done: allVideosWatched || alreadyCompleted },
             { n: 2, label: "Take Quiz", done: quizPassed || alreadyCompleted },
             { n: 3, label: "Complete", done: alreadyCompleted },
           ].map((step, i, arr) => (
-            <div key={step.n} className="flex items-center gap-2">
+            <li key={step.n} className="flex items-center gap-2">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors
                 ${step.done
                   ? "bg-emerald-500 border-emerald-500 text-white"
@@ -372,10 +372,10 @@ export default function ModulePlayer() {
               <span className={`text-sm ${step.done ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-slate-400 dark:text-gray-600"}`}>
                 {step.label}
               </span>
-              {i < arr.length - 1 && <div className="w-8 h-px bg-slate-200 dark:bg-gray-800 ml-2" />}
-            </div>
+              {i < arr.length - 1 && <div className="w-8 h-px bg-slate-200 dark:bg-gray-800 ml-2" aria-hidden="true" />}
+            </li>
           ))}
-        </div>
+        </ol>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <section className="lg:col-span-8 space-y-4">
@@ -384,7 +384,11 @@ export default function ModulePlayer() {
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
               {/* Video playlist tabs (if multiple videos) */}
               {content.videos.length > 1 && (
-                <div className="flex overflow-x-auto border-b border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0d0d0d]">
+                <div
+                  role="tablist"
+                  aria-label="Video chapters"
+                  className="flex overflow-x-auto border-b border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0d0d0d]"
+                >
                   {content.videos.map((v, i) => {
                     const pct = videoProgress[String(i)] ?? 0;
                     const done = pct >= 80;
@@ -392,6 +396,8 @@ export default function ModulePlayer() {
                     return (
                       <button
                         key={v.id || i}
+                        role="tab"
+                        aria-selected={active}
                         onClick={() => switchVideo(i)}
                         title={done ? "80%+ watched — counts toward unlocking the quiz" : undefined}
                         className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all shrink-0
@@ -583,7 +589,7 @@ export default function ModulePlayer() {
                       Retake Quiz
                     </button>
                     {nextModule && !nextModule.locked && (
-                      <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90">
+                      <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90">
                         Next Module →
                       </button>
                     )}
@@ -596,12 +602,12 @@ export default function ModulePlayer() {
                       Quiz Unlocked
                     </div>
                     <div className="text-xs text-slate-500 dark:text-gray-500">
-                      Pass the quiz (≥70%) to complete this module and earn <strong className="text-yellow-600 dark:text-yellow-300">+{content.points} pts</strong>.
+                      Pass the quiz (≥70%) to complete this module and earn <strong className="text-yellow-700 dark:text-yellow-300">+{content.points} pts</strong>.
                     </div>
                   </div>
                   <button
                     onClick={goToQuiz}
-                    className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition"
+                    className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90 transition"
                   >
                     Take Module Quiz
                   </button>
@@ -627,11 +633,13 @@ export default function ModulePlayer() {
 
               {/* Comment input */}
               <div className="flex gap-3 mb-5">
-                <div className="h-8 w-8 rounded-full bg-blue-500/10 border border-blue-400/20 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                <div className="h-8 w-8 rounded-full bg-blue-500/10 border border-blue-400/20 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true">
                   {user?.initials || "?"}
                 </div>
                 <div className="flex-1 flex gap-2">
+                  <label htmlFor="discussion-comment" className="sr-only">Add a comment</label>
                   <input
+                    id="discussion-comment"
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postComment(); } }}
@@ -642,7 +650,7 @@ export default function ModulePlayer() {
                   <button
                     onClick={postComment}
                     disabled={!commentInput.trim() || commentPosting}
-                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 disabled:opacity-40 transition"
+                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90 disabled:opacity-40 transition"
                   >
                     {commentPosting ? "…" : "Post"}
                   </button>
@@ -738,7 +746,7 @@ export default function ModulePlayer() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500 dark:text-gray-500">Points reward</span>
-                  <span className="font-bold text-yellow-600 dark:text-yellow-300">+{content.points}</span>
+                  <span className="font-bold text-yellow-700 dark:text-yellow-300">+{content.points}</span>
                 </div>
               </div>
             </div>
@@ -752,7 +760,7 @@ export default function ModulePlayer() {
                   <div className="text-[11px] text-slate-400 dark:text-gray-600 mb-3">{nextModule.description}</div>
                   {nextModule.locked
                     ? <div className="text-xs text-slate-400 dark:text-gray-600 flex items-center gap-1">🔒 Complete this module first</div>
-                    : <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="w-full px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90">
+                    : <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="w-full px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90">
                         Start →
                       </button>
                   }

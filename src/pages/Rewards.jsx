@@ -165,7 +165,7 @@ export default function Rewards() {
         )}
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-2">
           {TABS.map((t) => (
             <button
               key={t.key}

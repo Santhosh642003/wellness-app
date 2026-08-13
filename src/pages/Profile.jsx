@@ -300,7 +300,7 @@ export default function Profile() {
                   </div>
                 ) : (
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-5">Edit Profile</h3>
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-5">Edit Profile</h2>
                     <div className="space-y-4">
                       <div>
                         <label htmlFor="profile-name" className={LABEL_CLS}>Full Name</label>

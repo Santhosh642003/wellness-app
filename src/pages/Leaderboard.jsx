@@ -57,7 +57,7 @@ export default function Leaderboard() {
         </div>
 
         {/* Period filter tabs */}
-        <div className="flex gap-2 mb-6">
+        <div role="group" aria-label="Filter by time period" className="flex gap-2 mb-6">
           {PERIODS.map((p) => (
             <button
               key={p.key}
@@ -129,11 +129,11 @@ export default function Leaderboard() {
               <p className="text-sm mt-1">Complete modules and quizzes to appear here!</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-gray-800/60">
+            <ol className="divide-y divide-slate-100 dark:divide-gray-800/60 list-none m-0 p-0" aria-label="Rankings">
               {entries.map((e) => {
                 const isMe = e.id === user?.id;
                 return (
-                  <div
+                  <li
                     key={e.id}
                     className={`flex items-center gap-4 px-5 py-3.5 transition
                       ${isMe ? "bg-blue-50 dark:bg-blue-500/10" : "hover:bg-slate-50 dark:hover:bg-white/[0.02]"}`}
@@ -168,10 +168,10 @@ export default function Leaderboard() {
                     <div className="text-sm font-semibold text-slate-900 dark:text-white shrink-0">
                       {e.points.toLocaleString()} <span className="text-xs text-slate-400 dark:text-gray-500 font-normal">pts</span>
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ol>
           )}
         </div>
 

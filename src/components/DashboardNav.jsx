@@ -70,7 +70,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
         </button>
 
         {/* Nav */}
-        <nav className="hidden md:flex items-center gap-2">
+        <nav aria-label="Main navigation" className="hidden md:flex items-center gap-2">
           <NavItem to="/dashboard"><Home size={16} />Dashboard</NavItem>
           <NavItem to="/modules"><BookOpen size={16} />Modules</NavItem>
           <NavItem to="/rewards"><Gift size={16} />Rewards</NavItem>
@@ -159,13 +159,13 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
       </div>
 
       {/* Mobile nav */}
-      <div className="md:hidden px-6 pb-3 flex items-center gap-1 overflow-x-auto">
+      <nav aria-label="Mobile navigation" className="md:hidden px-6 pb-3 flex items-center gap-1 overflow-x-auto">
         <NavItem to="/dashboard"><Home size={15} />Home</NavItem>
         <NavItem to="/modules"><BookOpen size={15} />Modules</NavItem>
         <NavItem to="/rewards"><Gift size={15} />Rewards</NavItem>
         <NavItem to="/leaderboard"><Trophy size={15} />Leaderboard</NavItem>
         <NavItem to="/profile"><User size={15} />Profile</NavItem>
-      </div>
+      </nav>
     </header>
   );
 }
