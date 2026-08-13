@@ -260,6 +260,13 @@ ALTER TABLE referrals ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMPTZ;
 ALTER TABLE referrals ADD COLUMN IF NOT EXISTS "modulesAtPayout" INTEGER;
 `;
 
+const PROFILE_V2 = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS college TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pronouns TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "preferredName" TEXT;
+`;
+
 const CAMPUS_FIX = `
 UPDATE users SET campus = 'Newark' WHERE campus = 'NJIT Newark';
 UPDATE users SET campus = 'Jersey City' WHERE campus = 'NJIT Jersey City';
@@ -279,6 +286,7 @@ export async function migrate() {
     await pool.query(MODULE_THUMBNAIL);
     await pool.query(VIDEO_TIMESTAMPS);
     await pool.query(BATCH2_SCHEMA);
+    await pool.query(PROFILE_V2);
     await pool.query(CAMPUS_FIX);
     console.log('Database schema ready');
   } catch (err) {

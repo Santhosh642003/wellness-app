@@ -60,11 +60,15 @@ router.get('/:userId', requireSelf, async (req, res, next) => {
 // PATCH /api/users/:userId/profile
 const profileSchema = z.object({
   name: z.string().min(2).optional(),
+  preferredName: z.string().max(100).optional(),
   role: z.string().optional(),
   campus: z.string().optional(),
+  college: z.string().max(120).optional(),
   major: z.string().max(100).optional(),
   graduationYear: z.string().max(10).optional(),
   yearOfStudy: z.string().max(50).optional(),
+  gender: z.string().max(100).optional(),
+  pronouns: z.string().max(100).optional(),
   ethnicity: z.string().max(100).optional(),
   bio: z.string().max(500).optional(),
 });
@@ -83,11 +87,15 @@ router.patch('/:userId/profile', requireSelf, async (req, res, next) => {
       sets.push(`name=$${i++}`, `initials=$${i++}`);
       vals.push(data.name.trim(), initials);
     }
+    if (data.preferredName !== undefined) { sets.push(`"preferredName"=$${i++}`); vals.push(data.preferredName); }
     if (data.role !== undefined) { sets.push(`role=$${i++}`); vals.push(data.role); }
     if (data.campus !== undefined) { sets.push(`campus=$${i++}`); vals.push(data.campus); }
+    if (data.college !== undefined) { sets.push(`college=$${i++}`); vals.push(data.college); }
     if (data.major !== undefined) { sets.push(`major=$${i++}`); vals.push(data.major); }
     if (data.graduationYear !== undefined) { sets.push(`"graduationYear"=$${i++}`); vals.push(data.graduationYear); }
     if (data.yearOfStudy !== undefined) { sets.push(`"yearOfStudy"=$${i++}`); vals.push(data.yearOfStudy); }
+    if (data.gender !== undefined) { sets.push(`gender=$${i++}`); vals.push(data.gender); }
+    if (data.pronouns !== undefined) { sets.push(`pronouns=$${i++}`); vals.push(data.pronouns); }
     if (data.ethnicity !== undefined) { sets.push(`ethnicity=$${i++}`); vals.push(data.ethnicity); }
     if (data.bio !== undefined) { sets.push(`bio=$${i++}`); vals.push(data.bio); }
     if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });

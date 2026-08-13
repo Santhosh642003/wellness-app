@@ -7,6 +7,60 @@ import Toast from "../components/Toast";
 import { useAuth } from "../contexts/AuthContext";
 import { users as usersApi } from "../lib/api";
 
+const COLLEGES_AND_MAJORS = [
+  {
+    college: "Newark College of Engineering",
+    majors: [
+      "Biomedical Engineering", "Chemical Engineering", "Civil Engineering",
+      "Computer Engineering", "Electrical Engineering", "Environmental Engineering",
+      "Industrial Engineering", "Materials Engineering", "Mechanical Engineering",
+      "General Engineering", "Construction Management Technology",
+      "Electrical/Computer Engineering Technology", "Mechanical Engineering Technology",
+      "Surveying Engineering Technology",
+    ],
+  },
+  {
+    college: "Ying Wu College of Computing",
+    majors: [
+      "Computer Science", "Data Science", "Information Technology",
+      "Information Systems", "Human-Computer Interaction", "Business and Information Systems",
+    ],
+  },
+  {
+    college: "Jordan Hu College of Science and Liberal Arts",
+    majors: [
+      "Biology", "Chemistry", "Applied Physics", "Mathematical Sciences",
+      "Environmental Science", "Forensic Science", "Biochemistry",
+      "History", "Law Technology and Culture", "Communication and Media",
+      "Psychology", "Theatre Arts and Technology",
+    ],
+  },
+  {
+    college: "Hillier College of Architecture and Design",
+    majors: [
+      "Architecture", "Digital Design", "Industrial Design", "Interior Design", "Art and Design",
+    ],
+  },
+  {
+    college: "Martin Tuchman School of Management",
+    majors: ["Business", "Financial Technology", "Business with AI"],
+  },
+];
+
+function getMajorCollege(major) {
+  if (!major) return "";
+  for (const { college, majors } of COLLEGES_AND_MAJORS) {
+    if (majors.includes(major)) return college;
+  }
+  return "";
+}
+
+const KNOWN_GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
+const YEAR_OPTIONS = [
+  "Freshman (1st Year)", "Sophomore (2nd Year)", "Junior (3rd Year)",
+  "Senior (4th Year)", "Graduate Student", "Other",
+];
+
 function SectionCard({ children, accent }) {
   const bars = {
     blue:    "from-blue-500 to-blue-400",
@@ -26,17 +80,16 @@ function SectionCard({ children, accent }) {
 
 function ProfileCompletionBar({ profileData, onEdit }) {
   const fields = [
-    { key: "major", label: "Major" },
+    { key: "campus",         label: "Campus" },
+    { key: "major",          label: "Major" },
     { key: "graduationYear", label: "Graduation Year" },
-    { key: "bio", label: "Bio" },
-    { key: "campus", label: "Campus" },
+    { key: "bio",            label: "Bio" },
+    { key: "gender",         label: "Gender" },
   ];
-  const filled = fields.filter(({ key, check }) =>
-    check ? check(profileData?.[key]) : !!profileData?.[key]
-  ).length;
+  const filled = fields.filter(({ key }) => !!profileData?.[key]).length;
   const pct = Math.round((filled / fields.length) * 100);
   const missing = fields
-    .filter(({ key, check }) => !(check ? check(profileData?.[key]) : !!profileData?.[key]))
+    .filter(({ key }) => !profileData?.[key])
     .map(({ label }) => label);
 
   if (pct === 100) {
@@ -93,6 +146,7 @@ function ProfileCompletionBar({ profileData, onEdit }) {
 
 const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30";
 const LABEL_CLS = "block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5";
+const SECTION_CLS = "text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-600 mb-3 mt-5 first:mt-0";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -168,12 +222,21 @@ export default function Profile() {
   const nextModule = moduleProgresses.find((m) => !m.locked && !m.completed);
 
   const startEdit = () => {
+    const storedGender = profileData?.gender || "";
+    const genderOption = KNOWN_GENDERS.includes(storedGender) ? storedGender : (storedGender ? "self-describe" : "");
+    const genderCustom = genderOption === "self-describe" ? storedGender : "";
     setForm({
       name: profileData?.name || "",
+      preferredName: profileData?.preferredName || "",
       role: profileData?.role || "Student",
       campus: profileData?.campus || "",
+      yearOfStudy: profileData?.yearOfStudy || "",
       major: profileData?.major || "",
+      college: profileData?.college || getMajorCollege(profileData?.major || ""),
       graduationYear: profileData?.graduationYear || "",
+      genderOption,
+      genderCustom,
+      pronouns: profileData?.pronouns || "",
       bio: profileData?.bio || "",
     });
     setEditing(true);
@@ -185,7 +248,22 @@ export default function Profile() {
     if (!user?.id) return;
     setSaving(true);
     try {
-      const updated = await usersApi.updateProfile(user.id, form);
+      const gender = form.genderOption === "self-describe"
+        ? (form.genderCustom || "")
+        : form.genderOption;
+      const updated = await usersApi.updateProfile(user.id, {
+        name: form.name,
+        preferredName: form.preferredName,
+        role: form.role,
+        campus: form.campus,
+        college: form.college,
+        major: form.major,
+        graduationYear: form.graduationYear,
+        yearOfStudy: form.yearOfStudy,
+        gender,
+        pronouns: form.pronouns,
+        bio: form.bio,
+      });
       setProfileData((prev) => ({ ...prev, ...updated }));
       setEditing(false);
       setToast("Profile saved!");
@@ -263,16 +341,34 @@ export default function Profile() {
                         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white leading-tight">
                           {profileData?.name || user?.name || "Student"}
                         </h1>
+                        {profileData?.preferredName && profileData.preferredName !== profileData?.name && (
+                          <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
+                            Goes by <span className="text-slate-600 dark:text-gray-300 font-medium">{profileData.preferredName}</span>
+                          </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-2 mt-2">
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
                             {profileData?.role || "Student"}
                           </span>
+                          {profileData?.pronouns && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400">
+                              {profileData.pronouns}
+                            </span>
+                          )}
                           <span className="text-xs text-slate-400 dark:text-gray-500">{user?.email}</span>
                         </div>
-                        <div className="text-xs text-slate-400 dark:text-gray-500 mt-1.5">
-                          {profileData?.campus || "NJIT"}
-                          {profileData?.major && ` · ${profileData.major}`}
-                          {profileData?.graduationYear && ` · Class of ${profileData.graduationYear}`}
+                        <div className="text-xs text-slate-400 dark:text-gray-500 mt-1.5 space-y-0.5">
+                          <div>
+                            {profileData?.campus || "NJIT"}
+                            {profileData?.college && ` · ${profileData.college}`}
+                          </div>
+                          {(profileData?.major || profileData?.graduationYear) && (
+                            <div>
+                              {profileData.major}
+                              {profileData?.yearOfStudy && ` · ${profileData.yearOfStudy}`}
+                              {profileData?.graduationYear && ` · Class of ${profileData.graduationYear}`}
+                            </div>
+                          )}
                         </div>
                         {profileData?.bio && (
                           <p className="text-sm text-slate-600 dark:text-gray-400 mt-3 leading-relaxed max-w-md">
@@ -302,27 +398,50 @@ export default function Profile() {
                   <div>
                     <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-5">Edit Profile</h2>
                     <div className="space-y-4">
-                      <div>
-                        <label htmlFor="profile-name" className={LABEL_CLS}>Full Name</label>
-                        <input
-                          id="profile-name"
-                          value={form.name}
-                          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                          className={INPUT_CLS}
-                        />
-                      </div>
+
+                      {/* ── Account ─────────────────────────── */}
+                      <p className={SECTION_CLS}>Account</p>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="profile-role" className={LABEL_CLS}>Role</label>
-                          <select
-                            id="profile-role"
-                            value={form.role}
-                            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                          <label htmlFor="profile-name" className={LABEL_CLS}>Full Name</label>
+                          <input
+                            id="profile-name"
+                            value={form.name}
+                            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                             className={INPUT_CLS}
-                          >
-                            {["Student", "Faculty", "Staff"].map((r) => <option key={r}>{r}</option>)}
-                          </select>
+                          />
                         </div>
+                        <div>
+                          <label htmlFor="profile-preferred-name" className={LABEL_CLS}>
+                            Preferred Name <span className="font-normal opacity-60">(optional)</span>
+                          </label>
+                          <input
+                            id="profile-preferred-name"
+                            value={form.preferredName}
+                            onChange={(e) => setForm((f) => ({ ...f, preferredName: e.target.value }))}
+                            placeholder="Goes by…"
+                            className={INPUT_CLS}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="max-w-xs">
+                        <label htmlFor="profile-role" className={LABEL_CLS}>Role</label>
+                        <select
+                          id="profile-role"
+                          value={form.role}
+                          onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                          className={INPUT_CLS}
+                        >
+                          {["Student", "Faculty", "Staff"].map((r) => <option key={r}>{r}</option>)}
+                        </select>
+                      </div>
+
+                      {/* ── Academic ────────────────────────── */}
+                      <p className={SECTION_CLS}>Academic</p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label htmlFor="profile-campus" className={LABEL_CLS}>Campus</label>
                           <select
@@ -337,26 +456,99 @@ export default function Profile() {
                           </select>
                         </div>
                         <div>
-                          <label htmlFor="profile-major" className={LABEL_CLS}>Major</label>
-                          <input
-                            id="profile-major"
-                            value={form.major}
-                            onChange={(e) => setForm((f) => ({ ...f, major: e.target.value }))}
-                            placeholder="e.g. Computer Science"
+                          <label htmlFor="profile-year-of-study" className={LABEL_CLS}>Year of Study</label>
+                          <select
+                            id="profile-year-of-study"
+                            value={form.yearOfStudy}
+                            onChange={(e) => setForm((f) => ({ ...f, yearOfStudy: e.target.value }))}
                             className={INPUT_CLS}
-                          />
+                          >
+                            <option value="">Select…</option>
+                            {YEAR_OPTIONS.map((y) => <option key={y}>{y}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="profile-major" className={LABEL_CLS}>Major / Program</label>
+                        <select
+                          id="profile-major"
+                          value={form.major}
+                          onChange={(e) => {
+                            const major = e.target.value;
+                            const college = getMajorCollege(major);
+                            setForm((f) => ({ ...f, major, college }));
+                          }}
+                          className={INPUT_CLS}
+                        >
+                          <option value="">Select a program…</option>
+                          {COLLEGES_AND_MAJORS.map(({ college, majors }) => (
+                            <optgroup key={college} label={college}>
+                              {majors.map((m) => <option key={m} value={m}>{m}</option>)}
+                            </optgroup>
+                          ))}
+                          <option value="Other / Not listed">Other / Not listed</option>
+                        </select>
+                        {form.college && (
+                          <p className="text-[11px] text-slate-400 dark:text-gray-500 mt-1.5 px-1">
+                            College: <span className="text-slate-600 dark:text-gray-300 font-medium">{form.college}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="max-w-xs">
+                        <label htmlFor="profile-year" className={LABEL_CLS}>Graduation Year</label>
+                        <input
+                          id="profile-year"
+                          value={form.graduationYear}
+                          onChange={(e) => setForm((f) => ({ ...f, graduationYear: e.target.value }))}
+                          placeholder="e.g. 2026"
+                          className={INPUT_CLS}
+                        />
+                      </div>
+
+                      {/* ── Personal ────────────────────────── */}
+                      <p className={SECTION_CLS}>Personal</p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="profile-gender" className={LABEL_CLS}>
+                            Gender <span className="font-normal opacity-60">(optional)</span>
+                          </label>
+                          <select
+                            id="profile-gender"
+                            value={form.genderOption}
+                            onChange={(e) => setForm((f) => ({ ...f, genderOption: e.target.value, genderCustom: "" }))}
+                            className={INPUT_CLS}
+                          >
+                            <option value="">Prefer not to say</option>
+                            {KNOWN_GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+                            <option value="self-describe">Self-describe…</option>
+                          </select>
+                          {form.genderOption === "self-describe" && (
+                            <input
+                              id="profile-gender-custom"
+                              value={form.genderCustom}
+                              onChange={(e) => setForm((f) => ({ ...f, genderCustom: e.target.value }))}
+                              placeholder="Describe your gender"
+                              className={`${INPUT_CLS} mt-2`}
+                            />
+                          )}
                         </div>
                         <div>
-                          <label htmlFor="profile-year" className={LABEL_CLS}>Graduation Year</label>
+                          <label htmlFor="profile-pronouns" className={LABEL_CLS}>
+                            Pronouns <span className="font-normal opacity-60">(optional)</span>
+                          </label>
                           <input
-                            id="profile-year"
-                            value={form.graduationYear}
-                            onChange={(e) => setForm((f) => ({ ...f, graduationYear: e.target.value }))}
-                            placeholder="e.g. 2026"
+                            id="profile-pronouns"
+                            value={form.pronouns}
+                            onChange={(e) => setForm((f) => ({ ...f, pronouns: e.target.value }))}
+                            placeholder="e.g. she/her, they/them"
                             className={INPUT_CLS}
                           />
                         </div>
                       </div>
+
                       <div>
                         <label htmlFor="profile-bio" className={LABEL_CLS}>
                           Bio <span className="font-normal text-slate-400">({(form.bio || "").length}/500)</span>
@@ -370,6 +562,7 @@ export default function Profile() {
                           className={`${INPUT_CLS} resize-none`}
                         />
                       </div>
+
                       <div className="flex gap-3 pt-1">
                         <button
                           onClick={saveEdit}
