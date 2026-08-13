@@ -155,8 +155,35 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
           {/* Seek bar */}
           <div
             ref={seekRef}
-            className="relative h-1.5 rounded-full bg-white/20 cursor-pointer mb-3 group"
+            role="slider"
+            tabIndex={0}
+            aria-label="Seek"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(seekPercent)}
+            className="relative h-1.5 rounded-full bg-white/20 cursor-pointer mb-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:rounded"
             onClick={handleSeek}
+            onKeyDown={(e) => {
+              const v = videoRef.current;
+              if (!v || !duration) return;
+              if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                v.currentTime = Math.min(duration, v.currentTime + 5);
+                scheduleHide();
+              } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                v.currentTime = Math.max(0, v.currentTime - 5);
+                scheduleHide();
+              } else if (e.key === 'Home') {
+                e.preventDefault();
+                v.currentTime = 0;
+                scheduleHide();
+              } else if (e.key === 'End') {
+                e.preventDefault();
+                v.currentTime = duration;
+                scheduleHide();
+              }
+            }}
           >
             {/* Buffered */}
             <div className="absolute inset-0 rounded-full bg-white/30" style={{ width: `${buffered}%` }} />
@@ -172,7 +199,7 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
           {/* Bottom controls */}
           <div className="flex items-center gap-3">
             {/* Play/Pause */}
-            <button onClick={togglePlay} className="text-white hover:text-emerald-400 transition shrink-0">
+            <button onClick={togglePlay} aria-label={playing ? "Pause" : "Play"} className="text-white hover:text-emerald-400 transition shrink-0">
               {playing ? (
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
@@ -185,7 +212,7 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
             </button>
 
             {/* Volume */}
-            <button onClick={toggleMute} className="text-white hover:text-emerald-400 transition shrink-0">
+            <button onClick={toggleMute} aria-label={effectiveVolume === 0 ? "Unmute" : "Mute"} className="text-white hover:text-emerald-400 transition shrink-0">
               {effectiveVolume === 0 ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
               ) : effectiveVolume < 0.5 ? (
@@ -196,8 +223,28 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
             </button>
             <div
               ref={volumeRef}
-              className="w-16 h-1 rounded-full bg-white/20 cursor-pointer relative group shrink-0"
+              role="slider"
+              tabIndex={0}
+              aria-label="Volume"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(effectiveVolume * 100)}
+              className="w-16 h-1 rounded-full bg-white/20 cursor-pointer relative group shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:rounded"
               onClick={handleVolumeChange}
+              onKeyDown={(e) => {
+                const step = 0.1;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  const v = Math.min(1, (muted ? 0 : volume) + step);
+                  setVolume(v); setMuted(false);
+                  if (videoRef.current) { videoRef.current.volume = v; videoRef.current.muted = false; }
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  const v = Math.max(0, (muted ? 0 : volume) - step);
+                  setVolume(v); setMuted(v === 0);
+                  if (videoRef.current) { videoRef.current.volume = v; videoRef.current.muted = v === 0; }
+                }
+              }}
             >
               <div className="absolute inset-0 rounded-full bg-white" style={{ width: `${effectiveVolume * 100}%` }} />
             </div>
@@ -228,6 +275,8 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
             <button
               onClick={onToggleCaptions}
               disabled={!hasTranscript}
+              aria-label={!hasTranscript ? "Captions unavailable" : captionsOn ? "Turn off captions" : "Turn on captions"}
+              aria-pressed={hasTranscript ? captionsOn : undefined}
               title={!hasTranscript ? "No transcript available" : captionsOn ? "Turn off captions" : "Turn on captions"}
               className={`text-xs font-bold px-1.5 py-0.5 rounded border transition shrink-0
                 ${captionsOn
@@ -240,7 +289,7 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
             </button>
 
             {/* Fullscreen */}
-            <button onClick={toggleFullscreen} className="text-white hover:text-emerald-400 transition shrink-0">
+            <button onClick={toggleFullscreen} aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"} className="text-white hover:text-emerald-400 transition shrink-0">
               {fullscreen ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
               ) : (

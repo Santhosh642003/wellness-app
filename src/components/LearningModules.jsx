@@ -18,7 +18,7 @@ function StatusBadge({ completed, locked, watchedPct }) {
     </span>
   );
   if (locked) return (
-    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">
       Locked
     </span>
   );
@@ -28,7 +28,7 @@ function StatusBadge({ completed, locked, watchedPct }) {
     </span>
   );
   return (
-    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500">
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">
       Not Started
     </span>
   );
@@ -70,7 +70,14 @@ export default function LearningModules({ modules = [], onContinue }) {
       {/* Overall progress strip */}
       {totalCount > 0 && (
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-1.5 bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={overallPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Overall learning progress"
+            className="flex-1 h-1.5 bg-slate-100 dark:bg-[#0f0f0f] rounded-full overflow-hidden"
+          >
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-700"
               style={{ width: `${overallPct}%` }}
@@ -110,7 +117,7 @@ export default function LearningModules({ modules = [], onContinue }) {
                       {m.category}
                     </span>
                     <StatusBadge completed={m.completed} locked={m.locked} watchedPct={pct} />
-                    <span className="ml-auto text-[10px] font-bold text-yellow-600 dark:text-yellow-300 bg-yellow-400/10 border border-yellow-400/20 px-1.5 py-0.5 rounded-full shrink-0">
+                    <span className="ml-auto text-[10px] font-bold text-yellow-700 dark:text-yellow-300 bg-yellow-400/10 border border-yellow-400/20 px-1.5 py-0.5 rounded-full shrink-0">
                       +{m.points}
                     </span>
                   </div>
@@ -144,7 +151,7 @@ export default function LearningModules({ modules = [], onContinue }) {
                         ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
                         : m.completed
                         ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
-                        : "bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 shadow-sm"}`}
+                        : "bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90 shadow-sm"}`}
                   >
                     {m.locked
                       ? "🔒 Locked"

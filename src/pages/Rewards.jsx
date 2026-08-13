@@ -21,14 +21,35 @@ const TABS = [
 ];
 
 function Modal({ open, title, children, onClose }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.activeElement;
+    dialogRef.current?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      prev?.focus();
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl shadow-2xl p-6">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        tabIndex={-1}
+        className="relative w-full max-w-lg bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl shadow-2xl p-6 focus:outline-none"
+      >
         <div className="flex items-start justify-between gap-4 mb-4">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-white/10">✕</button>
+          <h3 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} aria-label="Close" className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-white/10">✕</button>
         </div>
         {children}
       </div>
@@ -122,7 +143,7 @@ export default function Rewards() {
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Rewards Store</h1>
           <p className="text-slate-500 dark:text-gray-400 mt-2">Redeem your points for gift cards and rewards</p>
           <div className="mt-2 text-sm text-slate-600 dark:text-gray-400">
-            You have <span className="font-bold text-yellow-600 dark:text-yellow-300">{points}</span> points
+            You have <span className="font-bold text-yellow-700 dark:text-yellow-300">{points}</span> points
           </div>
         </header>
 

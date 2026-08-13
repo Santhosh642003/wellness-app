@@ -95,12 +95,14 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
           <div className="relative" ref={bellRef}>
             <button
               onClick={openBell}
-              title="Notifications"
+              aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+              aria-expanded={showBell}
+              aria-haspopup="true"
               className="relative h-10 w-10 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
             >
-              <Bell size={16} />
+              <Bell size={16} aria-hidden="true" />
               {unread > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                <span aria-hidden="true" className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                   {unread > 9 ? "9+" : unread}
                 </span>
               )}
@@ -111,8 +113,8 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
               <div className="absolute right-0 top-12 w-80 bg-white dark:bg-[#141414] border border-slate-200 dark:border-gray-800 rounded-2xl shadow-xl z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-gray-800">
                   <span className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</span>
-                  <button onClick={() => setShowBell(false)} className="text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 transition">
-                    <X size={14} />
+                  <button onClick={() => setShowBell(false)} aria-label="Close notifications" className="text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 transition">
+                    <X size={14} aria-hidden="true" />
                   </button>
                 </div>
                 <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-gray-800">
@@ -137,16 +139,16 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
           {/* Theme toggle */}
           <button
             onClick={toggle}
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
           >
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
           </button>
 
           {/* Avatar */}
           <button
             onClick={() => navigate("/profile")}
-            title="Profile"
+            aria-label="Go to profile"
             className="h-10 w-10 rounded-2xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center font-semibold text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-[#151515] transition overflow-hidden"
           >
             {avatarUrl

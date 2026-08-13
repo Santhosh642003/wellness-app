@@ -62,6 +62,7 @@ export default function Leaderboard() {
             <button
               key={p.key}
               onClick={() => setPeriod(p.key)}
+              aria-pressed={period === p.key}
               className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all
                 ${period === p.key
                   ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-600 dark:text-yellow-300"
