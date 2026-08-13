@@ -374,9 +374,9 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
 const quizSchema = z.object({
   moduleId: z.string().optional(),
   quizType: z.enum(['module', 'biweekly']),
-  score: z.number().min(0),
-  totalPoints: z.number().min(0),
-  answers: z.array(z.any()),
+  score: z.number().min(0).max(10000),
+  totalPoints: z.number().min(1).max(10000),
+  answers: z.array(z.any()).max(100),
 });
 
 router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
@@ -402,14 +402,54 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
         }
       }
 
-      const passed = data.score / data.totalPoints >= 0.7;
-      const pointsEarned = passed ? (data.quizType === 'biweekly' ? 200 : Math.round(data.score * 0.5)) : 0;
+      // C1: Module quizzes are one-time — block replay once the user has already passed
+      if (data.quizType === 'module' && data.moduleId) {
+        const { rows: [priorPass] } = await client.query(
+          `SELECT id FROM quiz_attempts WHERE "userId"=$1 AND "moduleId"=$2 AND "quizType"='module' AND passed=true LIMIT 1`,
+          [req.params.userId, data.moduleId]
+        );
+        if (priorPass) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ error: 'You have already passed this module quiz' });
+        }
+      }
+
+      // C2: Fetch real max points from the DB; clamp client-supplied score to that ceiling
+      let validatedScore = data.score;
+      let validatedTotalPoints = data.totalPoints;
+      if (data.quizType === 'module' && data.moduleId) {
+        const { rows: [qt] } = await client.query(
+          `SELECT COALESCE(SUM(qq.points), 0)::int AS total
+           FROM quizzes q
+           JOIN quiz_questions qq ON qq."quizId" = q.id
+           WHERE q."moduleId" = $1 AND q.type = 'module'`,
+          [data.moduleId]
+        );
+        if (qt?.total > 0) {
+          validatedTotalPoints = qt.total;
+          validatedScore = Math.min(data.score, validatedTotalPoints);
+        }
+      } else if (data.quizType === 'biweekly') {
+        const { rows: [qt] } = await client.query(
+          `SELECT COALESCE(SUM(qq.points), 0)::int AS total
+           FROM quizzes q
+           JOIN quiz_questions qq ON qq."quizId" = q.id
+           WHERE q.type = 'biweekly'`
+        );
+        if (qt?.total > 0) {
+          validatedTotalPoints = qt.total;
+          validatedScore = Math.min(data.score, validatedTotalPoints);
+        }
+      }
+
+      const passed = validatedTotalPoints > 0 && validatedScore / validatedTotalPoints >= 0.7;
+      const pointsEarned = passed ? (data.quizType === 'biweekly' ? 200 : Math.round(validatedScore * 0.5)) : 0;
 
       const { rows: [attempt] } = await client.query(
         `INSERT INTO quiz_attempts (id, "userId", "moduleId", "quizType", score, "totalPoints", passed, answers)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         [randomUUID(), req.params.userId, data.moduleId || null, data.quizType,
-         data.score, data.totalPoints, passed, JSON.stringify(data.answers)]
+         validatedScore, validatedTotalPoints, passed, JSON.stringify(data.answers)]
       );
 
       if (passed && pointsEarned > 0) {

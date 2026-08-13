@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import pool from './db.js';
 
@@ -161,11 +161,16 @@ const TEST_MODULES = [
 
 export async function seed() {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@njit.edu').toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@1234';
+  let adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    adminPassword = randomBytes(16).toString('hex');
+    console.warn(`[seed] ADMIN_PASSWORD not set — generated one-time dev password for ${adminEmail}: ${adminPassword}`);
+    console.warn('[seed] Set ADMIN_PASSWORD in your .env to use a stable password across restarts.');
+  }
 
   const { rows } = await pool.query('SELECT id FROM admin_users WHERE email=$1', [adminEmail]);
   if (rows.length === 0) {
-    const hashed = await bcrypt.hash(adminPassword, 12);
+    const hashed = await bcrypt.hash(adminPassword, 14);
     await pool.query(
       `INSERT INTO admin_users (id, email, password, name) VALUES ($1,$2,$3,'Administrator')`,
       [randomUUID(), adminEmail, hashed]

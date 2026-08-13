@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-wellness_db}
       POSTGRES_USER: ${POSTGRES_USER:-wellness_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wellness_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -29,7 +29,7 @@ services:
     environment:
       NODE_ENV: production
       # If DATABASE_URL is set in .env it takes priority; otherwise fall back to local docker postgres
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-wellness_user}:${POSTGRES_PASSWORD:-wellness_secret}@db:5432/${POSTGRES_DB:-wellness_db}}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-wellness_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-wellness_db}}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       PORT: 3001
@@ -38,7 +38,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@njit.edu}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@1234}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       DB_SSL: ${DB_SSL:-false}
       # Email (SMTP)
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}

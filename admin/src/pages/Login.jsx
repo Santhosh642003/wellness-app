@@ -43,7 +43,6 @@ export default function Login() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
-        <p className="text-gray-600 text-xs mt-6 text-center">Default: admin@njit.edu / Admin@1234</p>
       </div>
     </div>
   );

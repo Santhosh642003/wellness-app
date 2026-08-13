@@ -37,6 +37,10 @@ if (
   console.error('[startup] JWT_SECRET is still the default placeholder — set a real secret in production.');
   process.exit(1);
 }
+if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+  console.error('[startup] ADMIN_PASSWORD is not set — required in production to avoid a known-weak admin account.');
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(process.cwd(), 'uploads');
