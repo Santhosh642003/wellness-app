@@ -228,8 +228,10 @@ export default function Users() {
                 </td>
                 <td className="px-4 py-3" onClick={() => navigate(`/users/${u.id}`)}>
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-emerald-600/20 border border-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs font-bold shrink-0">
-                      {u.initials || u.name?.[0]?.toUpperCase() || '?'}
+                    <div className="h-8 w-8 rounded-full bg-emerald-600/20 border border-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs font-bold shrink-0 overflow-hidden">
+                      {u.avatarUrl
+                        ? <img src={u.avatarUrl} alt={u.initials} className="h-full w-full object-cover" />
+                        : (u.initials || u.name?.[0]?.toUpperCase() || '?')}
                     </div>
                     <div>
                       <p className="text-white font-medium">{u.name}</p>

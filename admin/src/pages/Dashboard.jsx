@@ -178,6 +178,11 @@ export default function Dashboard() {
                 <span className={`text-sm font-bold w-5 shrink-0 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-gray-500'}`}>
                   #{i + 1}
                 </span>
+                <div className="h-7 w-7 rounded-full bg-emerald-600/20 border border-emerald-600/30 flex items-center justify-center text-emerald-400 text-[10px] font-bold shrink-0 overflow-hidden">
+                  {u.avatarUrl
+                    ? <img src={u.avatarUrl} alt={u.name?.[0]} className="h-full w-full object-cover" />
+                    : (u.name?.[0]?.toUpperCase() || '?')}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{u.name}</p>
                   <p className="text-gray-500 text-xs truncate">{u.email}</p>

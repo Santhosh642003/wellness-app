@@ -62,7 +62,7 @@ router.use(adminAuth);
 // GET /api/admin/stats
 router.get('/stats', async (req, res, next) => {
   try {
-    const [users, points, completions, redemptions, quizzes, modules, newUsers] = await Promise.all([
+    const [users, points, completions, redemptions, quizzes, modules, newUsers, rewards, topUsers] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM users'),
       pool.query('SELECT COALESCE(SUM(points),0) as total, COALESCE(AVG(points),0) as avg FROM user_progress'),
       pool.query('SELECT COUNT(*) FROM user_module_progress WHERE completed=true'),
@@ -70,6 +70,10 @@ router.get('/stats', async (req, res, next) => {
       pool.query('SELECT COUNT(*) FILTER (WHERE passed=true) as passed, COUNT(*) as total FROM quiz_attempts'),
       pool.query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE locked=false) as unlocked FROM modules'),
       pool.query(`SELECT COUNT(*) FROM users WHERE "createdAt" > NOW() - INTERVAL '7 days'`),
+      pool.query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE available=true) as available FROM rewards`),
+      pool.query(`SELECT u.name, u.email, u."avatarUrl", COALESCE(p.points,0) as points
+                  FROM users u LEFT JOIN user_progress p ON p."userId"=u.id
+                  ORDER BY p.points DESC NULLS LAST LIMIT 5`),
     ]);
     res.json({
       totalUsers: parseInt(users.rows[0].count),
@@ -84,6 +88,9 @@ router.get('/stats', async (req, res, next) => {
       totalModules: parseInt(modules.rows[0].total),
       unlockedModules: parseInt(modules.rows[0].unlocked),
       newUsersThisWeek: parseInt(newUsers.rows[0].count),
+      totalRewards: parseInt(rewards.rows[0].total),
+      availableRewards: parseInt(rewards.rows[0].available),
+      topUsers: topUsers.rows,
     });
   } catch (err) { next(err); }
 });
@@ -92,7 +99,7 @@ router.get('/stats', async (req, res, next) => {
 router.get('/users', async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT u.id, u.email, u.name, u.initials, u.role, u.campus, u."createdAt",
+      `SELECT u.id, u.email, u.name, u.initials, u."avatarUrl", u.role, u.campus, u."createdAt",
               COALESCE(p.points,0) as points, COALESCE(p."streakDays",0) as "streakDays", p."lastClaimDate",
               COUNT(ump.id) FILTER (WHERE ump.completed=true) as "modulesCompleted"
        FROM users u
@@ -385,10 +392,10 @@ router.get('/rewards', async (req, res, next) => {
 
 router.post('/rewards', async (req, res, next) => {
   try {
-    const d = z.object({ title: z.string(), description: z.string(), pointsCost: z.number(), category: z.string(), stock: z.number().optional(), available: z.boolean().optional() }).parse(req.body);
+    const d = z.object({ title: z.string(), description: z.string(), pointsCost: z.number(), category: z.string(), stock: z.number().optional(), available: z.boolean().optional(), imageUrl: z.string().nullable().optional() }).parse(req.body);
     const { rows: [r] } = await pool.query(
-      `INSERT INTO rewards (id, title, description, "pointsCost", category, stock, available) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [randomUUID(), d.title, d.description, d.pointsCost, d.category, d.stock??-1, d.available??true]
+      `INSERT INTO rewards (id, title, description, "pointsCost", category, stock, available, "imageUrl") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [randomUUID(), d.title, d.description, d.pointsCost, d.category, d.stock??-1, d.available??true, d.imageUrl??null]
     );
     res.status(201).json(r);
   } catch (err) { next(err); }
