@@ -7,8 +7,55 @@ const CATEGORIES = ['Foundations', 'HPV', 'MenB', 'Bonus', 'General'];
 const EMPTY = {
   slug: '', title: '', description: '', duration: '', category: 'Foundations',
   orderIndex: 0, pointsValue: 100, locked: true,
-  videos: [], documents: [], keyPoints: [],
+  thumbnailUrl: '', videos: [], documents: [], keyPoints: [],
 };
+
+function ThumbnailUploader({ value, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setUploading(true); setProgress(0); setError('');
+    try {
+      const result = await api.uploadImage(file, setProgress);
+      onChange(result.url);
+    } catch (err) { setError(err.message || 'Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-3 items-start">
+        {value && (
+          <div className="h-14 w-24 rounded-lg bg-gray-800 border border-gray-700 overflow-hidden shrink-0">
+            <img src={value} alt="Thumbnail" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+          </div>
+        )}
+        <div className="flex-1 space-y-2">
+          <div className="flex gap-2 flex-wrap">
+            <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+            <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm hover:bg-gray-700 disabled:opacity-50">
+              <Upload size={13} />{uploading ? `Uploading ${progress}%` : 'Upload image'}
+            </button>
+            {value && <button type="button" onClick={() => onChange('')} className="text-gray-500 hover:text-red-400 text-xs px-2">Remove</button>}
+          </div>
+          {uploading && (
+            <div className="h-1.5 w-full rounded-full bg-gray-800 overflow-hidden">
+              <div className="h-full bg-emerald-500 transition-all duration-200 rounded-full" style={{ width: `${progress}%` }} />
+            </div>
+          )}
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+          <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://... or paste upload URL"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EMPTY_Q = { question: '', options: ['', '', '', ''], answerIndex: 0, points: 10, explanation: '' };
 const EMPTY_VIDEO = { id: '', title: '', url: '', duration: '', transcript: [] };
@@ -441,6 +488,7 @@ function ModuleForm({ initial, onSaved, onCancel }) {
       : [];
     return {
       ...EMPTY, ...initial,
+      thumbnailUrl: initial?.thumbnailUrl || '',
       videos,
       documents,
       _keyPointsRaw: Array.isArray(initial?.keyPoints) ? initial.keyPoints.join('\n') : '',
@@ -484,6 +532,7 @@ function ModuleForm({ initial, onSaved, onCancel }) {
         slug: form.slug, title: form.title, description: form.description,
         duration: form.duration, category: form.category, orderIndex: form.orderIndex,
         pointsValue: form.pointsValue, locked: form.locked,
+        thumbnailUrl: form.thumbnailUrl || null,
         videoUrl: cleanVideos[0]?.url || '',
         videos: cleanVideos,
         documents: cleanDocs,
@@ -567,6 +616,10 @@ function ModuleForm({ initial, onSaved, onCancel }) {
           <label className="text-gray-300 text-sm">
             {form.locked ? '🔒 Locked — requires previous module' : '🔓 Unlocked — accessible immediately'}
           </label>
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-gray-400 text-xs mb-2">Thumbnail <span className="text-gray-600">(shown on the modules grid card)</span></label>
+          <ThumbnailUploader value={form.thumbnailUrl || ''} onChange={(url) => set('thumbnailUrl', url)} />
         </div>
       </div>
 

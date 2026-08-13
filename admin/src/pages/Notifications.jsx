@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Upload, Bell } from 'lucide-react';
 
-const EMPTY = { title: '', body: '', imageUrl: '', active: true };
+const EMPTY = { title: '', body: '', imageUrl: '', active: true, sendEmail: false };
 
 function ImageUploader({ value, onChange }) {
   const inputRef = useRef(null);
@@ -75,7 +75,7 @@ export default function Notifications() {
       if (form.id) {
         await api.updateNotification(form.id, { title: form.title, body: form.body, imageUrl: form.imageUrl || null, active: form.active });
       } else {
-        await api.createNotification({ title: form.title, body: form.body, imageUrl: form.imageUrl || null, active: form.active });
+        await api.createNotification({ title: form.title, body: form.body, imageUrl: form.imageUrl || null, active: form.active, sendEmail: form.sendEmail });
       }
       setForm(null); load();
     } catch (err) { alert(err.message); }
@@ -136,6 +136,21 @@ export default function Notifications() {
                 {form.active ? 'Active' : 'Hidden'}
               </span>
             </div>
+            {!form.id && (
+              <div className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                <button type="button" onClick={() => setForm(f => ({ ...f, sendEmail: !f.sendEmail }))}>
+                  {form.sendEmail
+                    ? <ToggleRight size={22} className="text-amber-400" />
+                    : <ToggleLeft size={22} className="text-gray-500" />}
+                </button>
+                <div>
+                  <span className={`text-xs font-medium ${form.sendEmail ? 'text-amber-400' : 'text-gray-500'}`}>
+                    {form.sendEmail ? '📧 Email blast enabled' : 'Email blast off'}
+                  </span>
+                  <p className="text-gray-600 text-[10px] mt-0.5">Sends this announcement to all registered users immediately on save</p>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex gap-3 mt-5">
             <button onClick={save} disabled={saving}

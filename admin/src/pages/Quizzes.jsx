@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X, Check, Settings, Calendar } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X, Check, Settings, Calendar, ToggleLeft, ToggleRight } from 'lucide-react';
 
 function QuestionForm({ form, setForm, onSave, onCancel, saving }) {
   const opts = Array.isArray(form.options) ? form.options : ['', '', '', ''];
@@ -72,6 +72,7 @@ function QuizSettingsForm({ quiz, onSave, onClose }) {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
   const [scheduledAt, setScheduledAt] = useState(toLocalInput(quiz.scheduledAt));
+  const [sendLiveEmail, setSendLiveEmail] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -84,8 +85,10 @@ function QuizSettingsForm({ quiz, onSave, onClose }) {
         title,
         passingScore: parseInt(passingScore),
         ...(isBiweekly ? { scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null } : {}),
+        ...(sendLiveEmail ? { sendLiveEmail: true } : {}),
       };
       await api.updateQuiz(quiz.id, payload);
+      if (sendLiveEmail) setSendLiveEmail(false);
       onSave({ ...quiz, ...payload });
     } catch (err) {
       setError(err.message);
@@ -148,6 +151,19 @@ function QuizSettingsForm({ quiz, onSave, onClose }) {
           )}
         </div>
       )}
+      <div className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2.5">
+        <button type="button" onClick={() => setSendLiveEmail(v => !v)}>
+          {sendLiveEmail
+            ? <ToggleRight size={22} className="text-amber-400" />
+            : <ToggleLeft size={22} className="text-gray-500" />}
+        </button>
+        <div>
+          <span className={`text-xs font-medium ${sendLiveEmail ? 'text-amber-400' : 'text-gray-500'}`}>
+            {sendLiveEmail ? '📧 Email blast on save' : 'No email blast'}
+          </span>
+          <p className="text-gray-600 text-[10px] mt-0.5">When on, saving triggers a "quiz is live" email to all users</p>
+        </div>
+      </div>
       {error && <p className="text-red-400 text-xs">{error}</p>}
       <div className="flex gap-2">
         <button onClick={save} disabled={saving}
