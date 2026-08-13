@@ -130,7 +130,7 @@ export default function Profile() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) { setToast("Please select an image file"); return; }
-    if (file.size > 5 * 1024 * 1024) { setToast("Image must be under 5 MB"); return; }
+    if (file.size > 5 * 1024 * 1024) { setToast("Image is too large — please choose a file under 5 MB"); return; }
     setUploading(true);
     try {
       const updated = await usersApi.uploadAvatar(user.id, file);

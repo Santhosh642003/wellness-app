@@ -63,6 +63,11 @@ export const users = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     }).then(async (res) => {
+      if (res.status === 413) {
+        const err = new Error("Image is too large — please choose a file under 5 MB");
+        err.status = 413;
+        throw err;
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const err = new Error(data.error || `HTTP ${res.status}`);
