@@ -12,12 +12,6 @@ const MAJORS = [
   "Biomedical Engineering", "Architecture", "Mathematics", "Physics",
   "Chemistry", "Biology", "Business", "Finance", "Data Science", "Other",
 ];
-const ETHNICITIES = [
-  "Asian / Pacific Islander", "Black / African American", "Hispanic / Latino",
-  "Middle Eastern / North African", "Native American / Alaskan Native",
-  "White / Caucasian", "Two or more races", "Prefer not to say",
-];
-
 const SPECIAL_CHAR_RE = /[!@#$%^&*()\-_=+\[\]{}|;:,.<>?]/;
 
 function passwordStrength(p) {
@@ -72,7 +66,6 @@ export default function Login() {
   const [campus, setCampus] = useState(CAMPUSES[0]);
   const [major, setMajor] = useState("");
   const [yearOfStudy, setYearOfStudy] = useState("");
-  const [ethnicity, setEthnicity] = useState("");
 
   // Register step 2 – credentials
   const [email, setEmail] = useState("");
@@ -100,7 +93,7 @@ export default function Login() {
 
   const resetRegister = () => {
     sendingOtp.current = false;
-    setStep(1); setName(""); setCampus(CAMPUSES[0]); setMajor(""); setYearOfStudy(""); setEthnicity("");
+    setStep(1); setName(""); setCampus(CAMPUSES[0]); setMajor(""); setYearOfStudy("");
     setEmail(""); setPassword(""); setConfirmPassword(""); setOtpCode(""); setOtpSent(false); setDevCode(""); setError("");
   };
 
@@ -160,7 +153,7 @@ export default function Login() {
       await register({
         email: normalEmail, password, name: name.trim(),
         campus, major: major || undefined, yearOfStudy: yearOfStudy || undefined,
-        ethnicity: ethnicity || undefined, otpCode,
+        otpCode,
       });
       navigate(redirectTo);
     } catch (err) {
@@ -275,13 +268,6 @@ export default function Login() {
                     <select value={yearOfStudy} onChange={(e) => setYearOfStudy(e.target.value)} className={SELECT_CLS}>
                       <option value="">Select year</option>
                       {YEARS.map((y) => <option key={y}>{y}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={LABEL_CLS}>Ethnicity</label>
-                    <select value={ethnicity} onChange={(e) => setEthnicity(e.target.value)} className={SELECT_CLS}>
-                      <option value="">Prefer not to say</option>
-                      {ETHNICITIES.map((et) => <option key={et}>{et}</option>)}
                     </select>
                   </div>
                   {error && <p className="text-sm text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3">{error}</p>}

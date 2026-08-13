@@ -44,7 +44,6 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   major: z.string().max(100).optional(),
   yearOfStudy: z.string().optional(),
-  ethnicity: z.string().optional(),
   role: z.string().optional(),
   campus: z.string().optional(),
   otpCode: z.string().length(6, 'Verification code must be 6 digits'),
@@ -172,11 +171,11 @@ router.post('/register', async (req, res, next) => {
     try {
       await client.query('BEGIN');
       await client.query(
-        `INSERT INTO users (id, email, name, password, initials, role, campus, major, "yearOfStudy", ethnicity, "emailVerified", "referralCode")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,$11)`,
+        `INSERT INTO users (id, email, name, password, initials, role, campus, major, "yearOfStudy", "emailVerified", "referralCode")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10)`,
         [userId, normalEmail, data.name.trim(), hashed, initials,
          data.role || 'Student', data.campus || 'NJIT Newark',
-         data.major || null, data.yearOfStudy || null, data.ethnicity || null,
+         data.major || null, data.yearOfStudy || null,
          referralCode]
       );
       await client.query(`INSERT INTO user_progress (id, "userId") VALUES ($1,$2)`, [randomUUID(), userId]);

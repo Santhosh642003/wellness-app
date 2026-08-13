@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export default function Footer() {
   return (
     <footer className="bg-slate-100 dark:bg-[#2f2f2f] text-slate-600 dark:text-gray-300 border-t border-slate-200 dark:border-gray-800">
@@ -78,6 +80,13 @@ export default function Footer() {
             >
               Sexual Assault Response
             </a>
+
+            <Link
+              to="/privacy"
+              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+            >
+              Privacy Policy
+            </Link>
 
           </div>
         </div>
