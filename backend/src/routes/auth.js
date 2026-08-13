@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomInt } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import pool from '../lib/db.js';
 import { authenticate } from '../middleware/auth.js';
@@ -101,13 +101,14 @@ router.post('/send-otp', async (req, res, next) => {
       [normalEmail]
     );
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const codeHash = await bcrypt.hash(code, 10);
 
     console.log('[send-otp] step 5: insert OTP row');
     await pool.query(
       `INSERT INTO email_otps (id, email, code, "expiresAt") VALUES ($1,$2,$3,$4)`,
-      [randomUUID(), normalEmail, code, expiresAt]
+      [randomUUID(), normalEmail, codeHash, expiresAt]
     );
 
     console.log('[send-otp] step 6: send email');
@@ -116,7 +117,9 @@ router.post('/send-otp', async (req, res, next) => {
 
     res.json({
       sent: true,
-      ...(result?.devMode ? { devCode: code, devNote: 'SMTP not configured — code shown for dev only' } : {}),
+      ...(result?.devMode && process.env.ALLOW_DEV_CODES === 'true'
+        ? { devCode: code, devNote: 'SMTP not configured — code shown for dev only' }
+        : {}),
     });
   } catch (err) {
     console.error('[send-otp] error at step:', err.message);
@@ -130,13 +133,14 @@ router.post('/register', async (req, res, next) => {
     const data = registerSchema.parse(req.body);
     const normalEmail = data.email.toLowerCase();
 
-    // Verify OTP
+    // Verify OTP — fetch by email only (code is bcrypt-hashed in DB), then compare
     const { rows: [otp] } = await pool.query(
-      `SELECT * FROM email_otps WHERE email=$1 AND code=$2 AND "expiresAt" > NOW() AND "usedAt" IS NULL
+      `SELECT * FROM email_otps WHERE email=$1 AND "expiresAt" > NOW() AND "usedAt" IS NULL
        ORDER BY "createdAt" DESC LIMIT 1`,
-      [normalEmail, data.otpCode]
+      [normalEmail]
     );
-    if (!otp) return res.status(400).json({ error: 'Invalid or expired verification code. Please request a new one.' });
+    const otpValid = otp && await bcrypt.compare(data.otpCode, otp.code);
+    if (!otpValid) return res.status(400).json({ error: 'Invalid or expired verification code. Please request a new one.' });
 
     // Mark OTP as used
     await pool.query(`UPDATE email_otps SET "usedAt"=NOW() WHERE id=$1`, [otp.id]);
@@ -346,7 +350,9 @@ router.post('/forgot-password', async (req, res, next) => {
 
     res.json({
       sent: true,
-      ...(result?.devMode ? { devUrl: resetUrl, devNote: 'SMTP not configured — URL shown for dev only' } : {}),
+      ...(result?.devMode && process.env.ALLOW_DEV_CODES === 'true'
+        ? { devUrl: resetUrl, devNote: 'SMTP not configured — URL shown for dev only' }
+        : {}),
     });
   } catch (err) {
     next(err);

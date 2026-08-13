@@ -6,6 +6,7 @@ import pool from '../lib/db.js';
 import { authenticate, requireSelf } from '../middleware/auth.js';
 import { awardPoints } from '../lib/points.js';
 import { uploadFile, deleteFile } from '../lib/storage.js';
+import { fileTypeFromBuffer } from 'file-type';
 
 const uploadAvatar = multer({
   storage: multer.memoryStorage(),
@@ -117,9 +118,13 @@ router.patch('/:userId/profile', requireSelf, async (req, res, next) => {
 router.post('/:userId/avatar', requireSelf, uploadAvatar.single('avatar'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image file provided' });
+    const fileType = await fileTypeFromBuffer(req.file.buffer);
+    if (!fileType || !fileType.mime.startsWith('image/')) {
+      return res.status(400).json({ error: 'File content does not match a valid image format' });
+    }
     const { rows: [user] } = await pool.query('SELECT "avatarUrl" FROM users WHERE id=$1', [req.params.userId]);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const url = await uploadFile(req.file.buffer, `file.${fileType.ext}`, fileType.mime);
     if (user.avatarUrl) await deleteFile(user.avatarUrl);
     const { rows: [updated] } = await pool.query(
       'UPDATE users SET "avatarUrl"=$1, "updatedAt"=$2 WHERE id=$3 RETURNING *',

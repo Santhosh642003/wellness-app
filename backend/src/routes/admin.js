@@ -10,6 +10,7 @@ import { adminAuth } from '../middleware/adminAuth.js';
 import { awardPoints } from '../lib/points.js';
 import { uploadFile, deleteFile } from '../lib/storage.js';
 import { sendQuizLiveEmail, sendAnnouncementEmail } from '../lib/email.js';
+import { fileTypeFromBuffer } from 'file-type';
 
 const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -40,6 +41,17 @@ const uploadDocument = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
 });
+
+const ALLOWED_DOC_MIMES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+const BLOCKED_EXTENSIONS = new Set(['html', 'htm', 'js', 'mjs', 'cjs', 'ts', 'exe', 'bat', 'sh', 'php', 'py', 'rb', 'pl', 'svg']);
 
 const router = Router();
 
@@ -132,7 +144,11 @@ router.get('/users/:id', async (req, res, next) => {
 router.post('/videos/upload', uploadVideo.single('video'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No video file provided' });
-    const url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const fileType = await fileTypeFromBuffer(req.file.buffer);
+    if (!fileType || !fileType.mime.startsWith('video/')) {
+      return res.status(400).json({ error: 'File content does not match a valid video format' });
+    }
+    const url = await uploadFile(req.file.buffer, `file.${fileType.ext}`, fileType.mime);
     res.json({ url });
   } catch (err) {
     next(err);
@@ -143,7 +159,11 @@ router.post('/videos/upload', uploadVideo.single('video'), async (req, res, next
 router.post('/images/upload', uploadImage.single('image'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image file provided' });
-    const url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const fileType = await fileTypeFromBuffer(req.file.buffer);
+    if (!fileType || !fileType.mime.startsWith('image/')) {
+      return res.status(400).json({ error: 'File content does not match a valid image format' });
+    }
+    const url = await uploadFile(req.file.buffer, `file.${fileType.ext}`, fileType.mime);
     res.json({ url });
   } catch (err) {
     next(err);
@@ -154,10 +174,27 @@ router.post('/images/upload', uploadImage.single('image'), async (req, res, next
 router.post('/documents/upload', uploadDocument.single('document'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
-    const url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const fileType = await fileTypeFromBuffer(req.file.buffer);
+    let filename, mime;
+    if (fileType) {
+      if (!ALLOWED_DOC_MIMES.has(fileType.mime)) {
+        return res.status(400).json({ error: 'File type not allowed. Upload PDF or Office documents only.' });
+      }
+      filename = `file.${fileType.ext}`;
+      mime = fileType.mime;
+    } else {
+      // file-type can't detect (e.g. plain text) — verify extension is not dangerous
+      const ext = req.file.originalname.split('.').pop()?.toLowerCase() || 'bin';
+      if (BLOCKED_EXTENSIONS.has(ext)) {
+        return res.status(400).json({ error: 'File type not allowed.' });
+      }
+      filename = req.file.originalname;
+      mime = req.file.mimetype;
+    }
+    const url = await uploadFile(req.file.buffer, filename, mime);
     const sizeKB = req.file.size / 1024;
     const size = sizeKB >= 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${Math.round(sizeKB)} KB`;
-    const ext = req.file.originalname.split('.').pop()?.toLowerCase() || 'file';
+    const ext = filename.split('.').pop()?.toLowerCase() || 'file';
     res.json({ url, size, fileType: ext, originalName: req.file.originalname });
   } catch (err) {
     next(err);

@@ -96,8 +96,11 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Serve uploaded videos as static files
-app.use('/uploads', express.static(uploadsDir));
+// Serve uploaded files as static files — nosniff prevents MIME-sniffing attacks
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+}, express.static(uploadsDir));
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
