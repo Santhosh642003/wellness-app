@@ -12,12 +12,14 @@ export default function Hero() {
 
       {/* Subtitle */}
       <p className="max-w-3xl mx-auto text-slate-600 dark:text-gray-200/90 leading-relaxed mb-14">
-        Getting informed about <span className="font-semibold">HPV</span> and{" "}
-        <span className="font-semibold">Meningitis B</span> vaccines shouldn’t
-        be confusing or boring. That’s why we’ve created quick, fun, and
-        reliable interactive modules. Start playing now to get the facts you
-        need, earn valuable points, and redeem great rewards for prioritizing
-        your health on campus.
+        Wellness covers more than any single topic. Explore a growing library of
+        interactive modules — from{" "}
+        <span className="font-semibold">mental health</span> and{" "}
+        <span className="font-semibold">preventive care</span> to{" "}
+        <span className="font-semibold">healthy habits</span> and{" "}
+        <span className="font-semibold">financial wellbeing</span>. Learn at
+        your own pace, test your knowledge, earn points, and redeem real rewards
+        — all while building skills that stay with you beyond campus.
       </p>
 
       {/* CTA */}

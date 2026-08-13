@@ -2,17 +2,17 @@ const cards = [
   {
     title: "Protect Your\nHealth",
     body:
-      "Learning about HPV and Meningitis B helps you understand the risks, symptoms, and how these infections spread. When you know the facts, you can make confident decisions about your health.",
+      "Understanding your physical and mental health helps you recognize what’s normal, spot warning signs early, and make confident choices — from how you sleep and manage stress to knowing when to reach out for support.",
   },
   {
     title: "Prevent What\nYou Can",
     body:
-      "Both HPV and Meningitis B are preventable. Staying informed helps you recognize early warning signs and understand the importance of vaccination, so you can take action before problems start.",
+      "Many health challenges are preventable or manageable when you’re informed. Learning about risk factors, healthy habits, and available campus resources means you can take action early — before small concerns grow into bigger ones.",
   },
   {
     title: "Support Your\nCommunity",
     body:
-      "Being informed doesn’t just protect you. It also helps keep your friends, classmates, and family safer by reducing the chances of outbreaks and promoting healthy habits.",
+      "Your wellbeing connects to the people around you. When you build knowledge and healthy habits, you’re better equipped to support friends, reduce stigma, and help create a campus culture where everyone can thrive.",
   },
 ];
 
@@ -23,8 +23,8 @@ export default function Why() {
       <div className="text-center max-w-3xl mx-auto mb-16">
         <h2 className="text-4xl font-semibold mb-6 text-slate-900 dark:text-white">Why Get Informed?</h2>
         <p className="text-slate-500 dark:text-gray-400 leading-relaxed">
-          Understanding the facts about HPV and Meningitis B is the first step
-          to protecting your health
+          Building healthy habits starts with knowing the facts — about your
+          mind, your body, and everything in between.
         </p>
       </div>
 
