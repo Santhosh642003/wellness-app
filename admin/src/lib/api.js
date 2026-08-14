@@ -116,6 +116,37 @@ export const api = {
     });
   },
 
+  // transcribe video — accepts a URL string (server-side fetch) or a File (direct upload)
+  // returns { cues: [{time, endTime, text}] }
+  transcribeVideo: (urlOrFile, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const isFile = urlOrFile instanceof File || urlOrFile instanceof Blob;
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/transcribe');
+      xhr.withCredentials = true;
+      if (isFile) {
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
+      }
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.error || `HTTP ${xhr.status}`));
+        } catch { reject(new Error('Invalid response')); }
+      };
+      xhr.onerror = () => reject(new Error('Transcription failed'));
+      if (isFile) {
+        const formData = new FormData();
+        formData.append('audio', urlOrFile);
+        xhr.send(formData);
+      } else {
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({ url: urlOrFile }));
+      }
+    });
+  },
+
   // video upload (returns { url })
   uploadVideo: (file, onProgress) => {
     return new Promise((resolve, reject) => {

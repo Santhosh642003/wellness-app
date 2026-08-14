@@ -241,7 +241,7 @@ const videoItemSchema = z.object({
   title: z.string(),
   url: z.string(),
   duration: z.string().optional(),
-  transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
+  transcript: z.array(z.object({ time: z.number(), endTime: z.number().optional(), text: z.string() })).optional(),
 });
 const documentItemSchema = z.object({
   id: z.string().optional(),
@@ -259,7 +259,7 @@ router.post('/modules', async (req, res, next) => {
       locked: z.boolean().optional(), videoUrl: z.string().optional(),
       thumbnailUrl: z.string().nullable().optional(),
       keyPoints: z.array(z.string()).optional(),
-      transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
+      transcript: z.array(z.object({ time: z.number(), endTime: z.number().optional(), text: z.string() })).optional(),
       videos: z.array(videoItemSchema).optional(),
       documents: z.array(documentItemSchema).optional(),
     }).parse(req.body);
@@ -292,7 +292,7 @@ router.patch('/modules/:id', async (req, res, next) => {
       locked: z.boolean().optional(), videoUrl: z.string().optional(),
       thumbnailUrl: z.string().nullable().optional(),
       keyPoints: z.array(z.string()).optional(),
-      transcript: z.array(z.object({ time: z.number(), text: z.string() })).optional(),
+      transcript: z.array(z.object({ time: z.number(), endTime: z.number().optional(), text: z.string() })).optional(),
       videos: z.array(videoItemSchema).optional(),
       documents: z.array(documentItemSchema).optional(),
     }).parse(req.body);

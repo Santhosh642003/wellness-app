@@ -259,7 +259,14 @@ export default function ModulePlayer() {
     }
     return idx;
   }, [videoTime, currentTranscript]);
-  const activeCaption = activeCaptionIdx >= 0 ? currentTranscript[activeCaptionIdx] : null;
+
+  // Null out overlay once video time passes the cue's endTime (prevents last cue staying on screen forever)
+  const activeCaption = useMemo(() => {
+    if (activeCaptionIdx < 0) return null;
+    const cue = currentTranscript[activeCaptionIdx];
+    if (cue.endTime !== undefined && videoTime > cue.endTime) return null;
+    return cue;
+  }, [activeCaptionIdx, currentTranscript, videoTime]);
 
   const goToQuiz = () => navigate(`/quiz/module/${moduleId}`);
 

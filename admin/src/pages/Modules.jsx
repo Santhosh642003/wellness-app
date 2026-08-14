@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { Plus, Pencil, Trash2, X, Check, Upload, ChevronDown, ChevronUp, Info, FileText, Video } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, Upload, ChevronDown, ChevronUp, Info, FileText, Video, Wand2 } from 'lucide-react';
 
 const CATEGORIES = ['Foundations', 'HPV', 'MenB', 'Bonus', 'General'];
 
@@ -75,6 +75,7 @@ function tempId() {
 
 function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDown }) {
   const inputRef = useRef(null);
+  const audioInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploadError, setUploadError] = useState('');
@@ -85,6 +86,8 @@ function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDow
       : ''
   );
   const [transcriptError, setTranscriptError] = useState('');
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcribeError, setTranscribeError] = useState('');
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -106,6 +109,30 @@ function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDow
       onChange({ ...video, transcript: parsed });
     } catch {
       setTranscriptError('Invalid JSON — format: [{"time": 0, "text": "..."}]');
+    }
+  };
+
+  const autoGenerateCaptions = async (fileOverride) => {
+    const source = fileOverride || video.url;
+    if (!source) { setTranscribeError('No video URL set — upload a video first.'); return; }
+    if (fileOverride && fileOverride.size > 25 * 1024 * 1024) {
+      setTranscribeError('File exceeds 25 MB — compress to a smaller audio file first.');
+      return;
+    }
+    setTranscribing(true);
+    setTranscribeError('');
+    try {
+      const result = await api.transcribeVideo(source);
+      const cues = result.cues || [];
+      const raw = JSON.stringify(cues, null, 2);
+      setTranscriptRaw(raw);
+      setTranscriptOpen(true);
+      onChange({ ...video, transcript: cues });
+    } catch (err) {
+      setTranscribeError(err.message || 'Transcription failed');
+      setTranscriptOpen(true);
+    } finally {
+      setTranscribing(false);
     }
   };
 
@@ -189,6 +216,24 @@ function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDow
             <p className="text-gray-600 text-[10px]">
               JSON array of time-stamped lines — displayed as captions and full transcript in the player
             </p>
+
+            {/* Auto-generate controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button type="button"
+                onClick={() => autoGenerateCaptions()}
+                disabled={transcribing || !video.url}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-900/40 border border-blue-800/40 rounded-lg text-blue-300 text-xs hover:bg-blue-900/60 disabled:opacity-40 transition">
+                <Wand2 size={11} />{transcribing ? 'Generating captions…' : 'Auto-generate captions'}
+              </button>
+              <input ref={audioInputRef} type="file" accept="audio/*,video/*" className="hidden"
+                onChange={(e) => { if (e.target.files?.[0]) autoGenerateCaptions(e.target.files[0]); e.target.value = ''; }} />
+              <button type="button" onClick={() => audioInputRef.current?.click()} disabled={transcribing}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 text-xs hover:bg-gray-700 disabled:opacity-40 transition">
+                <Upload size={11} /> Upload audio instead
+              </button>
+            </div>
+            {transcribeError && <p className="text-red-400 text-[10px]">{transcribeError}</p>}
+
             <textarea
               rows={7}
               value={transcriptRaw}
