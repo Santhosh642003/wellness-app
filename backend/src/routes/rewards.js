@@ -62,14 +62,15 @@ router.post('/redeem', async (req, res, next) => {
     }
 
     const client = await dbPool.connect();
-    let redemption, updatedProgress;
+    let redemption, updatedProgress, reward;
     try {
       await client.query('BEGIN');
 
       // Lock reward row first to prevent concurrent oversell
-      const { rows: [reward] } = await client.query(
+      const { rows: [fetchedReward] } = await client.query(
         'SELECT * FROM rewards WHERE id=$1 FOR UPDATE', [rewardId]
       );
+      reward = fetchedReward;
       if (!reward) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Reward not found' }); }
       if (!reward.available) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Reward is no longer available' }); }
       if (reward.stock === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Reward is out of stock' }); }

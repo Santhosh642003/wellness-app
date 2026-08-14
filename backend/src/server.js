@@ -135,6 +135,9 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 async function start() {
+  // In test mode setup.js runs migrations before any test; skip here to avoid
+  // concurrent CREATE TABLE races when Vitest spawns multiple worker forks.
+  if (process.env.NODE_ENV === 'test') return;
   await migrate();
   await seed();
   app.listen(PORT, () => {

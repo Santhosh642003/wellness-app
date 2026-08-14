@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "db:seed": "node src/lib/seed.js"
+    "db:seed": "node src/lib/seed.js",
+    "test": "DATABASE_URL=postgresql://wellness_test:wellness_test@127.0.0.1:5432/wellness_test JWT_SECRET=test-secret ADMIN_JWT_SECRET=test-admin-secret NODE_ENV=test vitest run",
+    "test:watch": "DATABASE_URL=postgresql://wellness_test:wellness_test@127.0.0.1:5432/wellness_test JWT_SECRET=test-secret ADMIN_JWT_SECRET=test-admin-secret NODE_ENV=test vitest"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1014.0",
@@ -29,6 +31,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.7",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.10"
   }
 }
