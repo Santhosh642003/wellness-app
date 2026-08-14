@@ -282,9 +282,9 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
         return res.status(404).json({ error: 'Module not found' });
       }
 
-      // Read current completion state BEFORE the upsert so the guard is accurate
+      // Read current state BEFORE the upsert so guards are accurate
       const { rows: [existing] } = await client.query(
-        'SELECT completed FROM user_module_progress WHERE "userId"=$1 AND "moduleId"=$2',
+        'SELECT completed, "watchedPercent", "updatedAt" FROM user_module_progress WHERE "userId"=$1 AND "moduleId"=$2',
         [req.params.userId, req.params.moduleId]
       );
       const wasCompleted = existing?.completed ?? false;
@@ -301,6 +301,23 @@ router.patch('/:userId/module-progress/:moduleId', requireSelf, async (req, res,
         insertCols.push('"videoProgress"');
         insertVals.push(JSON.stringify(data.videoProgress));
         updateClauses.push(`"videoProgress"=EXCLUDED."videoProgress"`);
+      }
+
+      // Anti-cheat: reject progress jumps faster than wall-clock allows.
+      // Only checked when an existing row provides a timing baseline; first-ever saves
+      // have no baseline so they pass (frontend is the primary gate for those).
+      // Rate: 2 %/s (covers 2× playback on short videos) + 30 % grace for resume jumps.
+      if (resolvedWatchedPercent !== undefined && existing) {
+        const prevPct = existing.watchedPercent ?? 0;
+        const increase = resolvedWatchedPercent - prevPct;
+        if (increase > 0) {
+          const elapsedSec = (Date.now() - new Date(existing.updatedAt).getTime()) / 1000;
+          const maxAllowed = Math.min(100 - prevPct, elapsedSec * 2 + 30);
+          if (increase > maxAllowed) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Invalid progress update' });
+          }
+        }
       }
 
       if (data.videoTimestamps && Object.keys(data.videoTimestamps).length > 0) {

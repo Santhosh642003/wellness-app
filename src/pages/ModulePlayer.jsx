@@ -63,6 +63,12 @@ export default function ModulePlayer() {
   // Stable ref to the latest saveProgress so the pause listener never re-registers.
   const saveProgressRef = useRef(null);
 
+  // Anti-seek-exploit: track the furthest position (seconds) reached via genuine playback,
+  // keyed by video index. Progress and quiz unlock are derived from this, not currentTime.
+  const furthestWatchedRef = useRef({});
+  // Previous currentTime per video — used to detect large forward jumps (seeks) in timeupdate.
+  const prevVideoTimeRef = useRef({});
+
   const [lastSaved, setLastSaved] = useState(null);
 
   // Caption state
@@ -177,33 +183,58 @@ export default function ModulePlayer() {
     return () => video.removeEventListener('pause', onPause);
   }, []); // stable — only registered once on mount
 
-  // Track video time, compute watched %, and record exact playback position in seconds
+  // Track video time and accumulate genuine watch progress.
+  // Progress is driven by furthestWatchedRef — the furthest position reached via continuous
+  // playback — not by currentTime. Large forward jumps in currentTime (seeks) don't count.
   const handleTimeUpdate = useCallback((currentTime) => {
     setVideoTime(Math.floor(currentTime));
     const key = String(currentVideoIdx);
-    // Update exact timestamp for this video (used for second-precision resume)
     videoTimestampsRef.current[key] = Math.floor(currentTime);
+
     const dur = videoRef.current?.duration;
     if (dur > 0) {
-      const pct = Math.min(100, (currentTime / dur) * 100);
-      const newPct = Math.max(watchedPercentRef.current, pct);
+      const prev = prevVideoTimeRef.current[key] ?? currentTime;
+      const delta = currentTime - prev;
+      // timeupdate fires ~4 times/sec; anything ≤ 1.5s forward is natural playback.
+      // Backward delta is fine (rewinding). Only large positive jumps indicate a seek.
+      const isNaturalPlayback = delta >= 0 && delta <= 1.5;
+      if (isNaturalPlayback) {
+        furthestWatchedRef.current[key] = Math.max(
+          furthestWatchedRef.current[key] ?? 0,
+          currentTime
+        );
+      }
+
+      // Derive progress exclusively from the furthest genuine position
+      const watchedPct = Math.min(100, ((furthestWatchedRef.current[key] ?? 0) / dur) * 100);
+      const newPct = Math.max(watchedPercentRef.current, watchedPct);
       watchedPercentRef.current = newPct;
-      setWatchedPercent((prev) => Math.max(prev, pct));
+      setWatchedPercent(newPct);
       setVideoProgress((prev) => {
-        if (pct <= (prev[key] ?? 0)) return prev;
-        return { ...prev, [key]: Math.round(pct) };
+        if (watchedPct <= (prev[key] ?? 0)) return prev;
+        return { ...prev, [key]: Math.round(watchedPct) };
       });
     }
+    prevVideoTimeRef.current[key] = currentTime;
   }, [currentVideoIdx]);
 
-  // On video ended: mark current video 100% and clear its resume timestamp
+  // On video ended: mark current video 100% and clear its resume timestamp.
+  // Guard: only count as genuine completion if the furthest-watched position is ≥70%
+  // of duration, so a seek-to-end that triggers the ended event cannot farm completion.
   const handleVideoEnded = useCallback(() => {
+    const key = String(currentVideoIdx);
+    const dur = videoRef.current?.duration;
+    const furthest = furthestWatchedRef.current[key] ?? 0;
+    if (dur > 0 && furthest < dur * 0.70) return; // seek-to-end — ignore
+
+    // Mark full watch for this video
+    if (dur > 0) furthestWatchedRef.current[key] = dur;
     watchedPercentRef.current = 100;
     setWatchedPercent(100);
     // Clear the timestamp so replaying a completed video starts from the beginning
-    delete videoTimestampsRef.current[String(currentVideoIdx)];
+    delete videoTimestampsRef.current[key];
     setVideoProgress((prev) => {
-      const updated = { ...prev, [String(currentVideoIdx)]: 100 };
+      const updated = { ...prev, [key]: 100 };
       const percs = Object.values(updated);
       const avg = Math.round(percs.reduce((a, b) => a + b, 0) / Math.max(percs.length, 1));
       saveProgress(avg, updated);
@@ -216,14 +247,21 @@ export default function ModulePlayer() {
   }, [saveProgress, currentVideoIdx, content.videos.length]);
 
   // Seek to saved position when video metadata loads.
-  // Prefers exact timestamp (seconds) stored in videoTimestampsRef; falls back to
-  // percentage-based seek for backward-compat with progress saved before this change.
+  // Initialises furthestWatchedRef from saved progress FIRST so the resume seek that
+  // immediately follows doesn't get snapped back by handleSeeked.
   const handleMetadataLoaded = useCallback(() => {
     const dur = videoRef.current?.duration;
     if (!dur || dur <= 0) return;
     const key = String(currentVideoIdx);
-    const savedTs = videoTimestampsRef.current[key];
     const savedPct = videoProgress[key] ?? 0;
+
+    // Restore furthest-watched so seek restriction reflects previously-earned progress.
+    // Only initialise once per video load; don't overwrite accrued watch time on remount.
+    if (furthestWatchedRef.current[key] === undefined) {
+      furthestWatchedRef.current[key] = (savedPct / 100) * dur;
+    }
+
+    const savedTs = videoTimestampsRef.current[key];
     if (savedTs !== undefined && savedTs > 0 && savedTs < dur * 0.95) {
       videoRef.current.currentTime = savedTs;
     } else if (savedPct > 0 && savedPct < 95) {
@@ -267,6 +305,32 @@ export default function ModulePlayer() {
     if (cue.endTime !== undefined && videoTime > cue.endTime) return null;
     return cue;
   }, [activeCaptionIdx, currentTranscript, videoTime]);
+
+  // Snap back any seek that jumps beyond the furthest genuinely-watched position.
+  // A 3-second buffer accounts for minor decode/buffering drift; backward seeks are always free.
+  const handleSeeked = useCallback(() => {
+    const v = videoRef.current;
+    if (!v?.duration) return;
+    const key = String(currentVideoIdx);
+    const furthest = furthestWatchedRef.current[key];
+    if (furthest === undefined) return; // metadata not yet loaded
+    const BUFFER_SEC = 3;
+    if (v.currentTime > furthest + BUFFER_SEC) {
+      v.currentTime = Math.max(0, furthest);
+    }
+  }, [currentVideoIdx]);
+
+  // Fraction of the video the user may seek to (0–1).
+  // For completed modules allow free seeking everywhere; otherwise cap at furthest watched + buffer.
+  const maxSeekFraction = useMemo(() => {
+    if (alreadyCompleted) return 1;
+    const key = String(currentVideoIdx);
+    const dur = videoRef.current?.duration;
+    if (!dur) return 0;
+    const furthest = furthestWatchedRef.current[key] ?? 0;
+    return Math.min(1, (furthest + 3) / dur);
+  // videoTime re-evaluates this on every timeupdate so the seek bar marker stays current
+  }, [currentVideoIdx, videoTime, alreadyCompleted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const goToQuiz = () => navigate(`/quiz/module/${moduleId}`);
 
@@ -444,6 +508,8 @@ export default function ModulePlayer() {
                   onTimeUpdate={handleTimeUpdate}
                   onEnded={handleVideoEnded}
                   onLoadedMetadata={handleMetadataLoaded}
+                  onSeeked={handleSeeked}
+                  maxSeekFraction={maxSeekFraction}
                   caption={captionsOn && activeCaption ? activeCaption.text : null}
                   captionsOn={captionsOn}
                   hasTranscript={currentTranscript.length > 0}

@@ -7,7 +7,7 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, videoRef: externalRef, caption = null, captionsOn = false, hasTranscript = false, onToggleCaptions, className = "" }) {
+export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetadata, onSeeked, videoRef: externalRef, caption = null, captionsOn = false, hasTranscript = false, onToggleCaptions, maxSeekFraction = 1, className = "" }) {
   const internalRef = useRef(null);
   const videoRef = externalRef || internalRef;
   const containerRef = useRef(null);
@@ -58,7 +58,9 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
 
   const handleSeek = (e) => {
     const rect = seekRef.current.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const raw = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    // Clamp to the furthest watched position so clicking into unwatched territory is blocked
+    const pct = Math.min(raw, maxSeekFraction);
     if (videoRef.current) videoRef.current.currentTime = pct * duration;
     scheduleHide();
   };
@@ -119,6 +121,7 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => { if (videoRef.current) { setDuration(videoRef.current.duration); onLoadedMetadata?.(); } }}
         onEnded={() => { setPlaying(false); setShowControls(true); onEnded?.(); }}
+        onSeeked={onSeeked}
       />
 
       {/* Big play button overlay (when paused) */}
@@ -166,9 +169,10 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
             onKeyDown={(e) => {
               const v = videoRef.current;
               if (!v || !duration) return;
+              const seekLimit = maxSeekFraction * duration;
               if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                v.currentTime = Math.min(duration, v.currentTime + 5);
+                v.currentTime = Math.min(seekLimit, v.currentTime + 5);
                 scheduleHide();
               } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -180,7 +184,7 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
                 scheduleHide();
               } else if (e.key === 'End') {
                 e.preventDefault();
-                v.currentTime = duration;
+                v.currentTime = seekLimit;
                 scheduleHide();
               }
             }}
@@ -194,6 +198,13 @@ export default function VideoPlayer({ src, onTimeUpdate, onEnded, onLoadedMetada
               className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full bg-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
               style={{ left: `calc(${seekPercent}% - 7px)` }}
             />
+            {/* Furthest-watched limit marker — shows how far the user can seek */}
+            {maxSeekFraction > 0 && maxSeekFraction < 0.99 && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3 bg-white/50 rounded-full pointer-events-none"
+                style={{ left: `${maxSeekFraction * 100}%` }}
+              />
+            )}
           </div>
 
           {/* Bottom controls */}
