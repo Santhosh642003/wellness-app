@@ -1,5 +1,10 @@
 const BASE = '/api/admin';
 
+// Called by the app when a 401 is received — redirects to login so the
+// admin sees the login form rather than confusing per-operation error messages.
+let _on401 = () => { window.location.href = '/'; };
+export function set401Handler(fn) { _on401 = fn; }
+
 async function req(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -10,6 +15,7 @@ async function req(path, options = {}) {
     },
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { _on401(); throw Object.assign(new Error(data.error || 'Session expired'), { status: 401 }); }
   if (!res.ok) { const e = new Error(data.error || `HTTP ${res.status}`); e.status = res.status; throw e; }
   return data;
 }
@@ -78,6 +84,7 @@ export const api = {
       xhr.onload = () => {
         try {
           const data = JSON.parse(xhr.responseText);
+          if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
           else reject(new Error(data.error || `HTTP ${xhr.status}`));
         } catch { reject(new Error('Invalid response')); }
@@ -99,6 +106,7 @@ export const api = {
       xhr.onload = () => {
         try {
           const data = JSON.parse(xhr.responseText);
+          if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
           else reject(new Error(data.error || `HTTP ${xhr.status}`));
         } catch { reject(new Error('Invalid response')); }
@@ -120,6 +128,7 @@ export const api = {
       xhr.onload = () => {
         try {
           const data = JSON.parse(xhr.responseText);
+          if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
           else reject(new Error(data.error || `HTTP ${xhr.status}`));
         } catch { reject(new Error('Invalid response')); }
