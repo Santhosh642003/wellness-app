@@ -267,6 +267,20 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS pronouns TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "preferredName" TEXT;
 `;
 
+// L1: Admin audit trail — queryable record of sensitive admin actions.
+const ADMIN_AUDIT_LOG = `
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id TEXT PRIMARY KEY,
+  "adminId" TEXT NOT NULL,
+  action TEXT NOT NULL,
+  "targetId" TEXT,
+  metadata JSONB,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS admin_audit_log_admin_idx ON admin_audit_log("adminId");
+CREATE INDEX IF NOT EXISTS admin_audit_log_created_idx ON admin_audit_log("createdAt");
+`;
+
 // M8: Biweekly quiz race-condition guard.
 // period is a 14-day bucket string (biweekly-N) for biweekly attempts, NULL for module attempts
 // (NULLs are distinct in Postgres UNIQUE — module attempts can accumulate freely until passed).
@@ -299,6 +313,7 @@ export async function migrate() {
     await pool.query(PROFILE_V2);
     await pool.query(CAMPUS_FIX);
     await pool.query(QUIZ_PERIOD_CONSTRAINT);
+    await pool.query(ADMIN_AUDIT_LOG);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

@@ -42,6 +42,15 @@ const uploadDocument = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
 });
 
+// Fire-and-forget audit log — never blocks the response, failure logged as warning only
+function auditLog(adminId, action, targetId, metadata) {
+  pool.query(
+    `INSERT INTO admin_audit_log (id, "adminId", action, "targetId", metadata, "createdAt")
+     VALUES ($1,$2,$3,$4,$5,NOW())`,
+    [randomUUID(), adminId, action, targetId || null, metadata ? JSON.stringify(metadata) : null]
+  ).catch(err => console.warn('[audit] Write failed:', err.message));
+}
+
 const ALLOWED_DOC_MIMES = new Set([
   'application/pdf',
   'application/msword',
@@ -269,6 +278,7 @@ router.post('/modules', async (req, res, next) => {
        JSON.stringify(d.keyPoints||[]), JSON.stringify(d.transcript||[]),
        JSON.stringify(videos), JSON.stringify(documents)]
     );
+    auditLog(req.adminId, 'module.create', m.id, { title: m.title });
     res.status(201).json(m);
   } catch (err) { next(err); }
 });
@@ -308,15 +318,17 @@ router.patch('/modules/:id', async (req, res, next) => {
       [...Object.values(d), req.params.id]
     );
     if (!m) return res.status(404).json({ error: 'Module not found' });
+    auditLog(req.adminId, 'module.update', req.params.id, { fields: Object.keys(d) });
     res.json(m);
   } catch (err) { next(err); }
 });
 
 router.delete('/modules/:id', async (req, res, next) => {
   try {
-    const { rows: [mod] } = await pool.query('SELECT "videoUrl" FROM modules WHERE id=$1', [req.params.id]);
+    const { rows: [mod] } = await pool.query('SELECT "videoUrl", title FROM modules WHERE id=$1', [req.params.id]);
     await pool.query('DELETE FROM modules WHERE id=$1', [req.params.id]);
-    if (mod?.videoUrl) deleteFile(mod.videoUrl).catch(() => {});
+    if (mod?.videoUrl) deleteFile(mod.videoUrl).catch(e => console.warn('[admin] deleteFile (module video) failed:', e.message));
+    auditLog(req.adminId, 'module.delete', req.params.id, { title: mod?.title });
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -378,9 +390,9 @@ router.patch('/quizzes/:id', async (req, res, next) => {
       const quizUrl = q.type === 'biweekly' ? `${appUrl}/quiz/biweekly` : `${appUrl}/quiz/module/${q.moduleId}`;
       pool.query('SELECT email FROM users').then(({ rows: users }) => {
         for (const user of users) {
-          sendQuizLiveEmail(user.email, q.title, quizUrl).catch(() => {});
+          sendQuizLiveEmail(user.email, q.title, quizUrl).catch(e => console.warn('[admin] sendQuizLiveEmail failed:', e.message));
         }
-      }).catch(() => {});
+      }).catch(e => console.warn('[admin] Failed to fetch users for quiz live email:', e.message));
     }
 
     res.json(q);
@@ -454,6 +466,7 @@ router.post('/rewards', async (req, res, next) => {
       `INSERT INTO rewards (id, title, description, "pointsCost", category, stock, available, "imageUrl") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [randomUUID(), d.title, d.description, d.pointsCost, d.category, d.stock??-1, d.available??true, d.imageUrl??null]
     );
+    auditLog(req.adminId, 'reward.create', r.id, { title: r.title, pointsCost: r.pointsCost });
     res.status(201).json(r);
   } catch (err) { next(err); }
 });
@@ -467,15 +480,17 @@ router.patch('/rewards/:id', async (req, res, next) => {
     const vals = fields.map(k => d[k]);
     const { rows: [r] } = await pool.query(`UPDATE rewards SET ${sets.join(',')} WHERE id=$${fields.length+1} RETURNING *`, [...vals, req.params.id]);
     if (!r) return res.status(404).json({ error: 'Reward not found' });
+    auditLog(req.adminId, 'reward.update', req.params.id, { fields });
     res.json(r);
   } catch (err) { next(err); }
 });
 
 router.delete('/rewards/:id', async (req, res, next) => {
   try {
-    const { rows: [reward] } = await pool.query('SELECT "imageUrl" FROM rewards WHERE id=$1', [req.params.id]);
+    const { rows: [reward] } = await pool.query('SELECT "imageUrl", title FROM rewards WHERE id=$1', [req.params.id]);
     await pool.query('DELETE FROM rewards WHERE id=$1', [req.params.id]);
-    if (reward?.imageUrl) deleteFile(reward.imageUrl).catch(() => {});
+    if (reward?.imageUrl) deleteFile(reward.imageUrl).catch(e => console.warn('[admin] deleteFile (reward image) failed:', e.message));
+    auditLog(req.adminId, 'reward.delete', req.params.id, { title: reward?.title });
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -520,9 +535,9 @@ router.post('/notifications', async (req, res, next) => {
     if (d.sendEmail && d.active) {
       pool.query('SELECT email FROM users').then(({ rows: users }) => {
         for (const user of users) {
-          sendAnnouncementEmail(user.email, d.title, d.body).catch(() => {});
+          sendAnnouncementEmail(user.email, d.title, d.body).catch(e => console.warn('[admin] sendAnnouncementEmail failed:', e.message));
         }
-      }).catch(() => {});
+      }).catch(e => console.warn('[admin] Failed to fetch users for announcement email:', e.message));
     }
 
     res.status(201).json(n);
@@ -579,6 +594,7 @@ router.patch('/users/:id/points', async (req, res, next) => {
       await awardPoints(client, { userId: req.params.id, source: 'admin_adjustment', points: delta, refId: reason || null });
       const { rows: [p] } = await client.query('SELECT points FROM user_progress WHERE "userId"=$1', [req.params.id]);
       await client.query('COMMIT');
+      auditLog(req.adminId, 'user.points_adjust', req.params.id, { delta, reason, newTotal: p.points });
       res.json({ points: p.points, delta, reason });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -674,6 +690,7 @@ router.post('/users/bulk', async (req, res, next) => {
       }
 
       await client.query('COMMIT');
+      auditLog(req.adminId, 'user.bulk_points', null, { action, delta, userIds, reason });
       res.json({ success: true, affected: userIds.length, action, delta });
     } catch (err) {
       await client.query('ROLLBACK');

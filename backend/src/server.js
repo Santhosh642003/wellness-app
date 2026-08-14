@@ -116,14 +116,14 @@ app.use('/api/events', eventRoutes);
 app.use('/api/transcribe', transcribeRoutes);
 
 // Notifications — authenticated users fetch active notifications
-app.get('/api/notifications', authenticate, async (req, res) => {
+app.get('/api/notifications', authenticate, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `SELECT * FROM notifications WHERE active=true ORDER BY "createdAt" DESC`
     );
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch notifications' });
+    next(err);
   }
 });
 

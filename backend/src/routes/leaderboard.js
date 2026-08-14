@@ -42,11 +42,12 @@ router.get('/', async (req, res, next) => {
          LEFT JOIN user_progress up ON up."userId" = u.id
          LEFT JOIN point_ledger pl
            ON pl."userId" = u.id
-           AND pl."createdAt" >= NOW() - INTERVAL '${interval}'
+           AND pl."createdAt" >= NOW() - $1::interval
          GROUP BY u.id, u.name, u.initials, u."avatarUrl", u.campus, u.role, up."streakDays"
          HAVING COALESCE(SUM(pl.points), 0) > 0
          ORDER BY points DESC
-         LIMIT 50`
+         LIMIT 50`,
+        [interval]
       ));
     }
 

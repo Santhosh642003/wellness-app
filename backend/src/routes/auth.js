@@ -87,18 +87,15 @@ function safeUser(user) {
 // POST /api/auth/send-otp
 router.post('/send-otp', async (req, res, next) => {
   try {
-    console.log('[send-otp] step 1: parse');
     const { email } = z.object({
       email: z.string().email().endsWith('@njit.edu', { message: 'Must be an NJIT email address' }),
     }).parse(req.body);
 
     const normalEmail = email.toLowerCase();
 
-    console.log('[send-otp] step 2: check existing user');
     const { rows: existing } = await pool.query('SELECT id FROM users WHERE email=$1', [normalEmail]);
     if (existing[0]) return res.status(409).json({ error: 'An account with this email already exists' });
 
-    console.log('[send-otp] step 3: rate limit check');
     const { rows: recent } = await pool.query(
       `SELECT COUNT(*) FROM email_otps WHERE email=$1 AND "createdAt" > NOW() - INTERVAL '15 minutes'`,
       [normalEmail]
@@ -107,7 +104,6 @@ router.post('/send-otp', async (req, res, next) => {
       return res.status(429).json({ error: 'Too many verification attempts. Please wait 15 minutes.' });
     }
 
-    console.log('[send-otp] step 4: cleanup expired OTPs');
     await pool.query(
       `DELETE FROM email_otps WHERE email=$1 AND ("expiresAt" < NOW() OR "usedAt" IS NOT NULL)`,
       [normalEmail]
@@ -117,15 +113,12 @@ router.post('/send-otp', async (req, res, next) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const codeHash = await bcrypt.hash(code, 10);
 
-    console.log('[send-otp] step 5: insert OTP row');
     await pool.query(
       `INSERT INTO email_otps (id, email, code, "expiresAt") VALUES ($1,$2,$3,$4)`,
       [randomUUID(), normalEmail, codeHash, expiresAt]
     );
 
-    console.log('[send-otp] step 6: send email');
     const result = await sendOtpEmail(normalEmail, code);
-    console.log('[send-otp] step 7: email done, sending response');
 
     res.json({
       sent: true,
@@ -134,7 +127,6 @@ router.post('/send-otp', async (req, res, next) => {
         : {}),
     });
   } catch (err) {
-    console.error('[send-otp] error at step:', err.message);
     next(err);
   }
 });

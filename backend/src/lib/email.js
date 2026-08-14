@@ -30,6 +30,11 @@ function isEmailConfigured() {
   return resend !== null || transporter !== null;
 }
 
+function maskEmail(email) {
+  const at = email.indexOf('@');
+  return at > 0 ? `${email[0]}***${email.slice(at)}` : '***';
+}
+
 function productionGuard() {
   if (process.env.NODE_ENV === 'production') {
     const err = new Error('Email delivery is not configured — contact support');
@@ -75,11 +80,11 @@ async function sendViaSMTP(to, subject, html) {
 
 async function sendEmail(to, subject, html) {
   if (resend) {
-    console.log('[email] Sending via Resend to:', to);
+    console.log('[email] Sending via Resend to:', maskEmail(to));
     return sendViaResend(to, subject, html);
   }
   if (transporter) {
-    console.log('[email] Sending via SMTP to:', to);
+    console.log('[email] Sending via SMTP to:', maskEmail(to));
     return sendViaSMTP(to, subject, html);
   }
   productionGuard();
