@@ -1,16 +1,11 @@
 const BASE = '/api/admin';
 
-function getToken() {
-  return localStorage.getItem('admin_token');
-}
-
 async function req(path, options = {}) {
-  const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
@@ -21,6 +16,7 @@ async function req(path, options = {}) {
 
 export const api = {
   login: (body) => req('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  logout: () => req('/auth/logout', { method: 'POST' }),
   stats: () => req('/stats'),
   users: () => req('/users'),
   user: (id) => req(`/users/${id}`),
@@ -73,12 +69,11 @@ export const api = {
   // document upload (returns { url, size, fileType, originalName })
   uploadDocument: (file, onProgress) => {
     return new Promise((resolve, reject) => {
-      const token = getToken();
       const formData = new FormData();
       formData.append('document', file);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${BASE}/documents/upload`);
-      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.withCredentials = true;
       xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
       xhr.onload = () => {
         try {
@@ -95,12 +90,11 @@ export const api = {
   // image upload (returns { url })
   uploadImage: (file, onProgress) => {
     return new Promise((resolve, reject) => {
-      const token = getToken();
       const formData = new FormData();
       formData.append('image', file);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${BASE}/images/upload`);
-      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.withCredentials = true;
       xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
       xhr.onload = () => {
         try {
@@ -117,12 +111,11 @@ export const api = {
   // video upload (returns { url })
   uploadVideo: (file, onProgress) => {
     return new Promise((resolve, reject) => {
-      const token = getToken();
       const formData = new FormData();
       formData.append('video', file);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${BASE}/videos/upload`);
-      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.withCredentials = true;
       xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
       xhr.onload = () => {
         try {

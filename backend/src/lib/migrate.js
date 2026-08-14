@@ -267,6 +267,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS pronouns TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "preferredName" TEXT;
 `;
 
+// M8: Biweekly quiz race-condition guard.
+// period is a 14-day bucket string (biweekly-N) for biweekly attempts, NULL for module attempts
+// (NULLs are distinct in Postgres UNIQUE — module attempts can accumulate freely until passed).
+const QUIZ_PERIOD_CONSTRAINT = `
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS period TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS quiz_attempts_biweekly_period_idx
+  ON quiz_attempts ("userId", "quizType", period)
+  WHERE period IS NOT NULL;
+`;
+
 const CAMPUS_FIX = `
 UPDATE users SET campus = 'Newark' WHERE campus = 'NJIT Newark';
 UPDATE users SET campus = 'Jersey City' WHERE campus = 'NJIT Jersey City';
@@ -288,6 +298,7 @@ export async function migrate() {
     await pool.query(BATCH2_SCHEMA);
     await pool.query(PROFILE_V2);
     await pool.query(CAMPUS_FIX);
+    await pool.query(QUIZ_PERIOD_CONSTRAINT);
     console.log('Database schema ready');
   } catch (err) {
     console.error('Migration error:', err);

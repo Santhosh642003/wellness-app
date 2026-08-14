@@ -31,6 +31,7 @@ services:
       # If DATABASE_URL is set in .env it takes priority; otherwise fall back to local docker postgres
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-wellness_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-wellness_db}}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       PORT: 3001
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}

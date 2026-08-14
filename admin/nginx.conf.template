@@ -32,5 +32,8 @@ server {
         proxy_read_timeout 30s;
         proxy_send_timeout 30s;
         client_max_body_size 500m;
+        # Pass cookies through in both directions (needed for httpOnly admin_token cookie)
+        proxy_pass_header Set-Cookie;
+        proxy_cookie_path / /;
     }
 }

@@ -392,12 +392,15 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
     try {
       await client.query('BEGIN');
 
-      // Enforce 14-day cooldown for bi-weekly quiz
+      // Enforce 14-day cooldown for bi-weekly quiz (also backed by UNIQUE constraint on period)
+      let biweeklyPeriod = null;
       if (data.quizType === 'biweekly') {
+        // Stable 14-day bucket: floor(unix_days / 14). Two requests in the same window get the
+        // same period string; the UNIQUE index rejects the second one atomically.
+        biweeklyPeriod = `biweekly-${Math.floor(Date.now() / (14 * 24 * 60 * 60 * 1000))}`;
         const { rows: [recent] } = await client.query(
-          `SELECT "createdAt" FROM quiz_attempts WHERE "userId"=$1 AND "quizType"='biweekly'
-           AND "createdAt" > NOW() - INTERVAL '14 days' ORDER BY "createdAt" DESC LIMIT 1`,
-          [req.params.userId]
+          `SELECT "createdAt" FROM quiz_attempts WHERE "userId"=$1 AND period=$2 LIMIT 1`,
+          [req.params.userId, biweeklyPeriod]
         );
         if (recent) {
           await client.query('ROLLBACK');
@@ -451,10 +454,10 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
       const pointsEarned = passed ? (data.quizType === 'biweekly' ? 200 : Math.round(validatedScore * 0.5)) : 0;
 
       const { rows: [attempt] } = await client.query(
-        `INSERT INTO quiz_attempts (id, "userId", "moduleId", "quizType", score, "totalPoints", passed, answers)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        `INSERT INTO quiz_attempts (id, "userId", "moduleId", "quizType", score, "totalPoints", passed, answers, period)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
         [randomUUID(), req.params.userId, data.moduleId || null, data.quizType,
-         validatedScore, validatedTotalPoints, passed, JSON.stringify(data.answers)]
+         validatedScore, validatedTotalPoints, passed, JSON.stringify(data.answers), biweeklyPeriod]
       );
 
       if (passed && pointsEarned > 0) {
@@ -514,6 +517,11 @@ router.post('/:userId/quiz', requireSelf, async (req, res, next) => {
       res.status(201).json({ ...attempt, pointsEarned });
     } catch (err) {
       await client.query('ROLLBACK');
+      // M8: unique constraint violation on (userId, quizType, period) means a concurrent
+      // request already committed this period's attempt — treat as "already attempted"
+      if (err.code === '23505' && err.constraint?.includes('biweekly_period')) {
+        return res.status(409).json({ error: 'Already completed this period' });
+      }
       throw err;
     } finally {
       client.release();

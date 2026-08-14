@@ -178,6 +178,17 @@ export async function seed() {
     console.log(`[seed] Admin account created: ${adminEmail}`);
   }
 
+  // [TEST] modules — functional during development/QA so the quiz/points flow can be verified.
+  // They award real points (675 total across 6 modules) and are completable by any registered user.
+  // LAUNCH CHECKLIST (M4): before onboarding real students, decide whether to:
+  //   (a) delete them via the admin panel, or
+  //   (b) set SEED_TEST_MODULES=false in Railway env to skip seeding on future restarts.
+  // Do NOT remove them automatically here — that decision belongs to the launch workflow.
+  if (process.env.SEED_TEST_MODULES === 'false') {
+    console.log('[seed] SEED_TEST_MODULES=false — skipping [TEST] module seeding');
+    return;
+  }
+
   // Insert [TEST] modules + their quizzes if they don't already exist
   const { rows: existing } = await pool.query(`SELECT slug FROM modules WHERE slug LIKE 'test-%'`);
   const existingSlugs = new Set(existing.map((r) => r.slug));

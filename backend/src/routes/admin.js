@@ -6,7 +6,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import pool from '../lib/db.js';
-import { adminAuth } from '../middleware/adminAuth.js';
+import { adminAuth, adminSecret } from '../middleware/adminAuth.js';
 import { awardPoints } from '../lib/points.js';
 import { uploadFile, deleteFile } from '../lib/storage.js';
 import { sendQuizLiveEmail, sendAnnouncementEmail } from '../lib/email.js';
@@ -64,9 +64,27 @@ router.post('/auth/login', adminLoginLimiter, async (req, res, next) => {
     if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, admin.password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ adminId: admin.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '12h' });
-    res.json({ token, admin: { id: admin.id, email: admin.email, name: admin.name } });
+    const token = jwt.sign({ adminId: admin.id, role: 'admin' }, adminSecret(), { expiresIn: '7d' });
+    res.cookie('admin_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    res.json({ admin: { id: admin.id, email: admin.email, name: admin.name } });
   } catch (err) { next(err); }
+});
+
+// POST /api/admin/auth/logout
+router.post('/auth/logout', (req, res) => {
+  res.clearCookie('admin_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+  });
+  res.json({ ok: true });
 });
 
 router.use(adminAuth);

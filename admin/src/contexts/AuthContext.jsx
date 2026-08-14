@@ -4,19 +4,20 @@ import { api } from '../lib/api.js';
 const Ctx = createContext(null);
 
 export function AuthProvider({ children }) {
+  // admin_user holds non-sensitive profile data (name/email) for display.
+  // The auth token lives exclusively in an httpOnly cookie — never in localStorage.
   const [admin, setAdmin] = useState(() => {
     try { return JSON.parse(localStorage.getItem('admin_user') || 'null'); } catch { return null; }
   });
 
   const login = async (email, password) => {
-    const { token, admin: a } = await api.login({ email, password });
-    localStorage.setItem('admin_token', token);
+    const { admin: a } = await api.login({ email, password });
     localStorage.setItem('admin_user', JSON.stringify(a));
     setAdmin(a);
   };
 
-  const logout = () => {
-    localStorage.removeItem('admin_token');
+  const logout = async () => {
+    try { await api.logout(); } catch { /* ignore network errors on logout */ }
     localStorage.removeItem('admin_user');
     setAdmin(null);
   };

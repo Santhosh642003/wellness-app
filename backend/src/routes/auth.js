@@ -11,7 +11,11 @@ import { awardPoints } from '../lib/points.js';
 
 const router = Router();
 
-// In-memory login rate limiter: max 10 failed attempts per IP per 15 min
+// In-memory login rate limiter: max 10 failed attempts per IP per 15 min.
+// KNOWN LIMITATION (M1): both this Map and express-rate-limit's default store are
+// process-local — state is not shared across multiple instances. Acceptable while
+// the app runs as a single Railway replica; if horizontal scaling is added, replace
+// with a Redis-backed store (e.g. rate-limit-redis / ioredis).
 const loginAttempts = new Map(); // ip -> { count, resetAt }
 function checkLoginRateLimit(ip) {
   const now = Date.now();
@@ -29,6 +33,14 @@ function recordFailedLogin(ip) {
 function clearLoginAttempts(ip) {
   loginAttempts.delete(ip);
 }
+
+// Purge stale entries every 30 minutes so the Map doesn't grow unbounded under scan traffic
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (now > entry.resetAt) loginAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000).unref();
 
 // Strong password: 8+ chars, uppercase, lowercase, number, special char
 const passwordSchema = z.string()

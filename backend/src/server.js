@@ -41,6 +41,10 @@ if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
   console.error('[startup] ADMIN_PASSWORD is not set — required in production to avoid a known-weak admin account.');
   process.exit(1);
 }
+if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_JWT_SECRET) {
+  console.error('[startup] ADMIN_JWT_SECRET is not set — required in production to isolate admin token signing from user tokens. Set ADMIN_JWT_SECRET in Railway with a long random string.');
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(process.cwd(), 'uploads');
