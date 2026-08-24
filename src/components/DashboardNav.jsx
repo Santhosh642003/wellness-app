@@ -60,12 +60,12 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
   return (
     <>
     <a href="#main-content" className="skip-to-content">Skip to main content</a>
-    <header className="sticky top-0 z-50 bg-white/90 dark:bg-[#0b0b0b]/80 backdrop-blur border-b border-slate-200 dark:border-gray-900">
+    <header className="sticky top-0 z-50 bg-white/90 dark:bg-[#0b0b0b]/80 backdrop-blur border-b border-slate-200 dark:border-gray-900 relative">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
         {/* Logo */}
-        <button onClick={() => navigate("/dashboard")} className="flex items-center gap-3">
+        <button onClick={() => navigate("/dashboard")} className="flex items-center gap-3 shrink-0">
           <img src="/njit_logo.png" alt="NJIT" className="h-10 w-auto" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-          <div className="leading-tight text-left">
+          <div className="hidden sm:block leading-tight text-left">
             <div className="text-sm font-semibold text-slate-900 dark:text-white">Campus Wellness Center</div>
             <div className="text-xs text-slate-500 dark:text-gray-400">NJIT</div>
           </div>
@@ -94,7 +94,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
           </div>
 
           {/* Notification bell */}
-          <div className="relative" ref={bellRef}>
+          <div ref={bellRef}>
             <button
               onClick={openBell}
               aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
@@ -110,9 +110,9 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
               )}
             </button>
 
-            {/* Notification dropdown */}
+            {/* Notification dropdown — anchored to header bottom-right so it never overflows on any screen */}
             {showBell && (
-              <div className="absolute right-0 top-12 w-80 bg-white dark:bg-[#141414] border border-slate-200 dark:border-gray-800 rounded-2xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-2 sm:right-4 top-full mt-1 w-[min(20rem,calc(100vw-1rem))] bg-white dark:bg-[#141414] border border-slate-200 dark:border-gray-800 rounded-2xl shadow-xl z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-gray-800">
                   <span className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</span>
                   <button onClick={() => setShowBell(false)} aria-label="Close notifications" className="text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 transition">

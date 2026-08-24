@@ -6,17 +6,17 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-8 py-14 flex flex-col md:flex-row justify-between gap-16">
 
         {/* LEFT: NJIT logo + divider + title */}
-        <div className="flex items-center gap-8">
+        <div className="flex flex-wrap items-center gap-4 md:gap-8">
           <img
             src="/njit_logo.png"
             alt="NJIT"
-            className="h-20 w-auto grayscale dark:invert dark:brightness-105"
+            className="h-14 md:h-20 w-auto grayscale dark:invert dark:brightness-105"
             draggable="false"
           />
 
-          <div className="h-16 w-px bg-slate-300 dark:bg-gray-400/70" />
+          <div className="hidden sm:block h-14 md:h-16 w-px bg-slate-300 dark:bg-gray-400/70" />
 
-          <div className="text-slate-900 dark:text-white font-semibold text-lg tracking-wide">
+          <div className="text-slate-900 dark:text-white font-semibold text-base md:text-lg tracking-wide">
             Campus Wellness Services
           </div>
         </div>

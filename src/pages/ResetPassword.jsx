@@ -71,7 +71,7 @@ export default function ResetPassword() {
   if (!token) {
     return (
       <section className="min-h-screen bg-slate-50 dark:bg-[#0b0b0b] flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-10 shadow-lg text-center">
+        <div className="w-full max-w-md bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6 sm:p-10 shadow-lg text-center">
           <p className="text-red-500 mb-6">No reset token found. Please request a new password reset link.</p>
           <Link to="/forgot-password" className="text-emerald-500 hover:underline font-medium">Request Reset Link</Link>
         </div>
@@ -81,7 +81,7 @@ export default function ResetPassword() {
 
   return (
     <section className="min-h-screen bg-slate-50 dark:bg-[#0b0b0b] flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-10 shadow-lg">
+      <div className="w-full max-w-md bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6 sm:p-10 shadow-lg">
         {success ? (
           <>
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6">

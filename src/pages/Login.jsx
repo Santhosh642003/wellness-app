@@ -168,7 +168,7 @@ export default function Login() {
 
   return (
     <section className="min-h-screen bg-slate-50 dark:bg-[#0b0b0b] flex items-center justify-center p-6">
-      <div className="w-full max-w-xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-10 shadow-lg">
+      <div className="w-full max-w-xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6 sm:p-10 shadow-lg">
 
         {/* ── LOGIN ── */}
         {mode === "login" && (

@@ -59,15 +59,15 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-[#2b2b2b]/90 backdrop-blur border-b border-slate-200/70 dark:border-black/20">
       <div className="max-w-7xl mx-auto flex items-center px-6 py-4">
         {/* Left */}
-        <div className="flex items-center gap-5 mr-14">
+        <div className="flex items-center gap-5 sm:mr-14">
           <img
             src="/njit_logo.png"
             alt="NJIT"
             className="h-10 w-auto grayscale dark:invert dark:brightness-110"
             draggable="false"
           />
-          <div className="h-10 w-px bg-slate-300 dark:bg-gray-500/60" />
-          <div className="text-slate-900 dark:text-white font-semibold">
+          <div className="hidden sm:block h-10 w-px bg-slate-300 dark:bg-gray-500/60" />
+          <div className="hidden sm:block text-slate-900 dark:text-white font-semibold">
             Campus Wellness Services
           </div>
         </div>
