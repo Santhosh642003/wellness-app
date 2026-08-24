@@ -31,7 +31,7 @@ export default function Footer() {
               href="https://www.njit.edu/contact"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+              className="py-1.5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
             >
               Contact Us
             </a>
@@ -40,7 +40,7 @@ export default function Footer() {
               href="https://www.njit.edu/publicsafety/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+              className="py-1.5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
             >
               Public Safety
             </a>
@@ -49,7 +49,7 @@ export default function Footer() {
               href="https://www.njit.edu/counseling/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+              className="py-1.5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
             >
               Center for Counseling and Psychological Services (C-CAPS)
             </a>
@@ -58,7 +58,7 @@ export default function Footer() {
               href="https://www.njit.edu/healthservices/peer-wellness-coaching"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+              className="py-1.5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
             >
               Student Wellness Program
             </a>
@@ -67,7 +67,7 @@ export default function Footer() {
               href="https://www.njit.edu/accessibility/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+              className="py-1.5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
             >
               Accessibility Resources and Services (OARS)
             </a>
@@ -76,14 +76,14 @@ export default function Footer() {
               href="https://www.njit.edu/counseling/sexual-assault-response"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+              className="py-1.5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
             >
               Sexual Assault Response
             </a>
 
             <Link
               to="/privacy"
-              className="text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
+              className="py-1.5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white underline underline-offset-4 decoration-slate-400/60 dark:decoration-gray-500/60"
             >
               Privacy Policy
             </Link>

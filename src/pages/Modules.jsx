@@ -73,7 +73,7 @@ function BookmarkButton({ moduleId, bookmarked, onToggle }) {
       onClick={handleClick}
       aria-label={bookmarked ? "Remove bookmark" : "Bookmark this module"}
       title={bookmarked ? "Remove bookmark" : "Bookmark this module"}
-      className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center border transition-all
+      className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center border transition-all
         ${bookmarked
           ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-500"
           : "bg-white/80 dark:bg-[#1a1a1a]/80 border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500 hover:text-yellow-500 hover:border-yellow-400/40"}`}
@@ -507,7 +507,7 @@ export default function Modules() {
         <div role="group" aria-label="Filter modules" className="flex gap-2 flex-wrap items-center">
           <button
             onClick={() => setShowBookmarked((v) => !v)}
-            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all flex items-center gap-1.5
+            className={`text-xs px-3 py-2 rounded-full border font-medium transition-all flex items-center gap-1.5
               ${showBookmarked
                 ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-600 dark:text-yellow-300"
                 : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-yellow-400/30"}`}
@@ -525,7 +525,7 @@ export default function Modules() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all
+                className={`text-xs px-3 py-2 rounded-full border font-medium transition-all
                   ${activeCategory === cat
                     ? cat === "All"
                       ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white"
