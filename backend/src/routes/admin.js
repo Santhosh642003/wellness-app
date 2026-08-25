@@ -101,19 +101,21 @@ function transcodeVideo(inputPath, outputPath) {
   });
 }
 
-// Extract a single JPEG frame at ~3 s for use as video poster
+// Extract a single JPEG frame at ~3 s for use as video poster.
+// Returns the full ffmpeg stderr string so the caller can log warnings even on success.
 function generatePoster(videoPath, posterPath) {
+  const args = [
+    '-y',
+    '-ss', '00:00:03',
+    '-i', videoPath,
+    '-frames:v', '1',
+    '-vf', 'scale=640:360:force_original_aspect_ratio=decrease',
+    '-q:v', '3',
+    posterPath,
+  ];
   return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', [
-      '-y',
-      '-ss', '00:00:03',
-      '-i', videoPath,
-      '-frames:v', '1',
-      '-vf', 'scale=640:360:force_original_aspect_ratio=decrease',
-      '-q:v', '3',
-      '-update', '1',  // required in ffmpeg 6+ to write a single JPEG without a sequence pattern
-      posterPath,
-    ]);
+    console.info('[poster] running: ffmpeg', args.join(' '));
+    const proc = spawn('ffmpeg', args);
     const stderrBufs = [];
     proc.stderr.on('data', (chunk) => stderrBufs.push(chunk));
     const timer = setTimeout(() => {
@@ -122,10 +124,11 @@ function generatePoster(videoPath, posterPath) {
     }, POSTER_TIMEOUT_MS);
     proc.on('close', (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve();
-      else {
-        const tail = Buffer.concat(stderrBufs).toString('utf8').slice(-200);
-        reject(new Error(`ffmpeg poster exited ${code}: ${tail}`));
+      const stderr = Buffer.concat(stderrBufs).toString('utf8');
+      if (code === 0) {
+        resolve(stderr);
+      } else {
+        reject(new Error(`ffmpeg poster exited ${code}: ${stderr.slice(-400)}`));
       }
     });
     proc.on('error', (err) => { clearTimeout(timer); reject(err); });
@@ -311,16 +314,51 @@ router.post('/videos/upload', uploadVideoMiddleware, async (req, res, next) => {
       });
     }
 
-    // Generate poster frame (non-fatal — upload proceeds even if this fails)
+    // Generate poster frame — three separate stages so failures are attributable.
+    // Non-fatal: a missing poster never blocks the video upload.
     const posterPath = join(tmpDir, 'poster.jpg');
     let posterUrl = null;
+
+    // Stage 1: ffmpeg frame extraction
+    let posterFfmpegOk = false;
     try {
-      await generatePoster(outputPath, posterPath);
-      const posterBuf = await readFile(posterPath);
-      posterUrl = await uploadFile(posterBuf, 'poster.jpg', 'image/jpeg');
-    } catch (posterErr) {
-      console.warn('[video-upload] Poster generation failed (non-fatal):', posterErr.message);
+      const posterStderr = await generatePoster(outputPath, posterPath);
+      posterFfmpegOk = true;
+      if (posterStderr) {
+        // Log any warnings ffmpeg emitted even on success (e.g. missing sequence pattern)
+        console.info('[poster] ffmpeg stderr:', posterStderr.slice(-500).trim());
+      }
+    } catch (ffErr) {
+      console.warn('[poster] ffmpeg frame extraction failed:', ffErr.message);
     }
+
+    // Stage 2: verify the file exists on disk and has non-zero size
+    let posterStat = null;
+    if (posterFfmpegOk) {
+      try {
+        posterStat = await stat(posterPath);
+        console.info(`[poster] file written: ${posterStat.size} bytes`);
+        if (posterStat.size === 0) {
+          console.warn('[poster] ffmpeg exited 0 but wrote a 0-byte file — skipping S3 upload');
+          posterStat = null;
+        }
+      } catch (statErr) {
+        console.warn('[poster] poster file missing after ffmpeg success:', statErr.message);
+      }
+    }
+
+    // Stage 3: upload to S3
+    if (posterStat) {
+      try {
+        const posterBuf = await readFile(posterPath);
+        posterUrl = await uploadFile(posterBuf, 'poster.jpg', 'image/jpeg');
+        console.info('[poster] uploaded:', posterUrl);
+      } catch (uploadErr) {
+        console.warn('[poster] S3 upload failed (non-fatal):', uploadErr.message);
+      }
+    }
+
+    console.info(`[video-upload] done — posterUrl: ${posterUrl || 'null (see [poster] logs above)'}`);
 
     // Stream transcoded video to S3 (avoids loading the full file into RAM)
     const { size: videoSize } = await stat(outputPath);
