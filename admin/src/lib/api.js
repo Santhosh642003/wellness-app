@@ -5,6 +5,16 @@ const BASE = '/api/admin';
 let _on401 = () => { window.location.href = '/'; };
 export function set401Handler(fn) { _on401 = fn; }
 
+// When an XHR response body is not JSON (e.g. nginx returns an HTML 504 page),
+// surface the actual HTTP status instead of swallowing it as "Invalid response".
+function xhrError(xhr, fallback = 'Request failed') {
+  const s = xhr.status;
+  if (s === 504 || s === 524) return new Error('Request timed out — server took too long to respond');
+  if (s === 413) return new Error('File too large');
+  if (s) return new Error(`${fallback} (HTTP ${s})`);
+  return new Error(fallback);
+}
+
 async function req(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -87,9 +97,9 @@ export const api = {
           if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
           else reject(new Error(data.error || `HTTP ${xhr.status}`));
-        } catch { reject(new Error('Invalid response')); }
+        } catch { reject(xhrError(xhr, 'Document upload failed')); }
       };
-      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.onerror = () => reject(new Error('Document upload failed — network error'));
       xhr.send(formData);
     });
   },
@@ -109,9 +119,9 @@ export const api = {
           if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
           else reject(new Error(data.error || `HTTP ${xhr.status}`));
-        } catch { reject(new Error('Invalid response')); }
+        } catch { reject(xhrError(xhr, 'Image upload failed')); }
       };
-      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.onerror = () => reject(new Error('Image upload failed — network error'));
       xhr.send(formData);
     });
   },
@@ -133,9 +143,9 @@ export const api = {
           if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
           else reject(new Error(data.error || `HTTP ${xhr.status}`));
-        } catch { reject(new Error('Invalid response')); }
+        } catch { reject(xhrError(xhr, 'Transcription failed')); }
       };
-      xhr.onerror = () => reject(new Error('Transcription failed'));
+      xhr.onerror = () => reject(new Error('Transcription failed — network error'));
       if (isFile) {
         const formData = new FormData();
         formData.append('audio', urlOrFile);
@@ -147,7 +157,7 @@ export const api = {
     });
   },
 
-  // video upload (returns { url })
+  // video upload (returns { url, posterUrl })
   uploadVideo: (file, onProgress) => {
     return new Promise((resolve, reject) => {
       const formData = new FormData();
@@ -162,9 +172,9 @@ export const api = {
           if (xhr.status === 401) { _on401(); return reject(Object.assign(new Error(data.error || 'Session expired'), { status: 401 })); }
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
           else reject(new Error(data.error || `HTTP ${xhr.status}`));
-        } catch { reject(new Error('Invalid response')); }
+        } catch { reject(xhrError(xhr, 'Video upload failed')); }
       };
-      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.onerror = () => reject(new Error('Video upload failed — network error'));
       xhr.send(formData);
     });
   },

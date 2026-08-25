@@ -21,6 +21,27 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # Video upload: synchronous transcode on the backend takes several minutes for large files.
+    # nginx picks the longest matching prefix, so this block wins over /api/ for this path.
+    # proxy_read_timeout here is how long nginx waits for the backend to respond (= transcode time).
+    # proxy_send_timeout here is how long nginx waits between successive sends of the upload body.
+    # These are intentionally high to cover a 500 MB file being transcoded by ffmpeg.
+    # All other /api/ routes keep the fast-fail 30s window.
+    location /api/admin/videos/upload {
+        set $backend ${BACKEND_URL};
+        proxy_pass $backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 900s;
+        proxy_send_timeout 300s;
+        client_max_body_size 500m;
+        proxy_pass_header Set-Cookie;
+        proxy_cookie_path / /;
+    }
+
     location /api/ {
         set $backend ${BACKEND_URL};
         proxy_pass $backend;
