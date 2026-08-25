@@ -222,12 +222,14 @@ function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDow
               <button type="button"
                 onClick={() => autoGenerateCaptions()}
                 disabled={transcribing || !video.url}
+                title="Downloads the video, extracts audio, and transcribes via Whisper — works for any video size"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-900/40 border border-blue-800/40 rounded-lg text-blue-300 text-xs hover:bg-blue-900/60 disabled:opacity-40 transition">
-                <Wand2 size={11} />{transcribing ? 'Generating captions…' : 'Auto-generate captions'}
+                <Wand2 size={11} />{transcribing ? 'Processing video…' : 'Auto-generate captions'}
               </button>
               <input ref={audioInputRef} type="file" accept="audio/*,video/*" className="hidden"
                 onChange={(e) => { if (e.target.files?.[0]) autoGenerateCaptions(e.target.files[0]); e.target.value = ''; }} />
               <button type="button" onClick={() => audioInputRef.current?.click()} disabled={transcribing}
+                title="Upload a separate audio file as an alternative (25 MB limit)"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 text-xs hover:bg-gray-700 disabled:opacity-40 transition">
                 <Upload size={11} /> Upload audio instead
               </button>

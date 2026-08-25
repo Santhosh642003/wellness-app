@@ -1,4 +1,6 @@
 FROM node:20-alpine
+# ffmpeg: audio extraction for transcribe route (strips video, compresses to mp3)
+RUN apk add --no-cache ffmpeg
 WORKDIR /app
 
 COPY package.json ./
