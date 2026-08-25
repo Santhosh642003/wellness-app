@@ -111,6 +111,7 @@ function generatePoster(videoPath, posterPath) {
       '-frames:v', '1',
       '-vf', 'scale=640:360:force_original_aspect_ratio=decrease',
       '-q:v', '3',
+      '-update', '1',  // required in ffmpeg 6+ to write a single JPEG without a sequence pattern
       posterPath,
     ]);
     const stderrBufs = [];
