@@ -92,6 +92,41 @@ export async function uploadFile(buffer, originalname, mimetype) {
 }
 
 /**
+ * Upload a file from a Node.js Readable stream (avoids loading large files into memory).
+ * @param {import('stream').Readable} stream – readable stream of file contents
+ * @param {number} contentLength – byte length of the stream (required for S3)
+ * @param {string} originalname – original filename (used to derive the key)
+ * @param {string} mimetype – MIME type
+ * @returns {Promise<string>} – public URL (cloud) or /uploads/<key> (local)
+ */
+export async function uploadFileStream(stream, contentLength, originalname, mimetype) {
+  const key = makeKey(originalname);
+
+  if (!isConfigured()) {
+    const { pipeline } = await import('stream/promises');
+    const { createWriteStream } = await import('fs');
+    const dir = join(process.cwd(), 'uploads');
+    mkdirSync(dir, { recursive: true });
+    await pipeline(stream, createWriteStream(join(dir, key)));
+    console.log(`[storage] saved locally: uploads/${key}`);
+    return `/uploads/${key}`;
+  }
+
+  const client = createClient();
+  await client.send(new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET,
+    Key: key,
+    Body: stream,
+    ContentLength: contentLength,
+    ContentType: mimetype,
+  }));
+
+  const url = publicUrl(key);
+  console.log(`[storage] uploaded to S3: ${url}`);
+  return url;
+}
+
+/**
  * Delete a previously uploaded file by its URL.
  * Silently ignores errors so a failed delete never breaks an API response.
  * @param {string|null} url – the URL returned by uploadFile()

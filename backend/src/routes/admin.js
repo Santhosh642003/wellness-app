@@ -5,10 +5,16 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
+import { mkdtempSync } from 'fs';
+import { rm, stat, readFile, open } from 'fs/promises';
+import { createReadStream } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { spawn } from 'child_process';
 import pool from '../lib/db.js';
 import { adminAuth, adminSecret } from '../middleware/adminAuth.js';
 import { awardPoints } from '../lib/points.js';
-import { uploadFile, deleteFile } from '../lib/storage.js';
+import { uploadFile, uploadFileStream, deleteFile } from '../lib/storage.js';
 import { sendQuizLiveEmail, sendAnnouncementEmail } from '../lib/email.js';
 import { fileTypeFromBuffer } from 'file-type';
 
@@ -18,15 +24,126 @@ const adminLoginLimiter = rateLimit({
   message: { error: 'Too many login attempts, please try again later.' },
 });
 
-// Use memory storage — the file buffer is passed to the storage module
+// DiskStorage: each upload gets its own temp dir so large files never hit RAM
 const uploadVideo = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      try {
+        const dir = mkdtempSync(join(tmpdir(), 'video-upload-'));
+        req._uploadTmpDir = dir;
+        cb(null, dir);
+      } catch (err) {
+        cb(err);
+      }
+    },
+    filename: (req, file, cb) => cb(null, 'source'),
+  }),
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('video/')) cb(null, true);
     else cb(new Error('Only video files are allowed'));
   },
 });
+
+const TRANSCODE_TIMEOUT_MS = 20 * 60 * 1000; // 20 min
+const POSTER_TIMEOUT_MS   =      60 * 1000;  // 1 min
+
+// Detect file type by reading the first 4100 bytes from disk
+async function detectFileType(filePath) {
+  let fh;
+  try {
+    fh = await open(filePath, 'r');
+    const buf = Buffer.alloc(4100);
+    const { bytesRead } = await fh.read(buf, 0, 4100, 0);
+    return await fileTypeFromBuffer(buf.subarray(0, bytesRead));
+  } finally {
+    await fh?.close().catch(() => {});
+  }
+}
+
+// Re-encode to H.264/AAC, 720p max, CRF 28, 1500kbps cap, faststart
+function transcodeVideo(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', [
+      '-y',
+      '-i', inputPath,
+      '-vf', 'scale=w=1280:h=720:force_original_aspect_ratio=decrease',
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-crf', '28',
+      '-maxrate', '1500k',
+      '-bufsize', '3000k',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-ar', '44100',
+      '-movflags', '+faststart',
+      '-f', 'mp4',
+      outputPath,
+    ]);
+    const stderrBufs = [];
+    proc.stderr.on('data', (chunk) => stderrBufs.push(chunk));
+    const timer = setTimeout(() => {
+      proc.kill('SIGTERM');
+      reject(new Error('ffmpeg transcode timed out'));
+    }, TRANSCODE_TIMEOUT_MS);
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else {
+        const tail = Buffer.concat(stderrBufs).toString('utf8').slice(-500);
+        reject(new Error(`ffmpeg transcode exited ${code}: ${tail}`));
+      }
+    });
+    proc.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err.code === 'ENOENT' ? new Error('ffmpeg not found in server environment') : err);
+    });
+  });
+}
+
+// Extract a single JPEG frame at ~3 s for use as video poster
+function generatePoster(videoPath, posterPath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', [
+      '-y',
+      '-ss', '00:00:03',
+      '-i', videoPath,
+      '-frames:v', '1',
+      '-vf', 'scale=640:360:force_original_aspect_ratio=decrease',
+      '-q:v', '3',
+      posterPath,
+    ]);
+    const stderrBufs = [];
+    proc.stderr.on('data', (chunk) => stderrBufs.push(chunk));
+    const timer = setTimeout(() => {
+      proc.kill('SIGTERM');
+      reject(new Error('ffmpeg poster generation timed out'));
+    }, POSTER_TIMEOUT_MS);
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else {
+        const tail = Buffer.concat(stderrBufs).toString('utf8').slice(-200);
+        reject(new Error(`ffmpeg poster exited ${code}: ${tail}`));
+      }
+    });
+    proc.on('error', (err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
+// Wrapper that cleans up tmpDir if multer errors before the route handler runs
+function uploadVideoMiddleware(req, res, next) {
+  uploadVideo.single('video')(req, res, (err) => {
+    if (err) {
+      if (req._uploadTmpDir) {
+        rm(req._uploadTmpDir, { recursive: true, force: true }).catch(() => {});
+        req._uploadTmpDir = null;
+      }
+      return next(err);
+    }
+    next();
+  });
+}
 
 const uploadImage = multer({
   storage: multer.memoryStorage(),
@@ -168,17 +285,52 @@ router.get('/users/:id', async (req, res, next) => {
 });
 
 // POST /api/admin/videos/upload
-router.post('/videos/upload', uploadVideo.single('video'), async (req, res, next) => {
+// Accepts multipart video upload; transcodes to H.264/AAC 720p and auto-generates a poster frame.
+// Returns { url, posterUrl } where posterUrl may be null if poster generation fails.
+router.post('/videos/upload', uploadVideoMiddleware, async (req, res, next) => {
+  const tmpDir = req._uploadTmpDir || null;
   try {
     if (!req.file) return res.status(400).json({ error: 'No video file provided' });
-    const fileType = await fileTypeFromBuffer(req.file.buffer);
+
+    const sourcePath = req.file.path;
+
+    // Magic-byte file type check (mimetype from browser is untrusted)
+    const fileType = await detectFileType(sourcePath);
     if (!fileType || !fileType.mime.startsWith('video/')) {
       return res.status(400).json({ error: 'File content does not match a valid video format' });
     }
-    const url = await uploadFile(req.file.buffer, `file.${fileType.ext}`, fileType.mime);
-    res.json({ url });
+
+    // Transcode to H.264/AAC 720p with faststart
+    const outputPath = join(tmpDir, 'transcoded.mp4');
+    try {
+      await transcodeVideo(sourcePath, outputPath);
+    } catch (transcodeErr) {
+      return res.status(422).json({
+        error: `Video processing failed — unsupported format or codec (${transcodeErr.message.slice(0, 200)})`,
+      });
+    }
+
+    // Generate poster frame (non-fatal — upload proceeds even if this fails)
+    const posterPath = join(tmpDir, 'poster.jpg');
+    let posterUrl = null;
+    try {
+      await generatePoster(outputPath, posterPath);
+      const posterBuf = await readFile(posterPath);
+      posterUrl = await uploadFile(posterBuf, 'poster.jpg', 'image/jpeg');
+    } catch (posterErr) {
+      console.warn('[video-upload] Poster generation failed (non-fatal):', posterErr.message);
+    }
+
+    // Stream transcoded video to S3 (avoids loading the full file into RAM)
+    const { size: videoSize } = await stat(outputPath);
+    const videoStream = createReadStream(outputPath);
+    const url = await uploadFileStream(videoStream, videoSize, 'video.mp4', 'video/mp4');
+
+    res.json({ url, posterUrl });
   } catch (err) {
     next(err);
+  } finally {
+    if (tmpDir) rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
 });
 

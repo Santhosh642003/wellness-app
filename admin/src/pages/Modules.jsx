@@ -73,7 +73,7 @@ function tempId() {
 
 // ── Single Video Row (with per-video transcript) ───────────────────────────
 
-function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDown }) {
+function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDown, onPosterGenerated }) {
   const inputRef = useRef(null);
   const audioInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -95,6 +95,7 @@ function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDow
     try {
       const r = await api.uploadVideo(file, setProgress);
       onChange({ ...video, url: r.url });
+      if (r.posterUrl) onPosterGenerated?.(r.posterUrl);
     } catch (err) { setUploadError(err.message || 'Upload failed'); }
     finally { setUploading(false); }
   };
@@ -181,7 +182,7 @@ function VideoRow({ video, index, total, onChange, onRemove, onMoveUp, onMoveDow
           onChange={(e) => handleFile(e.target.files?.[0])} />
         <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs hover:bg-gray-600 disabled:opacity-50 transition">
-          <Upload size={12} />{uploading ? `${progress}%` : 'Upload'}
+          <Upload size={12} />{uploading ? (progress >= 100 ? 'Processing video…' : `${progress}%`) : 'Upload'}
         </button>
         <input
           value={video.url}
@@ -708,6 +709,7 @@ function ModuleForm({ initial, onSaved, onCancel }) {
               onRemove={() => removeVideo(i)}
               onMoveUp={() => moveVideo(i, -1)}
               onMoveDown={() => moveVideo(i, 1)}
+              onPosterGenerated={(url) => { if (!form.thumbnailUrl) set('thumbnailUrl', url); }}
             />
           ))}
           <button type="button" onClick={addVideo}

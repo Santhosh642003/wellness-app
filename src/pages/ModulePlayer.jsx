@@ -504,6 +504,7 @@ export default function ModulePlayer() {
                 <VideoPlayer
                   key={`${moduleId}-${currentVideoIdx}`}
                   src={currentVideoUrl}
+                  poster={mod?.thumbnailUrl || undefined}
                   videoRef={videoRef}
                   onTimeUpdate={handleTimeUpdate}
                   onEnded={handleVideoEnded}
