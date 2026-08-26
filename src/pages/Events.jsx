@@ -87,17 +87,17 @@ export default function Events() {
       <main id="main-content" className="max-w-4xl mx-auto px-6 py-10 space-y-8 w-full">
         <header>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Events</h1>
-          <p className="text-slate-500 dark:text-gray-400 mt-2">Attend in-person events and earn 250 points per check-in</p>
+          <p className="text-slate-600 dark:text-gray-400 mt-2">Attend in-person events and earn 250 points per check-in</p>
         </header>
 
         {/* Check-in form */}
         {active.length > 0 && (
           <div className="bg-white dark:bg-[#121212] border border-emerald-500/20 rounded-2xl p-6">
             <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Check In Now</h2>
-            <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">Select the event you're attending and enter the code shown at the event</p>
+            <p className="text-slate-600 dark:text-gray-400 text-sm mb-4">Select the event you're attending and enter the code shown at the event</p>
             <form onSubmit={handleCheckin} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Event</label>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1.5">Event</label>
                 <select
                   value={selectedEventId}
                   onChange={(e) => setSelectedEventId(e.target.value)}
@@ -113,7 +113,7 @@ export default function Events() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5">Check-in Code</label>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1.5">Check-in Code</label>
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -149,7 +149,7 @@ export default function Events() {
         {/* Upcoming events */}
         {upcoming.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide mb-3">Upcoming</h2>
+            <h2 className="text-sm font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wide mb-3">Upcoming</h2>
             <div className="space-y-3">
               {upcoming.map((ev) => (
                 <EventCard key={ev.id} ev={ev} checkedIn={false} badge="upcoming" />
@@ -161,7 +161,7 @@ export default function Events() {
         {/* Past events */}
         {past.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide mb-3">Past</h2>
+            <h2 className="text-sm font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wide mb-3">Past</h2>
             <div className="space-y-3">
               {past.map((ev) => (
                 <EventCard key={ev.id} ev={ev} checkedIn={checkedInIds.has(ev.id)} badge="past" />
@@ -171,7 +171,7 @@ export default function Events() {
         )}
 
         {eventsList.length === 0 && (
-          <div className="text-center py-16 text-slate-400 dark:text-gray-500">
+          <div className="text-center py-16 text-slate-600 dark:text-gray-500">
             <p className="text-lg">No events scheduled yet</p>
             <p className="text-sm mt-1">Check back soon for upcoming wellness events</p>
           </div>
@@ -206,12 +206,12 @@ function EventCard({ ev, checkedIn, badge }) {
           </div>
           <h3 className="text-base font-semibold text-slate-900 dark:text-white">{ev.title}</h3>
           {ev.description && (
-            <p className="text-sm text-slate-500 dark:text-gray-400 mt-0.5">{ev.description}</p>
+            <p className="text-sm text-slate-600 dark:text-gray-400 mt-0.5">{ev.description}</p>
           )}
         </div>
         <span className="text-xs font-semibold text-emerald-500 shrink-0">+250 pts</span>
       </div>
-      <div className="mt-3 text-xs text-slate-400 dark:text-gray-500">
+      <div className="mt-3 text-xs text-slate-600 dark:text-gray-500">
         {start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} ·{' '}
         {start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} –{' '}
         {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}

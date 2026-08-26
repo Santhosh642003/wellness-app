@@ -34,7 +34,7 @@ function PasswordStrengthBar({ password }) {
       <p className={`text-xs ${strength <= 2 ? "text-red-400" : strength <= 3 ? "text-yellow-400" : "text-emerald-400"}`}>
         {labels[strength - 1] || "Too weak"}
         {strength < 5 && (
-          <span className="text-slate-400 dark:text-gray-500 ml-1">
+          <span className="text-slate-600 dark:text-gray-500 ml-1">
             — needs:{" "}
             {[!/[A-Z]/.test(password) && "uppercase", !/[a-z]/.test(password) && "lowercase", !/[0-9]/.test(password) && "number", !SPECIAL_CHAR_RE.test(password) && "special char", password.length < 8 && "8+ chars"].filter(Boolean).join(", ")}
           </span>
@@ -44,7 +44,7 @@ function PasswordStrengthBar({ password }) {
   );
 }
 
-const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-3 text-slate-900 dark:text-gray-100 placeholder:text-slate-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
+const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-3 text-slate-900 dark:text-gray-100 placeholder:text-slate-600 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
 const SELECT_CLS = INPUT_CLS + " appearance-none";
 const LABEL_CLS = "block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-2";
 
@@ -174,7 +174,7 @@ export default function Login() {
         {mode === "login" && (
           <>
             <h1 className="text-4xl font-semibold mb-3 text-slate-900 dark:text-white">Sign in</h1>
-            <p className="text-slate-500 dark:text-gray-400 mb-10">Sign in with your NJIT credentials to continue.</p>
+            <p className="text-slate-600 dark:text-gray-400 mb-10">Sign in with your NJIT credentials to continue.</p>
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
                 <label className={LABEL_CLS}>NJIT Email</label>
@@ -183,7 +183,7 @@ export default function Login() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className={LABEL_CLS} style={{ marginBottom: 0 }}>Password</label>
-                  <Link to="/forgot-password" className="text-xs text-slate-400 dark:text-gray-500 hover:text-emerald-500 transition-colors">Forgot password?</Link>
+                  <Link to="/forgot-password" className="text-xs text-slate-600 dark:text-gray-500 hover:text-emerald-500 transition-colors">Forgot password?</Link>
                 </div>
                 <input value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} type="password" placeholder="Your password" className={INPUT_CLS} />
               </div>
@@ -193,7 +193,7 @@ export default function Login() {
                 {loading ? "Signing in…" : "Sign In"}
               </button>
             </form>
-            <p className="text-sm text-slate-400 dark:text-gray-500 mt-8 text-center">
+            <p className="text-sm text-slate-600 dark:text-gray-500 mt-8 text-center">
               Don&apos;t have an account?{" "}
               <button onClick={switchToRegister} className="text-emerald-500 hover:underline font-medium">Register</button>
             </p>
@@ -201,7 +201,7 @@ export default function Login() {
               <div className="mt-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex-1 h-px bg-slate-200 dark:bg-gray-800" />
-                  <span className="text-xs text-slate-400 dark:text-gray-600">or continue with Google</span>
+                  <span className="text-xs text-slate-600 dark:text-gray-600">or continue with Google</span>
                   <div className="flex-1 h-px bg-slate-200 dark:bg-gray-800" />
                 </div>
                 <div className="flex justify-center">
@@ -216,7 +216,7 @@ export default function Login() {
                     theme="filled_black" shape="rectangular" text="signin_with"
                   />
                 </div>
-                <p className="text-xs text-slate-400 dark:text-gray-600 mt-3 text-center">Only @njit.edu Google accounts are accepted.</p>
+                <p className="text-xs text-slate-600 dark:text-gray-600 mt-3 text-center">Only @njit.edu Google accounts are accepted.</p>
               </div>
             )}
           </>
@@ -229,13 +229,13 @@ export default function Login() {
             <div className="flex items-center gap-2 mb-8">
               {[1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center gap-2">
-                  <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${step === s ? "border-emerald-400 bg-emerald-400 text-black" : step > s ? "border-emerald-600 bg-emerald-600/20 text-emerald-400" : "border-slate-300 dark:border-gray-700 text-slate-400 dark:text-gray-600"}`}>
+                  <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${step === s ? "border-emerald-400 bg-emerald-400 text-black" : step > s ? "border-emerald-600 bg-emerald-600/20 text-emerald-400" : "border-slate-300 dark:border-gray-700 text-slate-600 dark:text-gray-600"}`}>
                     {step > s ? "✓" : s}
                   </div>
                   {s < 3 && <div className={`h-px w-8 ${step > s ? "bg-emerald-600" : "bg-slate-200 dark:bg-gray-800"}`} />}
                 </div>
               ))}
-              <span className="ml-2 text-xs text-slate-400 dark:text-gray-500">
+              <span className="ml-2 text-xs text-slate-600 dark:text-gray-500">
                 {step === 1 ? "Personal info" : step === 2 ? "Account setup" : "Verify email"}
               </span>
             </div>
@@ -244,7 +244,7 @@ export default function Login() {
             {step === 1 && (
               <>
                 <h1 className="text-3xl font-semibold mb-2 text-slate-900 dark:text-white">About you</h1>
-                <p className="text-slate-500 dark:text-gray-400 mb-8">Tell us a bit about yourself to get started.</p>
+                <p className="text-slate-600 dark:text-gray-400 mb-8">Tell us a bit about yourself to get started.</p>
                 <form onSubmit={goToStep2} className="space-y-5">
                   <div>
                     <label className={LABEL_CLS}>Full Name *</label>
@@ -282,7 +282,7 @@ export default function Login() {
             {step === 2 && (
               <>
                 <h1 className="text-3xl font-semibold mb-2 text-slate-900 dark:text-white">Account setup</h1>
-                <p className="text-slate-500 dark:text-gray-400 mb-8">Use your official NJIT email. We&apos;ll send a verification code.</p>
+                <p className="text-slate-600 dark:text-gray-400 mb-8">Use your official NJIT email. We&apos;ll send a verification code.</p>
                 <form onSubmit={sendOtp} className="space-y-5">
                   <div>
                     <label className={LABEL_CLS}>NJIT Email *</label>
@@ -308,7 +308,7 @@ export default function Login() {
                   </div>
                   {error && <p className="text-sm text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3">{error}</p>}
                   <div className="flex gap-3">
-                    <button type="button" onClick={() => { setStep(1); setError(""); }} className="px-5 py-3 rounded-xl border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white text-sm">
+                    <button type="button" onClick={() => { setStep(1); setError(""); }} className="px-5 py-3 rounded-xl border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white text-sm">
                       Back
                     </button>
                     <button type="submit" disabled={loading || !isNjitEmail || !passwordValid || !passwordsMatch}
@@ -324,8 +324,8 @@ export default function Login() {
             {step === 3 && (
               <>
                 <h1 className="text-3xl font-semibold mb-2 text-slate-900 dark:text-white">Verify your email</h1>
-                <p className="text-slate-500 dark:text-gray-400 mb-2">We sent a 6-digit code to <span className="text-slate-900 dark:text-white font-medium">{normalEmail}</span>.</p>
-                <p className="text-slate-400 dark:text-gray-500 text-sm mb-8">The code expires in 10 minutes. Check your spam folder if you don&apos;t see it.</p>
+                <p className="text-slate-600 dark:text-gray-400 mb-2">We sent a 6-digit code to <span className="text-slate-900 dark:text-white font-medium">{normalEmail}</span>.</p>
+                <p className="text-slate-600 dark:text-gray-500 text-sm mb-8">The code expires in 10 minutes. Check your spam folder if you don&apos;t see it.</p>
                 {devCode && (
                   <div className="mb-6 bg-yellow-900/20 border border-yellow-700/40 rounded-xl px-4 py-3">
                     <p className="text-yellow-400 text-xs font-semibold mb-1">DEV MODE — SMTP not configured</p>
@@ -350,14 +350,14 @@ export default function Login() {
                     {loading ? "Creating account…" : "Create Account"}
                   </button>
                   <button type="button" onClick={() => { setStep(2); setOtpCode(""); setDevCode(""); setError(""); }}
-                    className="w-full text-sm text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 py-2">
+                    className="w-full text-sm text-slate-600 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 py-2">
                     ← Back / Resend code
                   </button>
                 </form>
               </>
             )}
 
-            <p className="text-sm text-slate-400 dark:text-gray-500 mt-8 text-center">
+            <p className="text-sm text-slate-600 dark:text-gray-500 mt-8 text-center">
               Already have an account?{" "}
               <button onClick={switchToLogin} className="text-emerald-500 hover:underline font-medium">Sign in</button>
             </p>
@@ -366,7 +366,7 @@ export default function Login() {
               <div className="mt-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex-1 h-px bg-slate-200 dark:bg-gray-800" />
-                  <span className="text-xs text-slate-400 dark:text-gray-600">or register with Google</span>
+                  <span className="text-xs text-slate-600 dark:text-gray-600">or register with Google</span>
                   <div className="flex-1 h-px bg-slate-200 dark:bg-gray-800" />
                 </div>
                 <div className="flex justify-center">
@@ -381,13 +381,13 @@ export default function Login() {
                     theme="filled_black" shape="rectangular" text="signup_with"
                   />
                 </div>
-                <p className="text-xs text-slate-400 dark:text-gray-600 mt-3 text-center">Only @njit.edu Google accounts are accepted.</p>
+                <p className="text-xs text-slate-600 dark:text-gray-600 mt-3 text-center">Only @njit.edu Google accounts are accepted.</p>
               </div>
             )}
           </>
         )}
 
-        <p className="text-xs text-slate-400 dark:text-gray-600 mt-6">Your password is securely hashed and never stored in plain text.</p>
+        <p className="text-xs text-slate-600 dark:text-gray-600 mt-6">Your password is securely hashed and never stored in plain text.</p>
       </div>
     </section>
   );

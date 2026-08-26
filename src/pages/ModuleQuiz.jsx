@@ -132,7 +132,7 @@ export default function ModuleQuiz() {
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
                 {result.passed ? "Module Complete! 🎉" : "Not quite there"}
               </h1>
-              <p className="text-slate-500 dark:text-gray-400 text-sm">
+              <p className="text-slate-600 dark:text-gray-400 text-sm">
                 {result.passed
                   ? "You passed the quiz and earned your points!"
                   : "You need 70% or more to pass. Review the module and try again."}
@@ -155,7 +155,7 @@ export default function ModuleQuiz() {
             {/* Score card */}
             <div className="animate-float-up bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6 space-y-3 text-left" style={{ animationDelay: "0.45s" }}>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500 dark:text-gray-500">Quiz score</span>
+                <span className="text-slate-600 dark:text-gray-500">Quiz score</span>
                 <span className={`font-bold text-lg ${result.passed ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
                   {pct}%
                 </span>
@@ -166,19 +166,19 @@ export default function ModuleQuiz() {
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-xs text-slate-400 dark:text-gray-600">
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-gray-600">
                 <span>Passing threshold: 70%</span>
                 <span>{result.score} / {result.total} pts</span>
               </div>
               {result.passed && result.pointsEarned > 0 && (
                 <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-100 dark:border-gray-800">
-                  <span className="text-slate-500 dark:text-gray-500">Quiz bonus</span>
+                  <span className="text-slate-600 dark:text-gray-500">Quiz bonus</span>
                   <span className="font-bold text-yellow-600 dark:text-yellow-300">+{result.pointsEarned} pts</span>
                 </div>
               )}
               {result.passed && mod?.pointsValue && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 dark:text-gray-500">Module completion</span>
+                  <span className="text-slate-600 dark:text-gray-500">Module completion</span>
                   <span className="font-bold text-yellow-600 dark:text-yellow-300">+{mod.pointsValue} pts</span>
                 </div>
               )}

@@ -78,7 +78,7 @@ export default function CalendarCard({ streakDays = 0, lastClaimDate = null }) {
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
-            className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-400 dark:text-gray-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-gray-200 transition"
+            className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-600 dark:text-gray-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-gray-200 transition"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -94,7 +94,7 @@ export default function CalendarCard({ streakDays = 0, lastClaimDate = null }) {
           )}
           <button
             onClick={nextMonth}
-            className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-400 dark:text-gray-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-gray-200 transition"
+            className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-600 dark:text-gray-500 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-gray-200 transition"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -104,7 +104,7 @@ export default function CalendarCard({ streakDays = 0, lastClaimDate = null }) {
       </div>
 
       {/* Day labels */}
-      <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-400 dark:text-gray-500 mb-1 text-center">
+      <div className="grid grid-cols-7 gap-1 text-[10px] text-slate-600 dark:text-gray-500 mb-1 text-center">
         {DAY_LABELS.map((d, i) => <div key={i}>{d}</div>)}
       </div>
 
@@ -123,7 +123,7 @@ export default function CalendarCard({ streakDays = 0, lastClaimDate = null }) {
                   ? "bg-emerald-400/15 border-emerald-400/30 text-emerald-600 dark:text-emerald-300"
                   : c.isActive
                   ? "bg-yellow-400/15 border-yellow-400/30 text-yellow-700 dark:text-yellow-300"
-                  : "border-slate-100 dark:border-gray-800 text-slate-400 dark:text-gray-500",
+                  : "border-slate-100 dark:border-gray-800 text-slate-600 dark:text-gray-500",
               ].join(" ")}
             >
               {c.valid ? c.dayNum : ""}
@@ -133,7 +133,7 @@ export default function CalendarCard({ streakDays = 0, lastClaimDate = null }) {
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex items-center gap-3 flex-wrap text-[10px] text-slate-400 dark:text-gray-500">
+      <div className="mt-3 flex items-center gap-3 flex-wrap text-[10px] text-slate-600 dark:text-gray-500">
         <span className="flex items-center gap-1">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/50 border border-emerald-400/40" />
           Streak

@@ -99,7 +99,7 @@ export default function Dashboard() {
               <span className="text-blue-500">Welcome back,</span>{" "}
               <span className="text-emerald-500 dark:text-emerald-300">{user?.name || "Student"}!</span>
             </h1>
-            <p className="text-slate-500 dark:text-gray-400 mt-2">
+            <p className="text-slate-600 dark:text-gray-400 mt-2">
               Ready to learn and earn exciting rewards?
             </p>
           </div>
@@ -118,13 +118,13 @@ export default function Dashboard() {
               <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
                 Points Earning — {pointsSummary.semesterLabel}
               </h2>
-              <p className="text-xs text-slate-400 dark:text-gray-500 mb-4">How much you can still earn from each source this semester</p>
+              <p className="text-xs text-slate-600 dark:text-gray-500 mb-4">How much you can still earn from each source this semester</p>
               <div className="space-y-3">
                 {pointsSummary.sources.filter(s => s.scope === 'semester').map((s) => (
                   <div key={s.source}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-slate-600 dark:text-gray-400">{s.label}</span>
-                      <span className="text-slate-500 dark:text-gray-500">{s.earned}/{s.cap} pts</span>
+                      <span className="text-slate-600 dark:text-gray-500">{s.earned}/{s.cap} pts</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
                       <div

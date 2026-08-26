@@ -49,7 +49,7 @@ function Modal({ open, title, children, onClose }) {
       >
         <div className="flex items-start justify-between gap-4 mb-4">
           <h3 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} aria-label="Close" className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-white/10">✕</button>
+          <button onClick={onClose} aria-label="Close" className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-white/10">✕</button>
         </div>
         {children}
       </div>
@@ -141,7 +141,7 @@ export default function Rewards() {
       <main id="main-content" className="max-w-7xl mx-auto px-6 py-10 space-y-8 w-full">
         <header>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Rewards Store</h1>
-          <p className="text-slate-500 dark:text-gray-400 mt-2">Redeem your points for gift cards and rewards</p>
+          <p className="text-slate-600 dark:text-gray-400 mt-2">Redeem your points for gift cards and rewards</p>
           <div className="mt-2 text-sm text-slate-600 dark:text-gray-400">
             You have <span className="font-bold text-yellow-700 dark:text-yellow-300">{points}</span> points
           </div>
@@ -183,7 +183,7 @@ export default function Rewards() {
 
         {/* Grid */}
         {filtered.length === 0 ? (
-          <div className="text-center py-16 text-slate-400 dark:text-gray-500">No rewards in this category yet</div>
+          <div className="text-center py-16 text-slate-600 dark:text-gray-500">No rewards in this category yet</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {filtered.map((r) => {
@@ -198,20 +198,20 @@ export default function Rewards() {
                   )}
                   <div className="p-6 flex flex-col flex-1">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{r.title}</h3>
-                  <p className="text-slate-500 dark:text-gray-400 text-sm mt-1 flex-1">{r.description}</p>
+                  <p className="text-slate-600 dark:text-gray-400 text-sm mt-1 flex-1">{r.description}</p>
                   <div className="mt-4 inline-block px-4 py-2 rounded-xl bg-slate-100 dark:bg-black/30 border border-slate-200 dark:border-gray-800 text-sm font-semibold text-slate-700 dark:text-gray-200">
                     {r.pointsCost} points
                   </div>
                   {r.stock > 0 && (
-                    <div className="text-xs text-slate-400 dark:text-gray-500 mt-2">{r.stock} left</div>
+                    <div className="text-xs text-slate-600 dark:text-gray-500 mt-2">{r.stock} left</div>
                   )}
                   <button
                     onClick={() => openRedeem(r)}
                     disabled={!affordable || outOfStock}
                     className={`mt-4 w-full px-5 py-3 rounded-xl font-semibold transition ${
-                      outOfStock ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+                      outOfStock ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
                         : affordable ? "bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90"
-                        : "bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 text-slate-400 dark:text-gray-400 cursor-not-allowed"
+                        : "bg-slate-100 dark:bg-[#1a1a1a] border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 cursor-not-allowed"
                     }`}
                   >
                     {outOfStock ? "Out of Stock" : affordable ? "Redeem" : "Need More Points"}
@@ -228,15 +228,15 @@ export default function Rewards() {
         {selectedReward && (
           <div className="space-y-4">
             <div className="bg-slate-50 dark:bg-black/25 border border-slate-200 dark:border-gray-800 rounded-2xl p-4">
-              <p className="text-sm text-slate-500 dark:text-gray-400">You're about to redeem:</p>
+              <p className="text-sm text-slate-600 dark:text-gray-400">You're about to redeem:</p>
               <p className="text-lg font-semibold text-slate-900 dark:text-white mt-1">{selectedReward.title}</p>
-              <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">{selectedReward.description}</p>
+              <p className="text-sm text-slate-600 dark:text-gray-400 mt-1">{selectedReward.description}</p>
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-slate-500 dark:text-gray-400">Cost</span>
+                <span className="text-sm text-slate-600 dark:text-gray-400">Cost</span>
                 <span className="font-semibold text-yellow-600 dark:text-yellow-300">{selectedReward.pointsCost} pts</span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-sm text-slate-500 dark:text-gray-400">Your points</span>
+                <span className="text-sm text-slate-600 dark:text-gray-400">Your points</span>
                 <span className="font-semibold text-slate-900 dark:text-white">{points}</span>
               </div>
               {points < selectedReward.pointsCost && (
@@ -250,7 +250,7 @@ export default function Rewards() {
               <button
                 onClick={redeem}
                 disabled={points < selectedReward.pointsCost || redeeming}
-                className={`flex-1 px-5 py-3 rounded-xl font-semibold transition ${points >= selectedReward.pointsCost && !redeeming ? "bg-yellow-400 text-black hover:brightness-110" : "bg-slate-200 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-400 cursor-not-allowed"}`}
+                className={`flex-1 px-5 py-3 rounded-xl font-semibold transition ${points >= selectedReward.pointsCost && !redeeming ? "bg-yellow-400 text-black hover:brightness-110" : "bg-slate-200 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400 cursor-not-allowed"}`}
               >
                 {redeeming ? "Redeeming…" : "Redeem"}
               </button>

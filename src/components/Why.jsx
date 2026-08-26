@@ -22,7 +22,7 @@ export default function Why() {
       {/* Header */}
       <div className="text-center max-w-3xl mx-auto mb-16">
         <h2 className="text-4xl font-semibold mb-6 text-slate-900 dark:text-white">Why Get Informed?</h2>
-        <p className="text-slate-500 dark:text-gray-400 leading-relaxed">
+        <p className="text-slate-600 dark:text-gray-400 leading-relaxed">
           Building healthy habits starts with knowing the facts — about your
           mind, your body, and everything in between.
         </p>

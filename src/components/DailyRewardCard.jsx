@@ -9,7 +9,7 @@ export default function DailyRewardCard({ claimedToday, onClaim, lastClaimDate }
           <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-1">
             {claimedToday ? "Reward claimed for today ✅" : "Claim Your Daily Bonus"}
           </h3>
-          <p className="text-slate-500 dark:text-gray-400 text-sm">
+          <p className="text-slate-600 dark:text-gray-400 text-sm">
             {claimedToday
               ? `Last claimed: ${lastClaimDate ? new Date(lastClaimDate).toLocaleDateString() : "—"}`
               : "Sign in every day to earn your daily bonus points (+25)"}
@@ -20,7 +20,7 @@ export default function DailyRewardCard({ claimedToday, onClaim, lastClaimDate }
           disabled={claimedToday}
           className={`font-semibold px-5 py-3 rounded-xl transition-transform shrink-0
             ${claimedToday
-              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-400 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400 cursor-not-allowed border border-slate-200 dark:border-gray-800"
               : "bg-yellow-400 text-black hover:scale-[1.02] hover:brightness-105"}`}
         >
           {claimedToday ? "Claimed" : "Claim +25 Points"}

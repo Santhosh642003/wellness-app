@@ -30,7 +30,7 @@ export default function HowItWorks() {
       {/* Header */}
       <div className="text-center mb-16">
         <h2 className="text-4xl font-semibold mb-4 text-slate-900 dark:text-white">How It Works</h2>
-        <p className="text-slate-500 dark:text-gray-400">
+        <p className="text-slate-600 dark:text-gray-400">
           Four simple steps to earn rewards while learning
         </p>
       </div>
@@ -48,7 +48,7 @@ export default function HowItWorks() {
                 </div>
 
                 <h3 className="text-xl font-semibold mb-3 text-slate-900 dark:text-white">{step.title}</h3>
-                <p className="text-slate-500 dark:text-gray-400 text-sm leading-relaxed">
+                <p className="text-slate-600 dark:text-gray-400 text-sm leading-relaxed">
                   {step.description}
                 </p>
               </div>

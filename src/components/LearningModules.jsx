@@ -7,7 +7,7 @@ const CATEGORY_COLORS = {
   Bonus:       { bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-600 dark:text-amber-400", accent: "bg-amber-500" },
   General:     { bg: "bg-teal-500/10", border: "border-teal-500/20", text: "text-teal-600 dark:text-teal-400", accent: "bg-teal-500" },
 };
-const DEFAULT_COLOR = { bg: "bg-slate-100 dark:bg-white/5", border: "border-slate-200 dark:border-gray-700", text: "text-slate-500 dark:text-gray-400", accent: "bg-slate-400" };
+const DEFAULT_COLOR = { bg: "bg-slate-100 dark:bg-white/5", border: "border-slate-200 dark:border-gray-700", text: "text-slate-600 dark:text-gray-400", accent: "bg-slate-400" };
 function getColor(cat) { return CATEGORY_COLORS[cat] || DEFAULT_COLOR; }
 
 function StatusBadge({ completed, locked, watchedPct }) {
@@ -18,7 +18,7 @@ function StatusBadge({ completed, locked, watchedPct }) {
     </span>
   );
   if (locked) return (
-    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400">
       Locked
     </span>
   );
@@ -28,7 +28,7 @@ function StatusBadge({ completed, locked, watchedPct }) {
     </span>
   );
   return (
-    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400">
       Not Started
     </span>
   );
@@ -55,7 +55,7 @@ export default function LearningModules({ modules = [], onContinue }) {
       <div className="flex items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Learning Modules</h2>
-          <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
+          <p className="text-xs text-slate-600 dark:text-gray-500 mt-0.5">
             {completedCount}/{totalCount} completed
           </p>
         </div>
@@ -83,13 +83,13 @@ export default function LearningModules({ modules = [], onContinue }) {
               style={{ width: `${overallPct}%` }}
             />
           </div>
-          <span className="shrink-0 text-[11px] font-semibold text-slate-500 dark:text-gray-400">{overallPct}%</span>
+          <span className="shrink-0 text-[11px] font-semibold text-slate-600 dark:text-gray-400">{overallPct}%</span>
         </div>
       )}
 
       {/* 2-column compact card grid */}
       {display.length === 0 ? (
-        <div className="text-center py-8 text-sm text-slate-400 dark:text-gray-500">No modules yet — check back soon!</div>
+        <div className="text-center py-8 text-sm text-slate-600 dark:text-gray-500">No modules yet — check back soon!</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {display.map((m) => {
@@ -123,12 +123,12 @@ export default function LearningModules({ modules = [], onContinue }) {
                   </div>
 
                   {/* Title */}
-                  <h3 className={`text-sm font-semibold leading-snug line-clamp-2 mb-1 ${m.locked ? "text-slate-400 dark:text-gray-600" : "text-slate-900 dark:text-white"}`}>
+                  <h3 className={`text-sm font-semibold leading-snug line-clamp-2 mb-1 ${m.locked ? "text-slate-600 dark:text-gray-600" : "text-slate-900 dark:text-white"}`}>
                     {m.title}
                   </h3>
 
                   {/* Duration / chapter count */}
-                  <p className="text-[10px] text-slate-400 dark:text-gray-500 mb-3">
+                  <p className="text-[10px] text-slate-600 dark:text-gray-500 mb-3">
                     {m.mins} min{isMultiVideo ? ` · ${m.videoCount} chapters` : ""}
                   </p>
 
@@ -148,7 +148,7 @@ export default function LearningModules({ modules = [], onContinue }) {
                     onClick={(e) => { e.stopPropagation(); if (!m.locked) onContinue(m.id); }}
                     className={`w-full px-3 py-2 rounded-lg text-xs font-semibold transition-all
                       ${m.locked
-                        ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+                        ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-500 cursor-not-allowed border border-slate-200 dark:border-gray-800"
                         : m.completed
                         ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
                         : "bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90 shadow-sm"}`}

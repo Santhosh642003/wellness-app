@@ -6,7 +6,7 @@ export default function UpcomingChallenge() {
   return (
     <div className="mt-4 bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-4">
       <h3 className="font-semibold text-slate-900 dark:text-gray-100">Upcoming Challenge</h3>
-      <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">Bi-weekly challenge • +200 points</p>
+      <p className="text-sm text-slate-600 dark:text-gray-400 mt-1">Bi-weekly challenge • +200 points</p>
 
       <button
         onClick={() => navigate("/quiz/biweekly")}

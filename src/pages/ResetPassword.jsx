@@ -23,7 +23,7 @@ function PasswordStrengthBar({ password }) {
       <p className={`text-xs ${strength <= 2 ? "text-red-500" : strength <= 3 ? "text-yellow-500" : "text-emerald-500"}`}>
         {labels[strength - 1] || "Too weak"}
         {strength < 5 && (
-          <span className="text-slate-400 dark:text-gray-500 ml-1">
+          <span className="text-slate-600 dark:text-gray-500 ml-1">
             — needs:{" "}
             {[!/[A-Z]/.test(password) && "uppercase", !/[a-z]/.test(password) && "lowercase", !/[0-9]/.test(password) && "number", !SPECIAL_CHAR_RE.test(password) && "special char", password.length < 8 && "8+ chars"].filter(Boolean).join(", ")}
           </span>
@@ -33,7 +33,7 @@ function PasswordStrengthBar({ password }) {
   );
 }
 
-const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-3 text-slate-900 dark:text-gray-100 placeholder:text-slate-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
+const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-3 text-slate-900 dark:text-gray-100 placeholder:text-slate-600 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -90,13 +90,13 @@ export default function ResetPassword() {
               </svg>
             </div>
             <h1 className="text-2xl font-semibold mb-3 text-slate-900 dark:text-white">Password updated!</h1>
-            <p className="text-slate-500 dark:text-gray-400 text-sm mb-6">Your password has been changed successfully. Redirecting you to sign in…</p>
+            <p className="text-slate-600 dark:text-gray-400 text-sm mb-6">Your password has been changed successfully. Redirecting you to sign in…</p>
             <Link to="/login" className="block text-center text-sm text-emerald-500 hover:underline font-medium">Go to Sign In</Link>
           </>
         ) : (
           <>
             <h1 className="text-3xl font-semibold mb-3 text-slate-900 dark:text-white">New password</h1>
-            <p className="text-slate-500 dark:text-gray-400 text-sm mb-8">Choose a strong password for your account.</p>
+            <p className="text-slate-600 dark:text-gray-400 text-sm mb-8">Choose a strong password for your account.</p>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-2">New Password</label>
@@ -137,7 +137,7 @@ export default function ResetPassword() {
                 {loading ? "Updating…" : "Set New Password"}
               </button>
             </form>
-            <p className="text-sm text-slate-400 dark:text-gray-500 mt-6 text-center">
+            <p className="text-sm text-slate-600 dark:text-gray-500 mt-6 text-center">
               <Link to="/login" className="text-emerald-500 hover:underline font-medium">Back to Sign In</Link>
             </p>
           </>

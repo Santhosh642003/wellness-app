@@ -14,7 +14,7 @@ const CATEGORY_COLORS = {
   Bonus:       { bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
   General:     { bg: "bg-teal-500/10", border: "border-teal-500/20", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500" },
 };
-const DEFAULT_COLOR = { bg: "bg-slate-100 dark:bg-white/5", border: "border-slate-200 dark:border-gray-700", text: "text-slate-500 dark:text-gray-400", dot: "bg-slate-400" };
+const DEFAULT_COLOR = { bg: "bg-slate-100 dark:bg-white/5", border: "border-slate-200 dark:border-gray-700", text: "text-slate-600 dark:text-gray-400", dot: "bg-slate-400" };
 function getColor(category) { return CATEGORY_COLORS[category] || DEFAULT_COLOR; }
 
 const CATEGORY_GRADIENTS = {
@@ -44,7 +44,7 @@ function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
     </span>
   );
   if (locked) return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400">
       <svg className="w-3 h-3" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
       Locked
     </span>
@@ -56,7 +56,7 @@ function StatusBadge({ completed, locked, watchedPct, quizPassed }) {
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-400/10 border border-orange-400/20 text-orange-600 dark:text-orange-400">In Progress</span>
   );
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400">Not Started</span>
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400">Not Started</span>
   );
 }
 
@@ -76,7 +76,7 @@ function BookmarkButton({ moduleId, bookmarked, onToggle }) {
       className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center border transition-all
         ${bookmarked
           ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-500"
-          : "bg-white/80 dark:bg-[#1a1a1a]/80 border-slate-200 dark:border-gray-700 text-slate-400 dark:text-gray-500 hover:text-yellow-500 hover:border-yellow-400/40"}`}
+          : "bg-white/80 dark:bg-[#1a1a1a]/80 border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-500 hover:text-yellow-500 hover:border-yellow-400/40"}`}
     >
       <svg className="w-3.5 h-3.5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -182,12 +182,12 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
         </div>
 
         {/* Title */}
-        <h3 className={`font-semibold text-sm leading-snug mb-1 line-clamp-2 ${m.locked ? "text-slate-400 dark:text-gray-600" : "text-slate-900 dark:text-white"}`}>
+        <h3 className={`font-semibold text-sm leading-snug mb-1 line-clamp-2 ${m.locked ? "text-slate-600 dark:text-gray-600" : "text-slate-900 dark:text-white"}`}>
           {m.title}
         </h3>
 
         {/* Meta */}
-        <div className="text-[10px] text-slate-400 dark:text-gray-500 mb-3">
+        <div className="text-[10px] text-slate-600 dark:text-gray-500 mb-3">
           {m.mins} min
           {isMultiVideo ? ` · ${m.videoCount} chapters` : ""}
           {m.documentCount > 0 ? ` · ${m.documentCount} resource${m.documentCount > 1 ? "s" : ""}` : ""}
@@ -195,7 +195,7 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
 
         {/* Lock message */}
         {m.locked && (
-          <p className="text-[11px] text-slate-400 dark:text-gray-500 mb-3">
+          <p className="text-[11px] text-slate-600 dark:text-gray-500 mb-3">
             {prevModuleTitle ? `Complete "${prevModuleTitle}" to unlock` : "Complete the previous module to unlock"}
           </p>
         )}
@@ -204,8 +204,8 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
         {!m.locked && (pct > 0 || m.completed) && (
           <div className="mb-3">
             <div className="flex justify-between text-[10px] mb-1">
-              <span className="text-slate-400 dark:text-gray-500">{m.completed ? "Completed" : "In progress"}</span>
-              <span className={m.completed ? "text-emerald-500 font-semibold" : "text-slate-500 dark:text-gray-400"}>
+              <span className="text-slate-600 dark:text-gray-500">{m.completed ? "Completed" : "In progress"}</span>
+              <span className={m.completed ? "text-emerald-500 font-semibold" : "text-slate-600 dark:text-gray-400"}>
                 {m.completed ? "100%" : `${pct}%`}
               </span>
             </div>
@@ -224,7 +224,7 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
           onClick={(e) => { e.stopPropagation(); if (!m.locked) onNavigate(m.id, resumeChapterIdx(m)); }}
           className={`w-full px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200
             ${m.locked
-              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 dark:text-gray-600 cursor-not-allowed border border-slate-200 dark:border-gray-800"
+              ? "bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-600 cursor-not-allowed border border-slate-200 dark:border-gray-800"
               : m.completed
               ? "bg-emerald-400/10 border border-emerald-400/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/20"
               : "bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90 shadow-sm"}`}
@@ -245,7 +245,7 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
           <div className="mt-2">
             <button
               onClick={(e) => { e.stopPropagation(); setChaptersExpanded((v) => !v); }}
-              className="w-full flex items-center justify-center gap-1 text-[11px] text-slate-400 dark:text-gray-600 hover:text-slate-600 dark:hover:text-gray-400 transition py-1"
+              className="w-full flex items-center justify-center gap-1 text-[11px] text-slate-600 dark:text-gray-600 hover:text-slate-600 dark:hover:text-gray-400 transition py-1"
             >
               {chaptersExpanded ? "Hide" : "Show"} chapters
               <svg className={`w-3 h-3 transition-transform duration-200 ${chaptersExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,10 +264,10 @@ function ModuleCard({ m, index, onNavigate, bookmarked, onBookmarkToggle, prevMo
                       className="flex items-center gap-2 text-[11px] py-0.5 cursor-pointer group/ch"
                     >
                       <div className={`shrink-0 h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold transition-colors
-                        ${done ? "bg-emerald-400 text-white" : vPct > 0 ? "bg-blue-400 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400"}`}>
+                        ${done ? "bg-emerald-400 text-white" : vPct > 0 ? "bg-blue-400 text-white" : "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-400"}`}>
                         {done ? "✓" : idx + 1}
                       </div>
-                      <span className="flex-1 truncate text-slate-500 dark:text-gray-400 group-hover/ch:text-blue-500 dark:group-hover/ch:text-blue-400 transition-colors">
+                      <span className="flex-1 truncate text-slate-600 dark:text-gray-400 group-hover/ch:text-blue-500 dark:group-hover/ch:text-blue-400 transition-colors">
                         {video.title || `Chapter ${idx + 1}`}
                       </span>
                       {!done && vPct > 0 && <span className="text-blue-400 shrink-0">{vPct}%</span>}
@@ -437,7 +437,7 @@ export default function Modules() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Learning Modules</h1>
-            <p className="text-slate-500 dark:text-gray-400 mt-1 text-sm">
+            <p className="text-slate-600 dark:text-gray-400 mt-1 text-sm">
               Complete all modules to earn points and build your health knowledge
             </p>
           </div>
@@ -471,15 +471,15 @@ export default function Modules() {
           {[
             { label: "Completed", value: stats.completed, total: stats.total, icon: "✅", color: "text-emerald-600 dark:text-emerald-400" },
             { label: "In Progress", value: stats.inProgress, total: null, icon: "▶", color: "text-blue-600 dark:text-blue-400" },
-            { label: "Locked", value: stats.locked, total: null, icon: "🔒", color: "text-slate-500 dark:text-gray-400" },
+            { label: "Locked", value: stats.locked, total: null, icon: "🔒", color: "text-slate-600 dark:text-gray-400" },
             { label: "Points Earned", value: lifetimeEarned, total: null, icon: "⭐", color: "text-yellow-700 dark:text-yellow-300" },
           ].map((s) => (
             <div key={s.label} className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm">
               <div className="text-lg mb-1">{s.icon}</div>
               <div className={`text-xl font-bold ${s.color}`}>
-                {s.value}{s.total != null ? <span className="text-sm font-normal text-slate-400 dark:text-gray-500">/{s.total}</span> : ""}
+                {s.value}{s.total != null ? <span className="text-sm font-normal text-slate-600 dark:text-gray-500">/{s.total}</span> : ""}
               </div>
-              <div className="text-[11px] text-slate-400 dark:text-gray-500 mt-0.5">{s.label}</div>
+              <div className="text-[11px] text-slate-600 dark:text-gray-500 mt-0.5">{s.label}</div>
             </div>
           ))}
         </div>
@@ -496,7 +496,7 @@ export default function Modules() {
               style={{ width: `${stats.pct}%` }}
             />
           </div>
-          <div className="flex justify-between text-[11px] text-slate-400 dark:text-gray-500 mt-2">
+          <div className="flex justify-between text-[11px] text-slate-600 dark:text-gray-500 mt-2">
             <span>{stats.completed} of {stats.total} modules completed</span>
             {stats.pct === 100 && <span className="text-emerald-500 font-semibold">All done! 🎉</span>}
             {stats.pct > 0 && stats.pct < 100 && <span>{100 - stats.pct}% remaining</span>}
@@ -510,7 +510,7 @@ export default function Modules() {
             className={`text-xs px-3 py-2 rounded-full border font-medium transition-all flex items-center gap-1.5
               ${showBookmarked
                 ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-600 dark:text-yellow-300"
-                : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-yellow-400/30"}`}
+                : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 hover:border-yellow-400/30"}`}
           >
             <svg className="w-3 h-3" fill={showBookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -530,7 +530,7 @@ export default function Modules() {
                     ? cat === "All"
                       ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white"
                       : `${color.bg} ${color.border} ${color.text} shadow-sm`
-                    : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"}`}
+                    : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"}`}
               >
                 {cat} <span className="opacity-60">({count})</span>
               </button>
@@ -540,7 +540,7 @@ export default function Modules() {
 
         {/* Module grid */}
         {filtered.length === 0 ? (
-          <div className="text-center py-16 text-slate-400 dark:text-gray-500">
+          <div className="text-center py-16 text-slate-600 dark:text-gray-500">
             <div className="text-4xl mb-3">{showBookmarked ? "🔖" : "📚"}</div>
             <p className="font-medium">{showBookmarked ? "No bookmarks yet" : "No modules yet"}</p>
             <p className="text-sm mt-1">{showBookmarked ? "Click the bookmark icon on any module to save it here" : "Check back soon — new modules are coming!"}</p>

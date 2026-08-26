@@ -133,7 +133,7 @@ function ProfileCompletionBar({ profileData, onEdit }) {
             <button
               key={label}
               onClick={onEdit}
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-blue-400/40 hover:text-blue-600 dark:hover:text-blue-400 transition"
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 hover:border-blue-400/40 hover:text-blue-600 dark:hover:text-blue-400 transition"
             >
               + {label}
             </button>
@@ -145,8 +145,8 @@ function ProfileCompletionBar({ profileData, onEdit }) {
 }
 
 const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30";
-const LABEL_CLS = "block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5";
-const SECTION_CLS = "text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-600 mb-3 mt-5 first:mt-0";
+const LABEL_CLS = "block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1.5";
+const SECTION_CLS = "text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-gray-600 mb-3 mt-5 first:mt-0";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -342,7 +342,7 @@ export default function Profile() {
                           {profileData?.name || user?.name || "Student"}
                         </h1>
                         {profileData?.preferredName && profileData.preferredName !== profileData?.name && (
-                          <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
+                          <div className="text-xs text-slate-600 dark:text-gray-500 mt-0.5">
                             Goes by <span className="text-slate-600 dark:text-gray-300 font-medium">{profileData.preferredName}</span>
                           </div>
                         )}
@@ -351,13 +351,13 @@ export default function Profile() {
                             {profileData?.role || "Student"}
                           </span>
                           {profileData?.pronouns && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400">
                               {profileData.pronouns}
                             </span>
                           )}
-                          <span className="text-xs text-slate-400 dark:text-gray-500">{user?.email}</span>
+                          <span className="text-xs text-slate-600 dark:text-gray-500">{user?.email}</span>
                         </div>
-                        <div className="text-xs text-slate-400 dark:text-gray-500 mt-1.5 space-y-0.5">
+                        <div className="text-xs text-slate-600 dark:text-gray-500 mt-1.5 space-y-0.5">
                           <div>
                             {profileData?.campus || "NJIT"}
                             {profileData?.college && ` · ${profileData.college}`}
@@ -388,7 +388,7 @@ export default function Profile() {
                       </button>
                       <button
                         onClick={signOut}
-                        className="px-4 py-2 rounded-xl text-sm border border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-800 transition"
+                        className="px-4 py-2 rounded-xl text-sm border border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-800 transition"
                       >
                         Sign out
                       </button>
@@ -490,7 +490,7 @@ export default function Profile() {
                           <option value="Other / Not listed">Other / Not listed</option>
                         </select>
                         {form.college && (
-                          <p className="text-[11px] text-slate-400 dark:text-gray-500 mt-1.5 px-1">
+                          <p className="text-[11px] text-slate-600 dark:text-gray-500 mt-1.5 px-1">
                             College: <span className="text-slate-600 dark:text-gray-300 font-medium">{form.college}</span>
                           </p>
                         )}
@@ -551,7 +551,7 @@ export default function Profile() {
 
                       <div>
                         <label htmlFor="profile-bio" className={LABEL_CLS}>
-                          Bio <span className="font-normal text-slate-400">({(form.bio || "").length}/500)</span>
+                          Bio <span className="font-normal text-slate-600">({(form.bio || "").length}/500)</span>
                         </label>
                         <textarea
                           id="profile-bio"
@@ -608,14 +608,14 @@ export default function Profile() {
               <div className="mt-4 grid grid-cols-3 gap-3">
                 <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4 text-center">
                   <div className="text-2xl font-bold text-slate-900 dark:text-white">{completedCount}</div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500 mt-1">Completed</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-500 mt-1">Completed</div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4 text-center">
                   <div className="text-2xl font-bold text-slate-900 dark:text-white">{totalModules}</div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500 mt-1">Total</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-500 mt-1">Total</div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 dark:border-gray-800 bg-slate-50 dark:bg-[#0f0f0f] p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500 mb-2">Next up</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-500 mb-2">Next up</div>
                   <div className="text-xs font-semibold text-slate-800 dark:text-gray-200 leading-snug line-clamp-2">
                     {nextModule ? nextModule.title : "All done!"}
                   </div>
@@ -647,7 +647,7 @@ export default function Profile() {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-slate-700 dark:text-gray-300 truncate">{m.title}</div>
                       </div>
-                      <div className="text-xs text-slate-400 dark:text-gray-600 shrink-0">
+                      <div className="text-xs text-slate-600 dark:text-gray-600 shrink-0">
                         {m.completed
                           ? <span className="text-emerald-500">✓ Done</span>
                           : m.locked
@@ -663,11 +663,11 @@ export default function Profile() {
             {/* Quizzes */}
             <SectionCard accent="violet">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Quizzes</h2>
-              <p className="text-slate-500 dark:text-gray-400 text-sm mb-5">Bi-weekly and module quizzes to earn points</p>
+              <p className="text-slate-600 dark:text-gray-400 text-sm mb-5">Bi-weekly and module quizzes to earn points</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-5">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Bi-weekly Quiz</div>
-                  <div className="text-xs text-slate-400 dark:text-gray-500 mt-1 mb-4">~20 questions · Earn bonus points</div>
+                  <div className="text-xs text-slate-600 dark:text-gray-500 mt-1 mb-4">~20 questions · Earn bonus points</div>
                   <button
                     onClick={() => navigate("/quiz/biweekly")}
                     className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-500 to-violet-400 text-white hover:opacity-90 transition"
@@ -677,7 +677,7 @@ export default function Profile() {
                 </div>
                 <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Module Quiz</div>
-                  <div className="text-xs text-slate-400 dark:text-gray-500 mt-1 mb-4">~10 questions · Unlock next module</div>
+                  <div className="text-xs text-slate-600 dark:text-gray-500 mt-1 mb-4">~10 questions · Unlock next module</div>
                   <button
                     onClick={() => navigate("/modules")}
                     className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90 transition"
@@ -697,7 +697,7 @@ export default function Profile() {
                     <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800">
                       <div>
                         <div className="text-sm font-medium text-slate-800 dark:text-gray-200">{r.title}</div>
-                        <div className="text-xs text-slate-400 dark:text-gray-500">{new Date(r.redeemedAt).toLocaleDateString()}</div>
+                        <div className="text-xs text-slate-600 dark:text-gray-500">{new Date(r.redeemedAt).toLocaleDateString()}</div>
                       </div>
                       <span className="text-sm font-semibold text-red-500 dark:text-red-400">-{r.pointsSpent} pts</span>
                     </div>
@@ -710,7 +710,7 @@ export default function Profile() {
             {referralsList.length > 0 && (
               <SectionCard accent="emerald">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Referrals</h2>
-                <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+                <p className="text-slate-600 dark:text-gray-400 text-sm mb-4">
                   You earn 100 pts when each invited friend completes 3 modules
                 </p>
                 <div className="space-y-3">
@@ -718,7 +718,7 @@ export default function Profile() {
                     <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800">
                       <div>
                         <div className="text-sm font-medium text-slate-800 dark:text-gray-200">{r.referredName}</div>
-                        <div className="text-xs text-slate-400 dark:text-gray-500">
+                        <div className="text-xs text-slate-600 dark:text-gray-500">
                           {r.modulesCompleted}/3 modules · joined {new Date(r.createdAt).toLocaleDateString()}
                         </div>
                       </div>
@@ -727,7 +727,7 @@ export default function Profile() {
                           ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                           : r.status === "processing"
                           ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
-                          : "bg-slate-100 dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+                          : "bg-slate-100 dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400"
                       }`}>
                         {r.status === "paid" ? "✓ +100 pts paid" : r.status === "processing" ? "Processing…" : `${r.modulesCompleted}/3`}
                       </span>
@@ -769,7 +769,7 @@ export default function Profile() {
             {/* Rewards */}
             <SectionCard accent="amber">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Rewards</h2>
-              <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">Earn points from modules, quizzes, and daily streaks</p>
+              <p className="text-slate-600 dark:text-gray-400 text-sm mb-4">Earn points from modules, quizzes, and daily streaks</p>
               <button
                 onClick={() => navigate("/rewards")}
                 className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-amber-400 text-white hover:opacity-90 transition"
@@ -782,7 +782,7 @@ export default function Profile() {
             {profileData?.referralCode && (
               <SectionCard accent="emerald">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Refer a Friend</h2>
-                <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+                <p className="text-slate-600 dark:text-gray-400 text-sm mb-4">
                   Your friend gets <strong className="text-blue-500">+25 pts</strong> on signup, you earn <strong className="text-emerald-500">+100 pts</strong> when they complete 3 modules.
                 </p>
                 <div className="flex items-center gap-2">
@@ -794,7 +794,7 @@ export default function Profile() {
                       navigator.clipboard.writeText(profileData.referralCode).catch(() => {});
                       setToast("Referral code copied!");
                     }}
-                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-100 dark:bg-[#141414] text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-100 dark:bg-[#141414] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
                     title="Copy code"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -808,7 +808,7 @@ export default function Profile() {
             {/* Certificate */}
             <SectionCard accent="yellow">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Certificate</h2>
-              <p className="text-slate-500 dark:text-gray-400 text-sm mb-4">
+              <p className="text-slate-600 dark:text-gray-400 text-sm mb-4">
                 {completedCount === totalModules && totalModules > 0
                   ? "You've completed all modules! View your certificate."
                   : `Complete all ${totalModules} modules to earn your certificate.`}

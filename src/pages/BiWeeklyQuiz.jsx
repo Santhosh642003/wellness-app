@@ -79,7 +79,7 @@ export default function BiWeeklyQuiz() {
         <div className="max-w-md w-full text-center">
           <div className="w-20 h-20 rounded-full bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center mx-auto mb-6 text-4xl">⚠️</div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">Quiz Unavailable</h1>
-          <p className="text-slate-500 dark:text-gray-400 mb-6">{error}</p>
+          <p className="text-slate-600 dark:text-gray-400 mb-6">{error}</p>
           <button onClick={() => navigate("/dashboard")} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-emerald-400 text-white hover:opacity-90 transition">
             Back to Dashboard
           </button>
@@ -109,15 +109,15 @@ export default function BiWeeklyQuiz() {
           <div className="max-w-md w-full text-center">
             <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-center mx-auto mb-6 text-5xl">🔒</div>
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">Quiz Not Yet Open</h1>
-            <p className="text-slate-500 dark:text-gray-400 mb-6">
+            <p className="text-slate-600 dark:text-gray-400 mb-6">
               The bi-weekly competition hasn't started yet. Check back when it goes live!
             </p>
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5 mb-6">
-              <div className="text-xs text-slate-500 dark:text-gray-500 uppercase tracking-wider mb-2">Opens on</div>
+              <div className="text-xs text-slate-600 dark:text-gray-500 uppercase tracking-wider mb-2">Opens on</div>
               <div className="text-lg font-semibold text-slate-900 dark:text-white">
                 {unlockDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </div>
-              <div className="text-sm text-slate-500 dark:text-gray-400 mt-1">
+              <div className="text-sm text-slate-600 dark:text-gray-400 mt-1">
                 {unlockDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
               </div>
               {diffMs > 0 && (
@@ -125,7 +125,7 @@ export default function BiWeeklyQuiz() {
                   {[{ val: diffDays, label: "days" }, { val: diffHrs, label: "hours" }, { val: diffMins, label: "mins" }].map(({ val, label }) => (
                     <div key={label} className="bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-gray-800 rounded-xl py-2">
                       <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{val}</p>
-                      <p className="text-xs text-slate-400 dark:text-gray-500">{label}</p>
+                      <p className="text-xs text-slate-600 dark:text-gray-500">{label}</p>
                     </div>
                   ))}
                 </div>
@@ -157,16 +157,16 @@ export default function BiWeeklyQuiz() {
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">
               {alreadyAttempted.passed ? "Quiz Completed!" : "Quiz Attempted"}
             </h1>
-            <p className="text-slate-500 dark:text-gray-400 mb-6">
+            <p className="text-slate-600 dark:text-gray-400 mb-6">
               You scored <strong className="text-slate-900 dark:text-white">{pct}%</strong> on this period's bi-weekly competition.
               {alreadyAttempted.passed ? " Great work!" : " Keep studying and try again next period."}
             </p>
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-5 mb-6">
-              <div className="text-xs text-slate-500 dark:text-gray-500 uppercase tracking-wider mb-1">Next quiz available</div>
+              <div className="text-xs text-slate-600 dark:text-gray-500 uppercase tracking-wider mb-1">Next quiz available</div>
               <div className="text-lg font-semibold text-slate-900 dark:text-white">
                 {next.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </div>
-              <div className="text-sm text-slate-400 dark:text-gray-500">
+              <div className="text-sm text-slate-600 dark:text-gray-500">
                 {Math.ceil((next - new Date()) / (1000 * 60 * 60 * 24))} days from now
               </div>
             </div>

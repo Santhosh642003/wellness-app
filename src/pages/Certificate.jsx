@@ -55,7 +55,7 @@ export default function Certificate() {
             </div>
             <div>
               <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Progress Certificate</h1>
-              <p className="text-sm text-slate-500 dark:text-gray-400">Your NJIT Campus Wellness achievement</p>
+              <p className="text-sm text-slate-600 dark:text-gray-400">Your NJIT Campus Wellness achievement</p>
             </div>
           </div>
           <button
@@ -98,12 +98,12 @@ export default function Certificate() {
             <div className="h-20 w-20 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg mb-3">
               <Award size={36} className="text-white" />
             </div>
-            <span className="text-xs tracking-[4px] uppercase text-slate-400 dark:text-gray-500 font-semibold">Certificate of Achievement</span>
+            <span className="text-xs tracking-[4px] uppercase text-slate-600 dark:text-gray-500 font-semibold">Certificate of Achievement</span>
           </div>
 
-          <p className="text-slate-500 dark:text-gray-400 text-sm mb-2">This certifies that</p>
+          <p className="text-slate-600 dark:text-gray-400 text-sm mb-2">This certifies that</p>
           <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{profileData?.name || user?.name || "—"}</h2>
-          <p className="text-slate-500 dark:text-gray-400 text-sm mb-6">
+          <p className="text-slate-600 dark:text-gray-400 text-sm mb-6">
             {profileData?.campus || "NJIT Newark"} · {profileData?.role || "Student"}
             {profileData?.major ? ` · ${profileData.major}` : ""}
           </p>
@@ -112,7 +112,7 @@ export default function Certificate() {
             <p className="text-slate-600 dark:text-gray-300 text-sm leading-relaxed">
               has successfully completed{" "}
               <span className="font-bold text-slate-900 dark:text-white">{completedCount}</span>
-              {totalModules > 0 && <span className="text-slate-400 dark:text-gray-500"> of {totalModules}</span>}{" "}
+              {totalModules > 0 && <span className="text-slate-600 dark:text-gray-500"> of {totalModules}</span>}{" "}
               wellness modules on the NJIT Campus Wellness platform, demonstrating commitment to health education and personal well-being.
             </p>
           </div>
@@ -126,13 +126,13 @@ export default function Certificate() {
             ].map((s) => (
               <div key={s.label} className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-gray-800">
                 <div className="text-2xl font-bold text-slate-900 dark:text-white">{s.value}</div>
-                <div className="text-[11px] text-slate-400 dark:text-gray-500 mt-0.5">{s.label}</div>
+                <div className="text-[11px] text-slate-600 dark:text-gray-500 mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between text-xs text-slate-400 dark:text-gray-600">
+          <div className="flex items-center justify-between text-xs text-slate-600 dark:text-gray-600">
             <span>NJIT Campus Wellness Center</span>
             <span>{today}</span>
           </div>

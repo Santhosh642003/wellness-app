@@ -9,8 +9,8 @@ export default function Privacy() {
     <div style={{ background: "var(--bg-page)", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <main id="main-content" className="flex-1 max-w-3xl mx-auto w-full px-6 py-14">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Privacy Policy</h1>
-        <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">NJIT Campus Wellness Center Platform</p>
-        <p className="text-sm text-slate-500 dark:text-gray-400 mb-10">
+        <p className="text-sm text-slate-600 dark:text-gray-400 mb-1">NJIT Campus Wellness Center Platform</p>
+        <p className="text-sm text-slate-600 dark:text-gray-400 mb-10">
           Last updated: <span className={PLACEHOLDER_CLS}>[date]</span>
         </p>
 

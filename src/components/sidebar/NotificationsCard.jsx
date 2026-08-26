@@ -35,7 +35,7 @@ export default function NotificationsCard() {
       </div>
 
       {items.length === 0 ? (
-        <p className="text-xs text-slate-400 dark:text-gray-500 text-center py-3">No notifications</p>
+        <p className="text-xs text-slate-600 dark:text-gray-500 text-center py-3">No notifications</p>
       ) : (
         <div className="space-y-2">
           {items.map((n) => (
@@ -59,16 +59,16 @@ export default function NotificationsCard() {
               <div className="px-3 py-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-semibold text-slate-800 dark:text-white leading-snug">{n.title}</p>
-                  <span className="text-slate-300 dark:text-gray-600 text-[10px] shrink-0 mt-0.5">
+                  <span className="text-slate-600 dark:text-gray-600 text-[10px] shrink-0 mt-0.5">
                     {expanded === n.id ? '▲' : '▼'}
                   </span>
                 </div>
                 {n.body && expanded === n.id && (
-                  <p className="text-xs text-slate-500 dark:text-gray-400 mt-1.5 leading-relaxed whitespace-pre-line">
+                  <p className="text-xs text-slate-600 dark:text-gray-400 mt-1.5 leading-relaxed whitespace-pre-line">
                     {n.body}
                   </p>
                 )}
-                <p className="text-[10px] text-slate-300 dark:text-gray-600 mt-1.5">
+                <p className="text-[10px] text-slate-600 dark:text-gray-600 mt-1.5">
                   {new Date(n.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </p>
               </div>

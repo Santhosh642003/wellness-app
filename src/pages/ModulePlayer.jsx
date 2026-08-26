@@ -376,7 +376,7 @@ export default function ModulePlayer() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
-        <div className="text-slate-400 animate-pulse">Loading module…</div>
+        <div className="text-slate-600 animate-pulse">Loading module…</div>
       </div>
     );
   }
@@ -396,7 +396,7 @@ export default function ModulePlayer() {
       <main id="main-content" className="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
         <button
           onClick={() => navigate("/modules")}
-          className="flex items-center gap-2 text-sm text-slate-500 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300 mb-6 transition"
+          className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300 mb-6 transition"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -410,7 +410,7 @@ export default function ModulePlayer() {
             <span className="text-xs px-3 py-1 rounded-full border bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 font-medium">
               {content.category}
             </span>
-            <span className="text-xs text-slate-400 dark:text-gray-500">{content.duration}</span>
+            <span className="text-xs text-slate-600 dark:text-gray-500">{content.duration}</span>
             {alreadyCompleted && (
               <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,7 +421,7 @@ export default function ModulePlayer() {
             )}
           </div>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">{mod.title}</h1>
-          <p className="text-slate-500 dark:text-gray-400 mt-2">{mod.description}</p>
+          <p className="text-slate-600 dark:text-gray-400 mt-2">{mod.description}</p>
         </div>
 
         {/* Steps indicator */}
@@ -435,12 +435,12 @@ export default function ModulePlayer() {
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors
                 ${step.done
                   ? "bg-emerald-500 border-emerald-500 text-white"
-                  : "border-slate-300 dark:border-gray-700 text-slate-400 dark:text-gray-600"}`}>
+                  : "border-slate-300 dark:border-gray-700 text-slate-600 dark:text-gray-600"}`}>
                 {step.done
                   ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                   : step.n}
               </div>
-              <span className={`text-sm ${step.done ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-slate-400 dark:text-gray-600"}`}>
+              <span className={`text-sm ${step.done ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-slate-600 dark:text-gray-600"}`}>
                 {step.label}
               </span>
               {i < arr.length - 1 && <div className="w-8 h-px bg-slate-200 dark:bg-gray-800 ml-2" aria-hidden="true" />}
@@ -474,7 +474,7 @@ export default function ModulePlayer() {
                         className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all shrink-0
                           ${active
                             ? "border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-[#121212]"
-                            : "border-transparent text-slate-500 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"
+                            : "border-transparent text-slate-600 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"
                           }`}
                       >
                         <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
@@ -482,7 +482,7 @@ export default function ModulePlayer() {
                           {done ? "✓" : i + 1}
                         </div>
                         <span className="max-w-[140px] truncate">{v.title || `Chapter ${i + 1}`}</span>
-                        {v.duration && <span className="text-[10px] text-slate-400 dark:text-gray-600">{v.duration}</span>}
+                        {v.duration && <span className="text-[10px] text-slate-600 dark:text-gray-600">{v.duration}</span>}
                         {pct > 0 && !done && (
                           <span className="text-[10px] text-orange-500 dark:text-orange-400">{pct}%</span>
                         )}
@@ -495,7 +495,7 @@ export default function ModulePlayer() {
               {/* Currently playing video label */}
               {content.videos.length > 1 && (
                 <div className="px-5 py-2.5 bg-slate-50 dark:bg-[#0f0f0f] border-b border-slate-100 dark:border-gray-800/60 flex items-center gap-2">
-                  <span className="text-xs text-slate-400 dark:text-gray-600">Now playing:</span>
+                  <span className="text-xs text-slate-600 dark:text-gray-600">Now playing:</span>
                   <span className="text-xs font-semibold text-slate-700 dark:text-gray-300">{currentVideoTitle}</span>
                 </div>
               )}
@@ -524,14 +524,14 @@ export default function ModulePlayer() {
                 {/* Watch progress */}
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-400 dark:text-gray-500 whitespace-nowrap">Progress saved</span>
+                    <span className="text-[10px] text-slate-600 dark:text-gray-500 whitespace-nowrap">Progress saved</span>
                     <div className="w-24 h-1.5 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all"
                         style={{ width: `${Math.min(100, watchedPercent)}%` }}
                       />
                     </div>
-                    <span className="text-xs text-slate-500 dark:text-gray-400 font-mono whitespace-nowrap">
+                    <span className="text-xs text-slate-600 dark:text-gray-400 font-mono whitespace-nowrap">
                       {Math.round(watchedPercent)}%
                     </span>
                   </div>
@@ -547,7 +547,7 @@ export default function ModulePlayer() {
                 </div>
 
                 {lastSaved && (
-                  <span className="text-[10px] text-slate-400 dark:text-gray-500 whitespace-nowrap shrink-0">
+                  <span className="text-[10px] text-slate-600 dark:text-gray-500 whitespace-nowrap shrink-0">
                     ✓ Saved {lastSaved.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                   </span>
                 )}
@@ -562,11 +562,11 @@ export default function ModulePlayer() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-blue-400" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
                   </span>
-                  <span className="text-xs font-medium text-slate-400 dark:text-gray-500 uppercase tracking-wider">Live Captions</span>
+                  <span className="text-xs font-medium text-slate-600 dark:text-gray-500 uppercase tracking-wider">Live Captions</span>
                 </div>
                 {activeCaption
                   ? <p className="text-slate-900 dark:text-white text-base leading-relaxed font-medium">{activeCaption.text}</p>
-                  : <p className="text-slate-400 dark:text-gray-600 text-sm italic">Play the video to see captions…</p>
+                  : <p className="text-slate-600 dark:text-gray-600 text-sm italic">Play the video to see captions…</p>
                 }
               </div>
             )}
@@ -574,7 +574,7 @@ export default function ModulePlayer() {
             {/* ── Key Points ─────────────────────────────────────────────── */}
             {content.keyPoints?.length > 0 && (
               <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-                <h2 className="text-sm font-semibold text-slate-500 dark:text-gray-300 uppercase tracking-wider mb-4">Key Takeaways</h2>
+                <h2 className="text-sm font-semibold text-slate-600 dark:text-gray-300 uppercase tracking-wider mb-4">Key Takeaways</h2>
                 <ul className="space-y-3">
                   {content.keyPoints.map((point, i) => (
                     <li key={i} className="flex items-start gap-3 text-sm text-slate-700 dark:text-gray-300">
@@ -589,7 +589,7 @@ export default function ModulePlayer() {
             {/* ── Documents ──────────────────────────────────────────────── */}
             {content.documents.length > 0 && (
               <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
-                <h2 className="text-sm font-semibold text-slate-500 dark:text-gray-300 uppercase tracking-wider mb-4">Module Resources</h2>
+                <h2 className="text-sm font-semibold text-slate-600 dark:text-gray-300 uppercase tracking-wider mb-4">Module Resources</h2>
                 <div className="space-y-2">
                   {content.documents.map((doc) => (
                     <a
@@ -604,12 +604,12 @@ export default function ModulePlayer() {
                         <div className="text-sm font-semibold text-slate-800 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition truncate">
                           {doc.title}
                         </div>
-                        <div className="text-xs text-slate-400 dark:text-gray-600 flex items-center gap-2">
+                        <div className="text-xs text-slate-600 dark:text-gray-600 flex items-center gap-2">
                           {doc.fileType && <span className="uppercase">{doc.fileType}</span>}
                           {doc.size && <><span>·</span><span>{doc.size}</span></>}
                         </div>
                       </div>
-                      <svg className="w-4 h-4 text-slate-400 dark:text-gray-600 group-hover:text-blue-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-slate-600 dark:text-gray-600 group-hover:text-blue-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                     </a>
@@ -631,8 +631,8 @@ export default function ModulePlayer() {
                     const isActive = idx === activeCaptionIdx && captionsOn;
                     return (
                       <div key={idx} className={`flex gap-3 p-2 rounded-xl transition-colors ${isActive ? "bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20" : ""}`}>
-                        <span className="text-slate-400 dark:text-gray-600 font-mono text-xs mt-0.5 shrink-0 w-12">[{mins}:{secs}]</span>
-                        <span className={isActive ? "text-slate-900 dark:text-white font-medium" : "text-slate-500 dark:text-gray-400"}>{line.text}</span>
+                        <span className="text-slate-600 dark:text-gray-600 font-mono text-xs mt-0.5 shrink-0 w-12">[{mins}:{secs}]</span>
+                        <span className={isActive ? "text-slate-900 dark:text-white font-medium" : "text-slate-600 dark:text-gray-400"}>{line.text}</span>
                       </div>
                     );
                   })}
@@ -654,7 +654,7 @@ export default function ModulePlayer() {
                     <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
                       ✓ Module Completed
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-gray-500">
+                    <div className="text-xs text-slate-600 dark:text-gray-500">
                       You've already passed the quiz and earned your points.
                     </div>
                   </div>
@@ -675,7 +675,7 @@ export default function ModulePlayer() {
                     <div className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1">
                       Quiz Unlocked
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-gray-500">
+                    <div className="text-xs text-slate-600 dark:text-gray-500">
                       Pass the quiz (≥70%) to complete this module and earn <strong className="text-yellow-700 dark:text-yellow-300">+{content.points} pts</strong>.
                     </div>
                   </div>
@@ -687,7 +687,7 @@ export default function ModulePlayer() {
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-gray-500">
+                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-gray-500">
                   <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
@@ -703,7 +703,7 @@ export default function ModulePlayer() {
             {/* ── Discussion ─────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl p-6">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Discussion</h2>
-              <p className="text-sm text-slate-500 dark:text-gray-400 mb-5">Share your thoughts about this module</p>
+              <p className="text-sm text-slate-600 dark:text-gray-400 mb-5">Share your thoughts about this module</p>
 
               {/* Comment input */}
               <div className="flex gap-3 mb-5">
@@ -719,7 +719,7 @@ export default function ModulePlayer() {
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postComment(); } }}
                     placeholder="Add a comment…"
                     maxLength={1000}
-                    className="flex-1 rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-slate-400 dark:placeholder:text-gray-600"
+                    className="flex-1 rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-slate-600 dark:placeholder:text-gray-600"
                   />
                   <button
                     onClick={postComment}
@@ -733,9 +733,9 @@ export default function ModulePlayer() {
 
               {/* Comments list */}
               {commentLoading ? (
-                <div className="py-6 text-center text-slate-400 dark:text-gray-600 text-sm animate-pulse">Loading discussion…</div>
+                <div className="py-6 text-center text-slate-600 dark:text-gray-600 text-sm animate-pulse">Loading discussion…</div>
               ) : discussionComments.length === 0 ? (
-                <div className="py-6 text-center text-slate-400 dark:text-gray-600 text-sm">No comments yet. Be the first to start a discussion!</div>
+                <div className="py-6 text-center text-slate-600 dark:text-gray-600 text-sm">No comments yet. Be the first to start a discussion!</div>
               ) : (
                 <div className="space-y-4">
                   {discussionComments.map((c) => (
@@ -747,14 +747,14 @@ export default function ModulePlayer() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-slate-900 dark:text-white">{c.userName || "User"}</span>
-                            <span className="text-[10px] text-slate-400 dark:text-gray-600">
+                            <span className="text-[10px] text-slate-600 dark:text-gray-600">
                               {new Date(c.createdAt).toLocaleDateString()}
                             </span>
                           </div>
                           {c.isOwn && (
                             <button
                               onClick={() => deleteComment(c.id)}
-                              className="text-[10px] text-slate-400 dark:text-gray-600 hover:text-red-500 transition shrink-0"
+                              className="text-[10px] text-slate-600 dark:text-gray-600 hover:text-red-500 transition shrink-0"
                             >
                               Delete
                             </button>
@@ -778,7 +778,7 @@ export default function ModulePlayer() {
               <div className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Your Progress</div>
               <div className="mt-3 flex items-baseline justify-between">
                 <div className="text-2xl font-semibold text-slate-900 dark:text-white">{completedCount}/{allModules.length}</div>
-                <div className="text-xs text-slate-400 dark:text-gray-500">Modules completed</div>
+                <div className="text-xs text-slate-600 dark:text-gray-500">Modules completed</div>
               </div>
               <div className="mt-3 h-2 rounded-full bg-slate-100 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all" style={{ width: `${Math.round((completedCount / Math.max(allModules.length, 1)) * 100)}%` }} />
@@ -798,7 +798,7 @@ export default function ModulePlayer() {
                       <div className="flex items-center justify-between text-xs">
                         <button
                           onClick={() => switchVideo(i)}
-                          className={`truncate max-w-[130px] text-left font-medium transition ${i === currentVideoIdx ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300"}`}
+                          className={`truncate max-w-[130px] text-left font-medium transition ${i === currentVideoIdx ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300"}`}
                         >
                           {content.videos.length > 1 ? `${i + 1}. ${v.title || `Chapter ${i + 1}`}` : "Video watched"}
                         </button>
@@ -813,13 +813,13 @@ export default function ModulePlayer() {
                   );
                 })}
                 <div className="pt-1 border-t border-slate-100 dark:border-gray-800/60 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-gray-500">Quiz</span>
-                  <span className={`font-semibold ${quizPassed ? "text-emerald-600 dark:text-emerald-400" : quizUnlocked ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-gray-600"}`}>
+                  <span className="text-slate-600 dark:text-gray-500">Quiz</span>
+                  <span className={`font-semibold ${quizPassed ? "text-emerald-600 dark:text-emerald-400" : quizUnlocked ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-gray-600"}`}>
                     {quizPassed ? "Passed ✓" : quizUnlocked ? "Unlocked" : "Locked"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500 dark:text-gray-500">Points reward</span>
+                  <span className="text-slate-600 dark:text-gray-500">Points reward</span>
                   <span className="font-bold text-yellow-700 dark:text-yellow-300">+{content.points}</span>
                 </div>
               </div>
@@ -831,9 +831,9 @@ export default function ModulePlayer() {
                 <div className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Up Next</div>
                 <div className="bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 rounded-xl p-4">
                   <div className="text-xs font-medium text-slate-700 dark:text-gray-400 mb-1">{nextModule.title}</div>
-                  <div className="text-[11px] text-slate-400 dark:text-gray-600 mb-3">{nextModule.description}</div>
+                  <div className="text-[11px] text-slate-600 dark:text-gray-600 mb-3">{nextModule.description}</div>
                   {nextModule.locked
-                    ? <div className="text-xs text-slate-400 dark:text-gray-600 flex items-center gap-1">🔒 Complete this module first</div>
+                    ? <div className="text-xs text-slate-600 dark:text-gray-600 flex items-center gap-1">🔒 Complete this module first</div>
                     : <button onClick={() => navigate(`/modules/${nextModule.id}`)} className="w-full px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:opacity-90">
                         Start →
                       </button>

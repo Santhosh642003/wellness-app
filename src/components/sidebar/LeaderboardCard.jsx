@@ -44,7 +44,7 @@ export default function LeaderboardCard() {
           ))}
         </div>
       ) : entries.length === 0 ? (
-        <p className="text-xs text-slate-400 dark:text-gray-500 text-center py-4">No data yet — be the first!</p>
+        <p className="text-xs text-slate-600 dark:text-gray-500 text-center py-4">No data yet — be the first!</p>
       ) : (
         <div className="space-y-1">
           {entries.map((entry) => {
@@ -60,7 +60,7 @@ export default function LeaderboardCard() {
                 ].join(" ")}
               >
                 {/* Rank */}
-                <span className={`w-6 text-center text-xs font-bold shrink-0 ${isMe ? "text-blue-600 dark:text-blue-300" : "text-slate-400 dark:text-gray-500"}`}>
+                <span className={`w-6 text-center text-xs font-bold shrink-0 ${isMe ? "text-blue-600 dark:text-blue-300" : "text-slate-600 dark:text-gray-500"}`}>
                   {MEDAL[entry.rank] || `#${entry.rank}`}
                 </span>
 
@@ -79,7 +79,7 @@ export default function LeaderboardCard() {
                 </div>
 
                 {/* Points */}
-                <span className={`text-xs font-semibold shrink-0 ${isMe ? "text-blue-600 dark:text-blue-300" : "text-slate-500 dark:text-gray-400"}`}>
+                <span className={`text-xs font-semibold shrink-0 ${isMe ? "text-blue-600 dark:text-blue-300" : "text-slate-600 dark:text-gray-400"}`}>
                   {entry.points.toLocaleString()} pts
                 </span>
               </div>
@@ -91,7 +91,7 @@ export default function LeaderboardCard() {
             <>
               <div className="flex items-center gap-1 py-1 px-3">
                 <div className="flex-1 border-t border-dashed border-slate-200 dark:border-gray-700" />
-                <span className="text-[10px] text-slate-300 dark:text-gray-600 px-1">···</span>
+                <span className="text-[10px] text-slate-600 dark:text-gray-600 px-1">···</span>
                 <div className="flex-1 border-t border-dashed border-slate-200 dark:border-gray-700" />
               </div>
               <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/25 text-sm">

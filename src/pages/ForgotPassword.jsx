@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { auth as authApi } from "../lib/api.js";
 
-const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-3 text-slate-900 dark:text-gray-100 placeholder:text-slate-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
+const INPUT_CLS = "w-full rounded-xl bg-slate-50 dark:bg-[#0f0f0f] border border-slate-200 dark:border-gray-800 px-4 py-3 text-slate-900 dark:text-gray-100 placeholder:text-slate-600 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -42,7 +42,7 @@ export default function ForgotPassword() {
               </svg>
             </div>
             <h1 className="text-2xl font-semibold mb-3 text-slate-900 dark:text-white">Check your inbox</h1>
-            <p className="text-slate-500 dark:text-gray-400 text-sm mb-6">
+            <p className="text-slate-600 dark:text-gray-400 text-sm mb-6">
               If an account exists for <span className="text-slate-800 dark:text-gray-200 font-medium">{email.trim().toLowerCase()}</span>, you'll receive a password reset link shortly. The link expires in 1 hour.
             </p>
             {devUrl && (
@@ -58,7 +58,7 @@ export default function ForgotPassword() {
         ) : (
           <>
             <h1 className="text-3xl font-semibold mb-3 text-slate-900 dark:text-white">Forgot password?</h1>
-            <p className="text-slate-500 dark:text-gray-400 text-sm mb-8">
+            <p className="text-slate-600 dark:text-gray-400 text-sm mb-8">
               Enter your NJIT email and we'll send you a link to reset your password.
             </p>
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -84,7 +84,7 @@ export default function ForgotPassword() {
                 {loading ? "Sending…" : "Send Reset Link"}
               </button>
             </form>
-            <p className="text-sm text-slate-400 dark:text-gray-500 mt-6 text-center">
+            <p className="text-sm text-slate-600 dark:text-gray-500 mt-6 text-center">
               Remember it?{" "}
               <Link to="/login" className="text-emerald-500 hover:underline font-medium">Back to Sign In</Link>
             </p>

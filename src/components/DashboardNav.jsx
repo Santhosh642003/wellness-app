@@ -67,7 +67,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
           <img src="/njit_logo.png" alt="NJIT" className="h-10 w-auto" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           <div className="hidden sm:block leading-tight text-left">
             <div className="text-sm font-semibold text-slate-900 dark:text-white">Campus Wellness Center</div>
-            <div className="text-xs text-slate-500 dark:text-gray-400">NJIT</div>
+            <div className="text-xs text-slate-600 dark:text-gray-400">NJIT</div>
           </div>
         </button>
 
@@ -84,11 +84,11 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2">
             <div className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 text-sm">
-              <span className="text-slate-500 dark:text-gray-400">Points:</span>{" "}
+              <span className="text-slate-600 dark:text-gray-400">Points:</span>{" "}
               <span className="font-semibold text-slate-900 dark:text-white">{points}</span>
             </div>
             <div className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 text-sm">
-              <span className="text-slate-500 dark:text-gray-400">Streak:</span>{" "}
+              <span className="text-slate-600 dark:text-gray-400">Streak:</span>{" "}
               <span className="font-semibold text-slate-900 dark:text-white">{streakDays}d</span>
             </div>
           </div>
@@ -100,7 +100,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
               aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
               aria-expanded={showBell}
               aria-haspopup="true"
-              className="relative h-10 w-10 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
+              className="relative h-10 w-10 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
             >
               <Bell size={16} aria-hidden="true" />
               {unread > 0 && (
@@ -115,19 +115,19 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
               <div className="absolute right-2 sm:right-4 top-full mt-1 w-[min(20rem,calc(100vw-1rem))] bg-white dark:bg-[#141414] border border-slate-200 dark:border-gray-800 rounded-2xl shadow-xl z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-gray-800">
                   <span className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</span>
-                  <button onClick={() => setShowBell(false)} aria-label="Close notifications" className="text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 transition">
+                  <button onClick={() => setShowBell(false)} aria-label="Close notifications" className="text-slate-600 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-300 transition">
                     <X size={14} aria-hidden="true" />
                   </button>
                 </div>
                 <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-gray-800">
                   {notifs.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 dark:text-gray-500 text-sm">No notifications yet</div>
+                    <div className="py-8 text-center text-slate-600 dark:text-gray-500 text-sm">No notifications yet</div>
                   ) : (
                     notifs.map((n) => (
                       <div key={n.id} className="px-4 py-3">
                         <div className="text-sm font-semibold text-slate-900 dark:text-white">{n.title}</div>
-                        {n.body && <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5 leading-relaxed">{n.body}</div>}
-                        <div className="text-[10px] text-slate-400 dark:text-gray-600 mt-1">
+                        {n.body && <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5 leading-relaxed">{n.body}</div>}
+                        <div className="text-[10px] text-slate-600 dark:text-gray-600 mt-1">
                           {new Date(n.createdAt).toLocaleDateString()}
                         </div>
                       </div>
@@ -142,7 +142,7 @@ export default function DashboardNav({ points = 0, streakDays = 0, initials = "?
           <button
             onClick={toggle}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
+            className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-gray-800 flex items-center justify-center text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition"
           >
             {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
           </button>

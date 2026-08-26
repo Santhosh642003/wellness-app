@@ -52,7 +52,7 @@ export default function Leaderboard() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Leaderboard</h1>
-            <p className="text-sm text-slate-500 dark:text-gray-400">Top students by wellness points</p>
+            <p className="text-sm text-slate-600 dark:text-gray-400">Top students by wellness points</p>
           </div>
         </div>
 
@@ -66,7 +66,7 @@ export default function Leaderboard() {
               className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all
                 ${period === p.key
                   ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-600 dark:text-yellow-300"
-                  : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-500 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"
+                  : "bg-white dark:bg-[#121212] border-slate-200 dark:border-gray-800 text-slate-600 dark:text-gray-400 hover:border-slate-300 dark:hover:border-gray-700"
                 }`}
             >
               {p.label}
@@ -111,7 +111,7 @@ export default function Leaderboard() {
                     ${isMe ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white"}`}>
                     {isMe ? "You" : (e?.name?.split(" ")[0] || "—")}
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">{e?.points ?? 0} pts</div>
+                  <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5">{e?.points ?? 0} pts</div>
                 </div>
               );
             })}
@@ -121,9 +121,9 @@ export default function Leaderboard() {
         {/* Full ranked list */}
         <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden">
           {loading ? (
-            <div className="py-16 text-center text-slate-400 dark:text-gray-500 animate-pulse">Loading…</div>
+            <div className="py-16 text-center text-slate-600 dark:text-gray-500 animate-pulse">Loading…</div>
           ) : entries.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 dark:text-gray-500">
+            <div className="py-16 text-center text-slate-600 dark:text-gray-500">
               <div className="text-3xl mb-3">🏆</div>
               <p>No activity for this period yet.</p>
               <p className="text-sm mt-1">Complete modules and quizzes to appear here!</p>
@@ -140,7 +140,7 @@ export default function Leaderboard() {
                   >
                     {/* Rank */}
                     <div className={`w-8 text-center text-sm font-bold shrink-0
-                      ${e.rank <= 3 ? "text-yellow-500" : "text-slate-400 dark:text-gray-500"}`}>
+                      ${e.rank <= 3 ? "text-yellow-500" : "text-slate-600 dark:text-gray-500"}`}>
                       {e.rank <= 3 ? MEDAL[e.rank - 1] : `#${e.rank}`}
                     </div>
 
@@ -161,12 +161,12 @@ export default function Leaderboard() {
                         ${isMe ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white"}`}>
                         {isMe ? "You" : e.name}
                       </div>
-                      <div className="text-xs text-slate-400 dark:text-gray-500 truncate">{e.role || "Student"}</div>
+                      <div className="text-xs text-slate-600 dark:text-gray-500 truncate">{e.role || "Student"}</div>
                     </div>
 
                     {/* Points */}
                     <div className="text-sm font-semibold text-slate-900 dark:text-white shrink-0">
-                      {e.points.toLocaleString()} <span className="text-xs text-slate-400 dark:text-gray-500 font-normal">pts</span>
+                      {e.points.toLocaleString()} <span className="text-xs text-slate-600 dark:text-gray-500 font-normal">pts</span>
                     </div>
                   </li>
                 );
